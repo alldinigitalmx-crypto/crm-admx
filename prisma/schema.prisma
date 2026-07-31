@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- CLIENTES ----------
+model Cliente {
+  id              Int             @id @default(autoincrement())
+  etiqueta        Etiqueta?
+  nombre          String
+  pais            String?
+  telefono        String?
+  email           String?
+  notas           String?
+  medioCaptacion  MedioCaptacion?
+  codigoReferido  String?         @unique
+  creadoEn        DateTime        @default(now())
+  servicios       Servicio[]
+  ventasReferidas Venta[]
+}
+
+// ---------- SERVICIOS (desarrollo a la medida) ----------
+model Intermediario {
+  id        Int        @id @default(autoincrement())
+  nombre    String
+  telefono  String?
+  email     String?
+  notas     String?
+  creadoEn  DateTime   @default(now())
+  servicios Servicio[]
+}
+
+model Servicio {
+  id                      Int            @id @default(autoincrement())
+  fechaInicio             DateTime
+  fechaFin                DateTime?
+  clienteId               Int
+  cliente                 Cliente        @relation(fields: [clienteId], references: [id])
+  descripcion             String
+  detalles                String?
+  montoInicial            Decimal        @db.Decimal(12, 2)
+  intermediarioId         Int?
+  intermediario           Intermediario? @relation(fields: [intermediarioId], references: [id])
+  porcentajeIntermediario Decimal?       @db.Decimal(5, 2)
+  status                  StatusServicio @default(Cotizado)
+  creadoEn                DateTime       @default(now())
+  ordenesCambio           OrdenCambio[]
+  pagos                   Pago[]
+}
+
+model OrdenCambio {
+  id          Int      @id @default(autoincrement())
+  servicioId  Int
+  servicio    Servicio @relation(fields: [servicioId], references: [id])
+  descripcion String
+  monto       Decimal  @db.Decimal(12, 2)
+  creadoEn    DateTime @default(now())
+}
+
+model Pago {
+  id          Int         @id @default(autoincrement())
+  servicioId  Int
+  servicio    Servicio    @relation(fields: [servicioId], references: [id])
+  fecha       DateTime    @default(now())
+  metodoPago  MetodoPago
+  monto       Decimal     @db.Decimal(12, 2)
+  comision    Decimal?    @db.Decimal(12, 2)
+  comprobante String?
+  cuenta      String?
+}
+
+// ---------- VENTAS (productos ya hechos al público) ----------
+model Producto {
+  id          Int               @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  categoria   CategoriaProducto @default(Plantilla)
+  precio      Decimal           @db.Decimal(12, 2)
+  activo      Boolean           @default(true)
+  creadoEn    DateTime          @default(now())
+  detalles    DetalleVenta[]
+}
+
+model Venta {
+  id               Int            @id @default(autoincrement())
+  fecha            DateTime       @default(now())
+  canal            CanalVenta     @default(Web)
+  nombreComprador  String?
+  emailComprador   String?
+  metodoPago       MetodoPago?
+  total            Decimal        @db.Decimal(12, 2)
+  referidoPorId    Int?
+  referidoPor      Cliente?       @relation(fields: [referidoPorId], references: [id])
+  comisionReferido Decimal?       @db.Decimal(12, 2)
+  detalles         DetalleVenta[]
+}
+
+model DetalleVenta {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int
+  venta          Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId     Int
+  producto       Producto @relation(fields: [productoId], references: [id])
+  cantidad       Int      @default(1)
+  precioUnitario Decimal  @db.Decimal(12, 2)
+  subtotal       Decimal  @db.Decimal(12, 2)
+}
+
+// ---------- CATÁLOGOS ----------
+enum Etiqueta {
+  VIP
+  Premium
+  Platinum
+}
+
+enum MedioCaptacion {
+  FacebookAds
+  Grupo
+  Intermediario
+  Otro
+}
+
+enum StatusServicio {
+  Cotizado
+  Aprobado
+  EnProceso
+  Entregado
+  Cancelado
+}
+
+enum MetodoPago {
+  Efectivo
+  Transferencia
+  MercadoPago
+  PayPal
+  Tarjeta
+}
+
+enum CategoriaProducto {
+  Plantilla
+  Sistema
+  Otro
+}
+
+enum CanalVenta {
+  Web
+  Referido
+  GrupoWhatsApp
+  Directo
+}
+
+model Usuario {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  passwordHash String
+  nombre       String
+  rol          RolUsuario @default(Interno)
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now())
+}
+
+enum RolUsuario {
+  Admin
+  Interno
+}
