@@ -233,7 +233,9 @@ export default async function ClienteDetallePage({
                 {cotizaciones.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">
-                      {c.servicioDescripcion}
+                      <Link href={`/admin/cotizaciones/${c.id}`} className="hover:underline">
+                        {c.servicioDescripcion}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{c.status}</Badge>

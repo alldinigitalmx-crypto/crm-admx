@@ -32,10 +32,10 @@ const navPrincipal = [
   { title: "Panel", href: "/admin", icon: LayoutDashboard },
   { title: "Clientes", href: "/admin/clientes", icon: Users },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase },
+  { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText },
 ];
 
 const navProximamente = [
-  { title: "Cotizaciones", icon: FileText },
   { title: "Pagos", icon: CreditCard },
   { title: "Productos y Ventas", icon: ShoppingBag },
   { title: "Quejas / Help Desk", icon: LifeBuoy },

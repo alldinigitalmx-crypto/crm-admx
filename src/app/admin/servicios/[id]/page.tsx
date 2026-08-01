@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio, comisionIntermediario } from "@/lib/servicio";
@@ -18,12 +18,24 @@ import {
 } from "@/components/ui/table";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { OrdenCambioFormDialog } from "@/components/servicios/orden-cambio-form-dialog";
+import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import {
   aprobarOrdenCambio,
   createOrdenCambio,
   rechazarOrdenCambio,
   updateServicio,
 } from "@/app/admin/servicios/actions";
+import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
+
+const COTIZACION_STATUS_VARIANT: Record<
+  string,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  Enviada: "outline",
+  Firmada: "default",
+  Pagada: "secondary",
+  Vencida: "destructive",
+};
 
 const STATUS_VARIANT: Record<
   string,
@@ -90,6 +102,7 @@ export default async function ServicioDetallePage({
 
   const boundUpdateServicio = updateServicio.bind(null, servicio.id);
   const boundCreateOrdenCambio = createOrdenCambio.bind(null, servicio.id);
+  const boundCrearCotizacion = crearCotizacion.bind(null, servicio.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -224,10 +237,23 @@ export default async function ServicioDetallePage({
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium">
             Cotizaciones ({servicio.cotizaciones.length})
           </CardTitle>
+          <CotizacionFormDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                <Plus />
+                Nueva cotización
+              </Button>
+            }
+            title="Nueva cotización"
+            description={servicio.descripcion}
+            action={boundCrearCotizacion}
+            montoSubtotal={montoTotal}
+            submitLabel="Crear cotización"
+          />
         </CardHeader>
         <CardContent>
           {servicio.cotizaciones.length === 0 ? (
@@ -242,17 +268,28 @@ export default async function ServicioDetallePage({
                   <TableHead>Emisión</TableHead>
                   <TableHead>Vencimiento</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {servicio.cotizaciones.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell>
-                      <Badge variant="outline">{c.status}</Badge>
+                      <Badge variant={COTIZACION_STATUS_VARIANT[c.status] ?? "outline"}>
+                        {c.status}
+                      </Badge>
                     </TableCell>
                     <TableCell>{formatDate(c.fechaEmision)}</TableCell>
                     <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/admin/cotizaciones/${c.id}`}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        Ver
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

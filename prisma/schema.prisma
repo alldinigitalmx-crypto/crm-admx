@@ -79,19 +79,21 @@ model OrdenCambio {
 }
 
 model Pago {
-  id              Int        @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   servicioId      Int
-  servicio        Servicio   @relation(fields: [servicioId], references: [id])
-  fecha           DateTime   @default(now())
+  servicio        Servicio    @relation(fields: [servicioId], references: [id])
+  cotizacionId    Int?
+  cotizacion      Cotizacion? @relation(fields: [cotizacionId], references: [id])
+  fecha           DateTime    @default(now())
   metodoPago      MetodoPago
-  monto           Decimal    @db.Decimal(12, 2)
+  monto           Decimal     @db.Decimal(12, 2)
   moneda          Moneda?
-  comision        Decimal?   @db.Decimal(12, 2)
+  comision        Decimal?    @db.Decimal(12, 2)
   comprobante     String?
   cuenta          String?
-  confirmado      Boolean    @default(true)
+  confirmado      Boolean     @default(true)
   confirmadoPorId Int?
-  confirmadoPor   Usuario?   @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  confirmadoPor   Usuario?    @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
   confirmadoEn    DateTime?
 }
 
@@ -122,6 +124,7 @@ model Cotizacion {
   editadoPor       Usuario?         @relation("CotizacionEditadoPor", fields: [editadoPorId], references: [id])
   creadoEn         DateTime         @default(now())
   actualizadoEn    DateTime         @updatedAt
+  pagos            Pago[]
 }
 
 // ---------- ARCHIVOS ADJUNTOS (Fase 1) ----------

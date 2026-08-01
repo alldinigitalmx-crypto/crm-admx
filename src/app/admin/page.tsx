@@ -206,7 +206,7 @@ export default async function AdminDashboardPage() {
             {cotizacionesPendientes.map((c) => (
               <li key={c.id} className="flex items-center justify-between text-sm">
                 <Link
-                  href={`/admin/servicios/${c.servicio.id}`}
+                  href={`/admin/cotizaciones/${c.id}`}
                   className="truncate hover:underline"
                 >
                   {c.servicio.cliente.nombre} — {c.servicio.descripcion}
@@ -227,7 +227,11 @@ export default async function AdminDashboardPage() {
             {pagosPorConfirmar.map((p) => (
               <li key={p.id} className="flex items-center justify-between text-sm">
                 <Link
-                  href={`/admin/servicios/${p.servicio.id}`}
+                  href={
+                    p.cotizacionId
+                      ? `/admin/cotizaciones/${p.cotizacionId}`
+                      : `/admin/servicios/${p.servicio.id}`
+                  }
                   className="truncate hover:underline"
                 >
                   {p.servicio.cliente.nombre} — {p.servicio.descripcion}
