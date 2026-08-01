@@ -8,6 +8,9 @@ export function ThemedLogo({ className }: { className?: string }) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  // Mount-detection guard so the theme-dependent logo only renders after
+  // hydration, avoiding a server/client mismatch.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const src =

@@ -21,7 +21,7 @@ export default async function LoginPage({
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
-        redirectTo: "/clientes",
+        redirectTo: "/admin",
       });
     } catch (err) {
       if (err instanceof AuthError) {

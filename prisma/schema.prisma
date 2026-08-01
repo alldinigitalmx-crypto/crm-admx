@@ -9,18 +9,23 @@ datasource db {
 
 // ---------- CLIENTES ----------
 model Cliente {
-  id              Int             @id @default(autoincrement())
-  etiqueta        Etiqueta?
-  nombre          String
-  pais            String?
-  telefono        String?
-  email           String?
-  notas           String?
-  medioCaptacion  MedioCaptacion?
-  codigoReferido  String?         @unique
-  creadoEn        DateTime        @default(now())
-  servicios       Servicio[]
-  ventasReferidas Venta[]
+  id                 Int             @id @default(autoincrement())
+  etiqueta           Etiqueta?
+  nombre             String
+  pais               String?
+  telefono           String?
+  email              String?
+  notas              String?
+  medioCaptacion     MedioCaptacion?
+  codigoReferido     String?         @unique
+  creadoEn           DateTime        @default(now())
+  // Portal del cliente (Fase 1) — credenciales propias, separadas del panel admin
+  passwordHash       String?
+  portalActivo       Boolean         @default(false)
+  ultimoAccesoPortal DateTime?
+  servicios          Servicio[]
+  ventasReferidas    Venta[]
+  quejas             Queja[]
 }
 
 // ---------- SERVICIOS (desarrollo a la medida) ----------
@@ -43,60 +48,187 @@ model Servicio {
   descripcion             String
   detalles                String?
   montoInicial            Decimal        @db.Decimal(12, 2)
+  moneda                  Moneda?
   intermediarioId         Int?
   intermediario           Intermediario? @relation(fields: [intermediarioId], references: [id])
   porcentajeIntermediario Decimal?       @db.Decimal(5, 2)
   status                  StatusServicio @default(Cotizado)
   creadoEn                DateTime       @default(now())
+  actualizadoEn           DateTime       @updatedAt
+  creadoPorId             Int?
+  creadoPor               Usuario?       @relation("ServicioCreadoPor", fields: [creadoPorId], references: [id])
+  editadoPorId            Int?
+  editadoPor              Usuario?       @relation("ServicioEditadoPor", fields: [editadoPorId], references: [id])
   ordenesCambio           OrdenCambio[]
   pagos                   Pago[]
+  cotizaciones            Cotizacion[]
+  quejas                  Queja[]
 }
 
 model OrdenCambio {
-  id          Int      @id @default(autoincrement())
-  servicioId  Int
-  servicio    Servicio @relation(fields: [servicioId], references: [id])
-  descripcion String
-  monto       Decimal  @db.Decimal(12, 2)
-  creadoEn    DateTime @default(now())
+  id            Int               @id @default(autoincrement())
+  servicioId    Int
+  servicio      Servicio          @relation(fields: [servicioId], references: [id])
+  descripcion   String
+  monto         Decimal           @db.Decimal(12, 2)
+  status        StatusOrdenCambio @default(Pendiente)
+  aprobadoPorId Int?
+  aprobadoPor   Usuario?          @relation("OrdenCambioAprobadoPor", fields: [aprobadoPorId], references: [id])
+  aprobadoEn    DateTime?
+  creadoEn      DateTime          @default(now())
 }
 
 model Pago {
-  id          Int         @id @default(autoincrement())
-  servicioId  Int
-  servicio    Servicio    @relation(fields: [servicioId], references: [id])
-  fecha       DateTime    @default(now())
-  metodoPago  MetodoPago
-  monto       Decimal     @db.Decimal(12, 2)
-  comision    Decimal?    @db.Decimal(12, 2)
-  comprobante String?
-  cuenta      String?
+  id              Int        @id @default(autoincrement())
+  servicioId      Int
+  servicio        Servicio   @relation(fields: [servicioId], references: [id])
+  fecha           DateTime   @default(now())
+  metodoPago      MetodoPago
+  monto           Decimal    @db.Decimal(12, 2)
+  moneda          Moneda?
+  comision        Decimal?   @db.Decimal(12, 2)
+  comprobante     String?
+  cuenta          String?
+  confirmado      Boolean    @default(true)
+  confirmadoPorId Int?
+  confirmadoPor   Usuario?   @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  confirmadoEn    DateTime?
+}
+
+// ---------- COTIZACIONES (Fase 1) ----------
+model Cotizacion {
+  id               Int              @id @default(autoincrement())
+  servicioId       Int
+  servicio         Servicio         @relation(fields: [servicioId], references: [id])
+  token            String           @unique
+  status           StatusCotizacion @default(Enviada)
+  montoSubtotal    Decimal          @db.Decimal(12, 2)
+  descuentoTipo    TipoDescuento?
+  descuentoValor   Decimal?         @db.Decimal(12, 2)
+  descuentoMotivo  String?
+  montoTotal       Decimal          @db.Decimal(12, 2)
+  moneda           Moneda?
+  metodoPago       MetodoPago?
+  fechaEmision     DateTime         @default(now())
+  fechaVencimiento DateTime?
+  fechaFirma       DateTime?
+  firmanteNombre   String?
+  firmanteIp       String?
+  fechaPago        DateTime?
+  pagoConfirmado   Boolean          @default(false)
+  creadoPorId      Int?
+  creadoPor        Usuario?         @relation("CotizacionCreadoPor", fields: [creadoPorId], references: [id])
+  editadoPorId     Int?
+  editadoPor       Usuario?         @relation("CotizacionEditadoPor", fields: [editadoPorId], references: [id])
+  creadoEn         DateTime         @default(now())
+  actualizadoEn    DateTime         @updatedAt
+}
+
+// ---------- ARCHIVOS ADJUNTOS (Fase 1) ----------
+// Polimórfico (entidadTipo + entidadId, sin FK) para no requerir una columna
+// nueva por cada entidad que necesite adjuntos.
+model Archivo {
+  id           Int            @id @default(autoincrement())
+  entidadTipo  EntidadArchivo
+  entidadId    Int
+  nombre       String
+  url          String
+  tipo         TipoArchivo
+  tamanioBytes Int?
+  subidoPorId  Int?
+  subidoPor    Usuario?       @relation("ArchivoSubidoPor", fields: [subidoPorId], references: [id])
+  creadoEn     DateTime       @default(now())
+}
+
+// ---------- EVENTOS DEL SISTEMA (RNF-11, base desacoplada para n8n) ----------
+model EventoSistema {
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  entidadTipo String
+  entidadId   Int
+  payload     Json
+  procesado   Boolean  @default(false)
+  creadoEn    DateTime @default(now())
+}
+
+// ---------- HELP DESK / QUEJAS (Fase 1) ----------
+model Queja {
+  id              Int            @id @default(autoincrement())
+  clienteId       Int
+  cliente         Cliente        @relation(fields: [clienteId], references: [id])
+  servicioId      Int?
+  servicio        Servicio?      @relation(fields: [servicioId], references: [id])
+  categoria       CategoriaQueja
+  descripcion     String
+  status          StatusQueja    @default(Nueva)
+  respuesta       String?
+  respondidoPorId Int?
+  respondidoPor   Usuario?       @relation("QuejaRespondidoPor", fields: [respondidoPorId], references: [id])
+  respondidoEn    DateTime?
+  creadoEn        DateTime       @default(now())
+  actualizadoEn   DateTime       @updatedAt
+}
+
+// ---------- TICKETS DE ACCESO (Fase 1) ----------
+model TicketAcceso {
+  id                   Int                @id @default(autoincrement())
+  usuarioSolicitanteId Int
+  usuarioSolicitante   Usuario            @relation("TicketSolicitante", fields: [usuarioSolicitanteId], references: [id])
+  moduloSolicitado     ModuloSistema
+  motivo               String
+  status               StatusTicketAcceso @default(Pendiente)
+  fechaSolicitud       DateTime           @default(now())
+  resueltoPorId        Int?
+  resueltoPor          Usuario?           @relation("TicketResueltoPor", fields: [resueltoPorId], references: [id])
+  fechaResolucion      DateTime?
+}
+
+model ModuloPermiso {
+  id        Int           @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario       @relation(fields: [usuarioId], references: [id])
+  modulo    ModuloSistema
+  nivel     NivelPermiso
+
+  @@unique([usuarioId, modulo])
 }
 
 // ---------- VENTAS (productos ya hechos al público) ----------
 model Producto {
-  id          Int               @id @default(autoincrement())
-  nombre      String
-  descripcion String?
-  categoria   CategoriaProducto @default(Plantilla)
-  precio      Decimal           @db.Decimal(12, 2)
-  activo      Boolean           @default(true)
-  creadoEn    DateTime          @default(now())
-  detalles    DetalleVenta[]
+  id                 Int               @id @default(autoincrement())
+  nombre             String
+  descripcion        String?
+  categoria          CategoriaProducto @default(Plantilla)
+  precio             Decimal           @db.Decimal(12, 2)
+  requiereCotizacion Boolean           @default(false)
+  costoReferencia    Decimal?          @db.Decimal(12, 2)
+  activo             Boolean           @default(true)
+  creadoEn           DateTime          @default(now())
+  detalles           DetalleVenta[]
 }
 
 model Venta {
-  id               Int            @id @default(autoincrement())
-  fecha            DateTime       @default(now())
-  canal            CanalVenta     @default(Web)
+  id               Int                   @id @default(autoincrement())
+  fecha            DateTime              @default(now())
+  canal            CanalVenta            @default(Web)
   nombreComprador  String?
   emailComprador   String?
   metodoPago       MetodoPago?
-  total            Decimal        @db.Decimal(12, 2)
+  total            Decimal               @db.Decimal(12, 2)
   referidoPorId    Int?
-  referidoPor      Cliente?       @relation(fields: [referidoPorId], references: [id])
-  comisionReferido Decimal?       @db.Decimal(12, 2)
+  referidoPor      Cliente?              @relation(fields: [referidoPorId], references: [id])
+  comisionReferido Decimal?              @db.Decimal(12, 2)
+  tipoEntrega      TipoEntrega           @default(Inmediata)
+  status           String?
+  etapaActualId    Int?
+  etapaActual      EtapaVenta?           @relation(fields: [etapaActualId], references: [id])
+  creadoPorId      Int?
+  creadoPor        Usuario?              @relation("VentaCreadoPor", fields: [creadoPorId], references: [id])
+  editadoPorId     Int?
+  editadoPor       Usuario?              @relation("VentaEditadoPor", fields: [editadoPorId], references: [id])
+  actualizadoEn    DateTime              @updatedAt
   detalles         DetalleVenta[]
+  etapaHistorial   VentaEtapaHistorial[]
 }
 
 model DetalleVenta {
@@ -108,6 +240,27 @@ model DetalleVenta {
   cantidad       Int      @default(1)
   precioUnitario Decimal  @db.Decimal(12, 2)
   subtotal       Decimal  @db.Decimal(12, 2)
+}
+
+// Catálogo configurable de etapas para ventas de entrega a largo plazo (RF-76)
+model EtapaVenta {
+  id        Int                   @id @default(autoincrement())
+  nombre    String
+  orden     Int
+  ventas    Venta[]
+  historial VentaEtapaHistorial[]
+}
+
+model VentaEtapaHistorial {
+  id              Int        @id @default(autoincrement())
+  ventaId         Int
+  venta           Venta      @relation(fields: [ventaId], references: [id])
+  etapaId         Int
+  etapa           EtapaVenta @relation(fields: [etapaId], references: [id])
+  fecha           DateTime   @default(now())
+  comentario      String?
+  registradoPorId Int?
+  registradoPor   Usuario?   @relation("VentaEtapaRegistradoPor", fields: [registradoPorId], references: [id])
 }
 
 // ---------- CATÁLOGOS ----------
@@ -132,12 +285,91 @@ enum StatusServicio {
   Cancelado
 }
 
+enum StatusOrdenCambio {
+  Pendiente
+  Aprobada
+  Rechazada
+}
+
 enum MetodoPago {
   Efectivo
   Transferencia
   MercadoPago
   PayPal
   Tarjeta
+}
+
+enum StatusCotizacion {
+  Enviada
+  Firmada
+  Pagada
+  Vencida
+}
+
+enum TipoDescuento {
+  Monto
+  Porcentaje
+}
+
+enum EntidadArchivo {
+  Servicio
+  Cotizacion
+  Queja
+}
+
+enum TipoArchivo {
+  Imagen
+  Video
+  Documento
+  Otro
+}
+
+enum CategoriaQueja {
+  Falla
+  Cobro
+  Atencion
+  Otro
+}
+
+enum StatusQueja {
+  Nueva
+  EnRevision
+  Resuelta
+  Cerrada
+}
+
+enum ModuloSistema {
+  Clientes
+  Servicios
+  Cotizaciones
+  Pagos
+  Productos
+  Ventas
+  Quejas
+  Usuarios
+  Portal
+}
+
+enum StatusTicketAcceso {
+  Pendiente
+  Aprobado
+  Rechazado
+}
+
+enum NivelPermiso {
+  Ver
+  Crear
+  Editar
+}
+
+enum TipoEntrega {
+  Inmediata
+  LargoPlazo
+}
+
+enum Moneda {
+  MXN
+  COP
 }
 
 enum CategoriaProducto {
@@ -161,6 +393,21 @@ model Usuario {
   rol          RolUsuario @default(Interno)
   activo       Boolean    @default(true)
   creadoEn     DateTime   @default(now())
+
+  serviciosCreados       Servicio[]            @relation("ServicioCreadoPor")
+  serviciosEditados      Servicio[]            @relation("ServicioEditadoPor")
+  ordenesCambioAprobadas OrdenCambio[]         @relation("OrdenCambioAprobadoPor")
+  pagosConfirmados       Pago[]                @relation("PagoConfirmadoPor")
+  cotizacionesCreadas    Cotizacion[]          @relation("CotizacionCreadoPor")
+  cotizacionesEditadas   Cotizacion[]          @relation("CotizacionEditadoPor")
+  archivosSubidos        Archivo[]             @relation("ArchivoSubidoPor")
+  quejasRespondidas      Queja[]               @relation("QuejaRespondidoPor")
+  ticketsSolicitados     TicketAcceso[]        @relation("TicketSolicitante")
+  ticketsResueltos       TicketAcceso[]        @relation("TicketResueltoPor")
+  moduloPermisos         ModuloPermiso[]
+  ventasCreadas          Venta[]               @relation("VentaCreadoPor")
+  ventasEditadas         Venta[]               @relation("VentaEditadoPor")
+  ventaEtapaHistorial    VentaEtapaHistorial[] @relation("VentaEtapaRegistradoPor")
 }
 
 enum RolUsuario {
