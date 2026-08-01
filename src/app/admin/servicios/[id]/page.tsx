@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio, comisionIntermediario } from "@/lib/servicio";
@@ -19,13 +19,20 @@ import {
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { OrdenCambioFormDialog } from "@/components/servicios/orden-cambio-form-dialog";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
+import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
+import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
+import { TareaLista } from "@/components/tareas/tarea-lista";
+import { EvidenciaForm } from "@/components/servicios/evidencia-form";
 import {
   aprobarOrdenCambio,
   createOrdenCambio,
+  eliminarEvidencia,
   rechazarOrdenCambio,
+  subirEvidencia,
   updateServicio,
 } from "@/app/admin/servicios/actions";
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
+import { crearTarea } from "@/app/admin/tareas/actions";
 
 const COTIZACION_STATUS_VARIANT: Record<
   string,
@@ -85,15 +92,20 @@ export default async function ServicioDetallePage({
           ordenesCambio: { orderBy: { creadoEn: "desc" } },
           pagos: { orderBy: { fecha: "desc" } },
           cotizaciones: { orderBy: { fechaEmision: "desc" } },
+          tareas: { orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }] },
         },
       })
     : null;
 
   if (!servicio) notFound();
 
-  const [clientes, intermediarios] = await Promise.all([
+  const [clientes, intermediarios, evidencias] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.intermediario.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.archivo.findMany({
+      where: { entidadTipo: "Servicio", entidadId: servicio.id },
+      orderBy: { creadoEn: "desc" },
+    }),
   ]);
 
   const montoTotal = montoTotalServicio(servicio);
@@ -102,7 +114,22 @@ export default async function ServicioDetallePage({
 
   const boundUpdateServicio = updateServicio.bind(null, servicio.id);
   const boundCreateOrdenCambio = createOrdenCambio.bind(null, servicio.id);
-  const boundCrearCotizacion = crearCotizacion.bind(null, servicio.id);
+  const boundSubirEvidencia = subirEvidencia.bind(null, servicio.id);
+
+  const servicioComoOpcion = [
+    {
+      id: servicio.id,
+      descripcion: servicio.descripcion,
+      clienteNombre: servicio.cliente.nombre,
+      montoTotal,
+      ordenesCambio: servicio.ordenesCambio.map((o) => ({
+        id: o.id,
+        descripcion: o.descripcion,
+        monto: Number(o.monto),
+        status: o.status,
+      })),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,21 +148,24 @@ export default async function ServicioDetallePage({
             </Link>
           </p>
         </div>
-        <ServicioFormDialog
-          trigger={
-            <Button variant="outline">
-              <Pencil />
-              Editar
-            </Button>
-          }
-          title="Editar servicio"
-          description={servicio.descripcion}
-          action={boundUpdateServicio}
-          clientes={clientes}
-          intermediarios={intermediarios}
-          defaultValues={servicio}
-          submitLabel="Guardar cambios"
-        />
+        <div className="flex flex-wrap gap-2">
+          <CopyLinkButton path={`/servicio/${servicio.tokenPublico}`} />
+          <ServicioFormDialog
+            trigger={
+              <Button variant="outline">
+                <Pencil />
+                Editar
+              </Button>
+            }
+            title="Editar servicio"
+            description={servicio.descripcion}
+            action={boundUpdateServicio}
+            clientes={clientes}
+            intermediarios={intermediarios}
+            defaultValues={servicio}
+            submitLabel="Guardar cambios"
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -239,6 +269,21 @@ export default async function ServicioDetallePage({
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium">
+            Tareas ({servicio.tareas.length})
+          </CardTitle>
+          <TareaFormDialog
+            action={crearTarea}
+            vinculoFijo={{ value: `servicio:${servicio.id}`, label: servicio.descripcion }}
+          />
+        </CardHeader>
+        <CardContent>
+          <TareaLista tareas={servicio.tareas} emptyText="Este servicio no tiene tareas." />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium">
             Cotizaciones ({servicio.cotizaciones.length})
           </CardTitle>
           <CotizacionFormDialog
@@ -250,8 +295,8 @@ export default async function ServicioDetallePage({
             }
             title="Nueva cotización"
             description={servicio.descripcion}
-            action={boundCrearCotizacion}
-            montoSubtotal={montoTotal}
+            action={crearCotizacion}
+            servicios={servicioComoOpcion}
             submitLabel="Crear cotización"
           />
         </CardHeader>
@@ -332,6 +377,55 @@ export default async function ServicioDetallePage({
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">
+            Evidencia ({evidencias.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <EvidenciaForm action={boundSubirEvidencia} />
+
+          {evidencias.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aún no has subido evidencia de este proyecto.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {evidencias.map((ev) => (
+                <div key={ev.id} className="flex flex-col gap-2 rounded-lg border border-input p-2">
+                  {ev.tipo === "Imagen" ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- evidencia guardada como dataURL
+                    <img
+                      src={ev.url}
+                      alt={ev.nombre}
+                      className="h-32 w-full rounded-md object-cover"
+                    />
+                  ) : (
+                    <a
+                      href={ev.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-32 items-center justify-center rounded-md bg-muted text-sm text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Ver grabación
+                    </a>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-xs text-muted-foreground">{ev.nombre}</p>
+                    <form action={eliminarEvidencia.bind(null, ev.id, servicio.id)}>
+                      <Button type="submit" size="icon" variant="ghost" className="size-6 shrink-0">
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

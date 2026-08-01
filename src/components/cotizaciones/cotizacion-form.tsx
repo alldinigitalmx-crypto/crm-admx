@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,11 +17,28 @@ import { formatCurrency } from "@/lib/format";
 import type { CotizacionFormState } from "@/app/admin/cotizaciones/actions";
 
 type CotizacionDefaults = {
+  clienteId?: number;
+  servicioId?: number | null;
+  descripcion?: string | null;
+  detalles?: string | null;
+  montoSubtotal?: number | string | { toString(): string } | null;
   descuentoTipo: string | null;
   descuentoValor: number | string | { toString(): string } | null;
   descuentoMotivo: string | null;
   fechaVencimiento: Date | null;
 };
+
+type OrdenOption = { id: number; descripcion: string; monto: number; status: string };
+
+export type ServicioOption = {
+  id: number;
+  descripcion: string;
+  clienteNombre: string;
+  montoTotal: number;
+  ordenesCambio: OrdenOption[];
+};
+
+export type ClienteOption = { id: number; nombre: string };
 
 function toDateInputValue(d: Date | null | undefined) {
   if (!d) return "";
@@ -29,6 +47,8 @@ function toDateInputValue(d: Date | null | undefined) {
 
 export function CotizacionForm({
   action,
+  servicios,
+  clientes,
   montoSubtotal,
   defaultValues,
   submitLabel,
@@ -38,12 +58,37 @@ export function CotizacionForm({
     prevState: CotizacionFormState,
     formData: FormData
   ) => Promise<CotizacionFormState>;
-  montoSubtotal: number;
+  servicios?: ServicioOption[];
+  clientes?: ClienteOption[];
+  montoSubtotal?: number;
   defaultValues?: CotizacionDefaults;
   submitLabel: string;
   onCancel?: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(action, undefined);
+
+  const editandoSinServicio = Boolean(defaultValues) && !defaultValues?.servicioId;
+  const puedeElegirModo = Boolean(servicios?.length) && Boolean(clientes?.length) && !defaultValues;
+  const [modo, setModo] = useState<"servicio" | "negociacion">(
+    editandoSinServicio ? "negociacion" : "servicio"
+  );
+  const usaServicio = Boolean(servicios && (modo === "servicio" || !puedeElegirModo) && !editandoSinServicio);
+
+  const [servicioId, setServicioId] = useState<string>(
+    servicios?.[0] ? String(servicios[0].id) : ""
+  );
+  const [ordenCambioId, setOrdenCambioId] = useState<string>("none");
+  const [clienteId, setClienteId] = useState<string>(
+    defaultValues?.clienteId ? String(defaultValues.clienteId) : (clientes?.[0] ? String(clientes[0].id) : "")
+  );
+
+  const servicioSeleccionado = servicios?.find((s) => String(s.id) === servicioId);
+  const ordenSeleccionada = servicioSeleccionado?.ordenesCambio.find(
+    (o) => String(o.id) === ordenCambioId
+  );
+  const subtotalPreview = usaServicio
+    ? (ordenSeleccionada ? ordenSeleccionada.monto : (servicioSeleccionado?.montoTotal ?? 0))
+    : (montoSubtotal ?? 0);
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -53,12 +98,138 @@ export function CotizacionForm({
         </p>
       )}
 
-      <p className="text-sm text-muted-foreground">
-        Subtotal actual del servicio:{" "}
-        <span className="font-medium text-foreground">
-          {formatCurrency(montoSubtotal)}
-        </span>
-      </p>
+      {puedeElegirModo && (
+        <div className="flex gap-2 rounded-lg border border-input bg-muted/40 p-1 text-sm">
+          <button
+            type="button"
+            onClick={() => setModo("servicio")}
+            className={`flex-1 rounded-md px-3 py-1.5 transition-colors ${modo === "servicio" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+          >
+            Para un servicio existente
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo("negociacion")}
+            className={`flex-1 rounded-md px-3 py-1.5 transition-colors ${modo === "negociacion" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+          >
+            Nueva negociación (sin servicio)
+          </button>
+        </div>
+      )}
+
+      {usaServicio && servicios && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="servicioId">Servicio *</Label>
+            <Select
+              name="servicioId"
+              required
+              value={servicioId}
+              onValueChange={(v) => {
+                setServicioId(v);
+                setOrdenCambioId("none");
+              }}
+            >
+              <SelectTrigger id="servicioId" className="w-full">
+                <SelectValue placeholder="Selecciona un servicio" />
+              </SelectTrigger>
+              <SelectContent>
+                {servicios.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.descripcion} — {s.clienteNombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ordenCambioId">Vincular a</Label>
+            <Select name="ordenCambioId" value={ordenCambioId} onValueChange={setOrdenCambioId}>
+              <SelectTrigger id="ordenCambioId" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Servicio completo</SelectItem>
+                {servicioSeleccionado?.ordenesCambio
+                  .filter((o) => o.status !== "Rechazada")
+                  .map((o) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      Orden de cambio: {o.descripcion} ({formatCurrency(o.monto)})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {!usaServicio && (clientes || editandoSinServicio) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {clientes && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="clienteId">Cliente *</Label>
+              <Select name="clienteId" required value={clienteId} onValueChange={setClienteId}>
+                <SelectTrigger id="clienteId" className="w-full">
+                  <SelectValue placeholder="Selecciona un cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="montoSubtotal">Monto *</Label>
+            <Input
+              id="montoSubtotal"
+              name="montoSubtotal"
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+              defaultValue={
+                defaultValues?.montoSubtotal ? String(defaultValues.montoSubtotal) : ""
+              }
+              placeholder="0.00"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <Label htmlFor="descripcion">Descripción *</Label>
+            <Input
+              id="descripcion"
+              name="descripcion"
+              required
+              defaultValue={defaultValues?.descripcion ?? ""}
+              placeholder="Ej. Sistema de reservas para..."
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <Label htmlFor="detalles">Detalles</Label>
+            <Textarea
+              id="detalles"
+              name="detalles"
+              rows={3}
+              defaultValue={defaultValues?.detalles ?? ""}
+              placeholder="Alcance, entregables, notas de la negociación..."
+            />
+          </div>
+        </div>
+      )}
+
+      {usaServicio && (
+        <p className="text-sm text-muted-foreground">
+          Subtotal {ordenSeleccionada ? "de la orden de cambio" : "actual del servicio"}:{" "}
+          <span className="font-medium text-foreground">{formatCurrency(subtotalPreview)}</span>
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">

@@ -114,6 +114,8 @@ export type CotizacionPdfProps = {
   cotizacion: {
     id: number;
     status: string;
+    descripcion: string | null;
+    detalles: string | null;
     montoSubtotal: number;
     descuentoTipo: string | null;
     descuentoValor: number | null;
@@ -128,7 +130,7 @@ export type CotizacionPdfProps = {
     status: string;
     fechaInicio: Date;
     fechaFin: Date | null;
-  };
+  } | null;
   cliente: { nombre: string; email: string | null };
 };
 
@@ -137,6 +139,8 @@ export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: Cotizac
     cotizacion.descuentoTipo === "Porcentaje"
       ? cotizacion.montoSubtotal * ((cotizacion.descuentoValor ?? 0) / 100)
       : (cotizacion.descuentoValor ?? 0);
+  const descripcion = servicio?.descripcion ?? cotizacion.descripcion ?? "";
+  const detalles = servicio?.detalles ?? cotizacion.detalles;
 
   return (
     <Document>
@@ -181,17 +185,19 @@ export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: Cotizac
             <Text style={styles.sectionHeader}>Proyecto</Text>
             <Text style={styles.sectionLine}>
               <Text style={styles.sectionLineLabel}>Nombre: </Text>
-              {servicio.descripcion}
+              {descripcion}
             </Text>
             <Text style={styles.sectionLine}>
               <Text style={styles.sectionLineLabel}>Status: </Text>
-              {servicio.status}
+              {servicio ? servicio.status : "En negociación"}
             </Text>
-            <Text style={styles.sectionLine}>
-              <Text style={styles.sectionLineLabel}>Inicio: </Text>
-              {fechaCorta(servicio.fechaInicio)}
-              {servicio.fechaFin ? ` — Entrega: ${fechaCorta(servicio.fechaFin)}` : ""}
-            </Text>
+            {servicio && (
+              <Text style={styles.sectionLine}>
+                <Text style={styles.sectionLineLabel}>Inicio: </Text>
+                {fechaCorta(servicio.fechaInicio)}
+                {servicio.fechaFin ? ` — Entrega: ${fechaCorta(servicio.fechaFin)}` : ""}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -206,9 +212,7 @@ export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: Cotizac
 
         <View style={styles.tableRow}>
           <Text style={[styles.colNum, styles.cellText]}>1</Text>
-          <Text style={[styles.colDesc, styles.cellText]}>
-            {servicio.detalles || servicio.descripcion}
-          </Text>
+          <Text style={[styles.colDesc, styles.cellText]}>{detalles || descripcion}</Text>
           <Text style={[styles.colQty, styles.cellText]}>1</Text>
           <Text style={[styles.colUnit, styles.cellText]}>Servicio</Text>
           <Text style={[styles.colPrice, styles.cellText]}>

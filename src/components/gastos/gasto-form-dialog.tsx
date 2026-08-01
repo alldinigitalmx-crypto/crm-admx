@@ -10,33 +10,25 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  CotizacionForm,
-  type ServicioOption,
-  type ClienteOption,
-} from "@/components/cotizaciones/cotizacion-form";
-import type { CotizacionFormState } from "@/app/admin/cotizaciones/actions";
+import { GastoForm } from "@/components/gastos/gasto-form";
+import type { GastoFormState } from "@/app/admin/gastos/actions";
 
-type CotizacionDefaults = {
-  clienteId?: number;
-  servicioId?: number | null;
-  descripcion?: string | null;
-  detalles?: string | null;
-  montoSubtotal?: number | string | { toString(): string } | null;
-  descuentoTipo: string | null;
-  descuentoValor: number | string | { toString(): string } | null;
-  descuentoMotivo: string | null;
-  fechaVencimiento: Date | null;
+type GastoDefaults = {
+  descripcion: string;
+  categoria: string;
+  ambito: string;
+  monto: number | string | { toString(): string };
+  metodoPago: string | null;
+  fecha: Date;
+  comprobante: string | null;
+  notas: string | null;
 };
 
-export function CotizacionFormDialog({
+export function GastoFormDialog({
   trigger,
   title,
   description,
   action,
-  servicios,
-  clientes,
-  montoSubtotal,
   defaultValues,
   submitLabel,
 }: {
@@ -44,13 +36,10 @@ export function CotizacionFormDialog({
   title: string;
   description?: string;
   action: (
-    prevState: CotizacionFormState,
+    prevState: GastoFormState,
     formData: FormData
-  ) => Promise<CotizacionFormState>;
-  servicios?: ServicioOption[];
-  clientes?: ClienteOption[];
-  montoSubtotal?: number;
-  defaultValues?: CotizacionDefaults;
+  ) => Promise<GastoFormState>;
+  defaultValues?: GastoDefaults;
   submitLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -63,13 +52,11 @@ export function CotizacionFormDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <CotizacionForm
+        <GastoForm
           action={action}
-          servicios={servicios}
-          clientes={clientes}
-          montoSubtotal={montoSubtotal}
           defaultValues={defaultValues}
           submitLabel={submitLabel}
+          onSuccess={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />
       </DialogContent>

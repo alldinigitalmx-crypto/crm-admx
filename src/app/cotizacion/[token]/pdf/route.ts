@@ -13,7 +13,7 @@ export async function GET(
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
-    include: { servicio: { include: { cliente: true } } },
+    include: { servicio: true, cliente: true },
   });
 
   if (!cotizacion) {
@@ -25,6 +25,8 @@ export async function GET(
       cotizacion: {
         id: cotizacion.id,
         status: cotizacion.status,
+        descripcion: cotizacion.descripcion,
+        detalles: cotizacion.detalles,
         montoSubtotal: Number(cotizacion.montoSubtotal),
         descuentoTipo: cotizacion.descuentoTipo,
         descuentoValor: cotizacion.descuentoValor ? Number(cotizacion.descuentoValor) : null,
@@ -33,16 +35,18 @@ export async function GET(
         fechaEmision: cotizacion.fechaEmision,
         fechaVencimiento: cotizacion.fechaVencimiento,
       },
-      servicio: {
-        descripcion: cotizacion.servicio.descripcion,
-        detalles: cotizacion.servicio.detalles,
-        status: cotizacion.servicio.status,
-        fechaInicio: cotizacion.servicio.fechaInicio,
-        fechaFin: cotizacion.servicio.fechaFin,
-      },
+      servicio: cotizacion.servicio
+        ? {
+            descripcion: cotizacion.servicio.descripcion,
+            detalles: cotizacion.servicio.detalles,
+            status: cotizacion.servicio.status,
+            fechaInicio: cotizacion.servicio.fechaInicio,
+            fechaFin: cotizacion.servicio.fechaFin,
+          }
+        : null,
       cliente: {
-        nombre: cotizacion.servicio.cliente.nombre,
-        email: cotizacion.servicio.cliente.email,
+        nombre: cotizacion.cliente.nombre,
+        email: cotizacion.cliente.email,
       },
     }) as ReactElement<DocumentProps>
   );

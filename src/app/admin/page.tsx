@@ -8,6 +8,7 @@ import {
   Landmark,
   LifeBuoy,
   KeyRound,
+  ListTodo,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
@@ -98,6 +99,11 @@ export default async function AdminDashboardPage() {
     quejasNuevas,
     ticketsPendientes,
     ordenesCambioPendientes,
+    tareasPendientes,
+    enNegociacion,
+    ganadasPorFormalizar,
+    convertidasAServicio,
+    perdidas,
   ] = await Promise.all([
     prisma.cliente.count(),
     prisma.servicio.count({ where: { status: { in: ["Aprobado", "EnProceso"] } } }),
@@ -111,7 +117,7 @@ export default async function AdminDashboardPage() {
       where: { status: "Enviada" },
       orderBy: { fechaVencimiento: "asc" },
       take: 10,
-      include: { servicio: { include: { cliente: true } } },
+      include: { cliente: true, servicio: true },
     }),
     prisma.pago.findMany({
       where: { metodoPago: "Transferencia", confirmado: false },
@@ -136,6 +142,32 @@ export default async function AdminDashboardPage() {
       orderBy: { creadoEn: "asc" },
       take: 10,
       include: { servicio: { include: { cliente: true } } },
+    }),
+    prisma.tarea.findMany({
+      where: { completada: false },
+      orderBy: [{ fechaLimite: "asc" }, { creadoEn: "asc" }],
+      take: 10,
+      include: { servicio: true, cotizacion: { include: { cliente: true } } },
+    }),
+    prisma.cotizacion.aggregate({
+      _count: true,
+      _sum: { montoTotal: true },
+      where: { status: "Enviada", servicioId: null },
+    }),
+    prisma.cotizacion.aggregate({
+      _count: true,
+      _sum: { montoTotal: true },
+      where: { status: "Firmada", servicioId: null },
+    }),
+    prisma.cotizacion.aggregate({
+      _count: true,
+      _sum: { montoTotal: true },
+      where: { servicioId: { not: null } },
+    }),
+    prisma.cotizacion.aggregate({
+      _count: true,
+      _sum: { montoTotal: true },
+      where: { status: "Perdida" },
     }),
   ]);
 
@@ -191,6 +223,57 @@ export default async function AdminDashboardPage() {
       </Card>
 
       <div>
+        <h2 className="text-lg font-semibold">Embudo de venta</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          De la negociación al servicio confirmado
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/admin/cotizaciones?status=Enviada">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="py-2">
+                <p className="text-xs text-muted-foreground">En negociación</p>
+                <p className="text-xl font-semibold">{enNegociacion._count}</p>
+                <p className="text-xs text-muted-foreground">
+                  {currency.format(Number(enNegociacion._sum.montoTotal ?? 0))}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/cotizaciones?status=Firmada">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="py-2">
+                <p className="text-xs text-muted-foreground">Ganadas por formalizar</p>
+                <p className="text-xl font-semibold">{ganadasPorFormalizar._count}</p>
+                <p className="text-xs text-muted-foreground">
+                  {currency.format(Number(ganadasPorFormalizar._sum.montoTotal ?? 0))}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Card>
+            <CardContent className="py-2">
+              <p className="text-xs text-muted-foreground">Convertidas a servicio</p>
+              <p className="text-xl font-semibold">{convertidasAServicio._count}</p>
+              <p className="text-xs text-muted-foreground">
+                {currency.format(Number(convertidasAServicio._sum.montoTotal ?? 0))}
+              </p>
+            </CardContent>
+          </Card>
+          <Link href="/admin/cotizaciones?status=Perdida">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="py-2">
+                <p className="text-xs text-muted-foreground">Perdidas</p>
+                <p className="text-xl font-semibold">{perdidas._count}</p>
+                <p className="text-xs text-muted-foreground">
+                  {currency.format(Number(perdidas._sum.montoTotal ?? 0))}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </div>
+
+      <div>
         <h2 className="text-lg font-semibold">Mis pendientes</h2>
         <p className="mb-3 text-sm text-muted-foreground">
           Cosas que requieren tu atención
@@ -209,7 +292,7 @@ export default async function AdminDashboardPage() {
                   href={`/admin/cotizaciones/${c.id}`}
                   className="truncate hover:underline"
                 >
-                  {c.servicio.cliente.nombre} — {c.servicio.descripcion}
+                  {c.cliente.nombre} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
                 </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
@@ -280,6 +363,36 @@ export default async function AdminDashboardPage() {
           </PendienteCard>
 
           <PendienteCard
+            title="Tareas pendientes"
+            icon={ListTodo}
+            count={tareasPendientes.length}
+            emptyText="No tienes tareas pendientes."
+          >
+            {tareasPendientes.map((t) => {
+              const proyecto = t.servicio?.descripcion ?? t.cotizacion?.cliente.nombre ?? null;
+              const vencida = t.fechaLimite && t.fechaLimite < new Date();
+              const href = t.servicioId
+                ? `/admin/servicios/${t.servicioId}`
+                : t.cotizacionId
+                  ? `/admin/cotizaciones/${t.cotizacionId}`
+                  : "/admin/tareas";
+              return (
+                <li key={t.id} className="flex items-center justify-between text-sm">
+                  <Link href={href} className="truncate hover:underline">
+                    {t.titulo}
+                    {proyecto ? ` — ${proyecto}` : ""}
+                  </Link>
+                  <span
+                    className={`shrink-0 text-xs ${vencida ? "text-destructive" : "text-muted-foreground"}`}
+                  >
+                    {t.fechaLimite ? fecha.format(t.fechaLimite) : t.prioridad}
+                  </span>
+                </li>
+              );
+            })}
+          </PendienteCard>
+
+          <PendienteCard
             title="Órdenes de cambio por aprobar"
             icon={Briefcase}
             count={ordenesCambioPendientes.length}
@@ -303,15 +416,8 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        ¿Buscas Cotizaciones, Quejas u otro módulo? Por ahora solo{" "}
-        <Link href="/admin/clientes" className="underline">
-          Clientes
-        </Link>{" "}
-        y{" "}
-        <Link href="/admin/servicios" className="underline">
-          Servicios
-        </Link>{" "}
-        están disponibles — el resto llega en próximas fases.
+        ¿Buscas Quejas, Pagos u otro módulo? Por ahora Clientes, Servicios, Cotizaciones,
+        Tareas y Gastos están disponibles — el resto llega en próximas fases.
       </p>
     </div>
   );

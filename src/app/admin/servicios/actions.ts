@@ -176,3 +176,56 @@ export async function rechazarOrdenCambio(ordenId: number, servicioId: number) {
   revalidatePath(`/admin/servicios/${servicioId}`);
   revalidatePath("/admin");
 }
+
+export type EvidenciaFormState = { error?: string } | undefined;
+
+export async function subirEvidencia(
+  servicioId: number,
+  _prevState: EvidenciaFormState,
+  formData: FormData
+): Promise<EvidenciaFormState> {
+  const tipoInput = String(formData.get("tipoEvidencia") ?? "imagen");
+  const titulo = String(formData.get("titulo") ?? "").trim();
+
+  const userId = await currentUserId();
+
+  if (tipoInput === "video") {
+    const url = String(formData.get("videoUrl") ?? "").trim();
+    if (!url.startsWith("http")) {
+      return { error: "Pega una liga válida (Loom, Drive, YouTube, etc.)." };
+    }
+    await prisma.archivo.create({
+      data: {
+        entidadTipo: "Servicio",
+        entidadId: servicioId,
+        nombre: titulo || "Grabación",
+        url,
+        tipo: "Video",
+        subidoPorId: userId,
+      },
+    });
+  } else {
+    const dataUrl = String(formData.get("imagen") ?? "");
+    if (!dataUrl.startsWith("data:image")) {
+      return { error: "Selecciona una imagen." };
+    }
+    await prisma.archivo.create({
+      data: {
+        entidadTipo: "Servicio",
+        entidadId: servicioId,
+        nombre: titulo || "Evidencia",
+        url: dataUrl,
+        tipo: "Imagen",
+        subidoPorId: userId,
+      },
+    });
+  }
+
+  revalidatePath(`/admin/servicios/${servicioId}`);
+  return undefined;
+}
+
+export async function eliminarEvidencia(archivoId: number, servicioId: number) {
+  await prisma.archivo.delete({ where: { id: archivoId } });
+  revalidatePath(`/admin/servicios/${servicioId}`);
+}

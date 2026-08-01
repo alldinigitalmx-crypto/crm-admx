@@ -42,15 +42,11 @@ function parseDescuento(formData: FormData) {
 }
 
 export async function crearCotizacion(
-  servicioId: number,
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
-  const servicio = await prisma.servicio.findUnique({
-    where: { id: servicioId },
-    include: { ordenesCambio: true },
-  });
-  if (!servicio) return { error: "El servicio ya no existe." };
+  const servicioIdRaw = String(formData.get("servicioId") ?? "");
+  const servicioId = servicioIdRaw && servicioIdRaw !== "none" ? Number(servicioIdRaw) : null;
 
   const { tipo, valor, motivo } = parseDescuento(formData);
   if (tipo && (!valor || valor <= 0)) {
@@ -63,14 +59,60 @@ export async function crearCotizacion(
   const fechaVencimientoRaw = String(formData.get("fechaVencimiento") ?? "");
   const monedaRaw = String(formData.get("moneda") ?? "");
   const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
-
-  const montoSubtotal = montoTotalServicio(servicio);
-  const montoTotal = calcularMontoTotal(montoSubtotal, tipo, valor);
   const userId = await currentUserId();
+
+  let clienteId: number;
+  let ordenCambioId: number | null = null;
+  let descripcion: string | null = null;
+  let detalles: string | null = null;
+  let montoSubtotal: number;
+
+  if (servicioId) {
+    const servicio = await prisma.servicio.findUnique({
+      where: { id: servicioId },
+      include: { ordenesCambio: true },
+    });
+    if (!servicio) return { error: "El servicio ya no existe." };
+
+    const ordenCambioIdRaw = String(formData.get("ordenCambioId") ?? "");
+    ordenCambioId = ordenCambioIdRaw && ordenCambioIdRaw !== "none" ? Number(ordenCambioIdRaw) : null;
+
+    let ordenCambio = null;
+    if (ordenCambioId) {
+      ordenCambio = servicio.ordenesCambio.find((o) => o.id === ordenCambioId) ?? null;
+      if (!ordenCambio) return { error: "La orden de cambio seleccionada no pertenece a este servicio." };
+    }
+
+    clienteId = servicio.clienteId;
+    montoSubtotal = ordenCambio ? Number(ordenCambio.monto) : montoTotalServicio(servicio);
+  } else {
+    const clienteIdRaw = Number(formData.get("clienteId") ?? "");
+    if (!clienteIdRaw) return { error: "Selecciona un cliente." };
+    const cliente = await prisma.cliente.findUnique({ where: { id: clienteIdRaw } });
+    if (!cliente) return { error: "El cliente ya no existe." };
+
+    descripcion = String(formData.get("descripcion") ?? "").trim();
+    if (!descripcion) return { error: "Describe brevemente qué se está cotizando." };
+    detalles = String(formData.get("detalles") ?? "").trim() || null;
+
+    const montoSubtotalRaw = Number(formData.get("montoSubtotal") ?? "");
+    if (!montoSubtotalRaw || montoSubtotalRaw <= 0) {
+      return { error: "Indica el monto de la cotización." };
+    }
+
+    clienteId = cliente.id;
+    montoSubtotal = montoSubtotalRaw;
+  }
+
+  const montoTotal = calcularMontoTotal(montoSubtotal, tipo, valor);
 
   const cotizacion = await prisma.cotizacion.create({
     data: {
+      clienteId,
       servicioId,
+      ordenCambioId,
+      descripcion,
+      detalles,
       token: randomUUID(),
       montoSubtotal,
       descuentoTipo: tipo,
@@ -86,10 +128,11 @@ export async function crearCotizacion(
 
   await registrarEvento("cotizacion.creada", "Cotizacion", cotizacion.id, {
     servicioId,
+    ordenCambioId,
     montoTotal,
   });
 
-  revalidatePath(`/admin/servicios/${servicioId}`);
+  if (servicioId) revalidatePath(`/admin/servicios/${servicioId}`);
   revalidatePath("/admin/cotizaciones");
   revalidatePath("/admin");
   redirect(`/admin/cotizaciones/${cotizacion.id}`);
@@ -115,12 +158,27 @@ export async function actualizarCotizacion(
   }
 
   const fechaVencimientoRaw = String(formData.get("fechaVencimiento") ?? "");
-  const montoTotal = calcularMontoTotal(Number(cotizacion.montoSubtotal), tipo, valor);
   const userId = await currentUserId();
+
+  let montoSubtotal = Number(cotizacion.montoSubtotal);
+  let descripcion = cotizacion.descripcion;
+  let detalles = cotizacion.detalles;
+
+  if (!cotizacion.servicioId) {
+    descripcion = String(formData.get("descripcion") ?? "").trim() || descripcion;
+    detalles = String(formData.get("detalles") ?? "").trim() || null;
+    const montoSubtotalRaw = Number(formData.get("montoSubtotal") ?? "");
+    if (montoSubtotalRaw > 0) montoSubtotal = montoSubtotalRaw;
+  }
+
+  const montoTotal = calcularMontoTotal(montoSubtotal, tipo, valor);
 
   await prisma.cotizacion.update({
     where: { id },
     data: {
+      descripcion,
+      detalles,
+      montoSubtotal,
       descuentoTipo: tipo,
       descuentoValor: valor,
       descuentoMotivo: motivo,
@@ -142,7 +200,7 @@ export async function firmarCotizacion(
 ): Promise<PublicActionState> {
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
-    include: { servicio: true },
+    include: { servicio: true, ordenCambio: true },
   });
   if (!cotizacion) return { error: "Cotización no encontrada." };
   if (cotizacion.status !== "Enviada") {
@@ -163,7 +221,9 @@ export async function firmarCotizacion(
     headersList.get("x-real-ip") ??
     null;
 
-  const servicioSeAprueba = cotizacion.servicio.status === "Cotizado";
+  const servicioSeAprueba = cotizacion.servicio?.status === "Cotizado";
+  const ordenSeAprueba = cotizacion.ordenCambio?.status === "Pendiente";
+  const userId = await currentUserId();
 
   await prisma.$transaction([
     prisma.cotizacion.update({
@@ -184,11 +244,19 @@ export async function firmarCotizacion(
         tipo: "Imagen",
       },
     }),
-    ...(servicioSeAprueba
+    ...(servicioSeAprueba && cotizacion.servicioId
       ? [
           prisma.servicio.update({
             where: { id: cotizacion.servicioId },
             data: { status: "Aprobado" },
+          }),
+        ]
+      : []),
+    ...(ordenSeAprueba && cotizacion.ordenCambioId
+      ? [
+          prisma.ordenCambio.update({
+            where: { id: cotizacion.ordenCambioId },
+            data: { status: "Aprobada", aprobadoPorId: userId, aprobadoEn: new Date() },
           }),
         ]
       : []),
@@ -197,11 +265,12 @@ export async function firmarCotizacion(
   await registrarEvento("cotizacion.firmada", "Cotizacion", cotizacion.id, {
     firmanteNombre,
     servicioAprobado: servicioSeAprueba,
+    ordenCambioAprobada: ordenSeAprueba,
   });
 
   revalidatePath(`/cotizacion/${token}`);
   revalidatePath(`/admin/cotizaciones/${cotizacion.id}`);
-  revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
+  if (cotizacion.servicioId) revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
   revalidatePath("/admin");
   return { success: true };
 }
@@ -215,6 +284,12 @@ export async function reportarPagoTransferencia(
   if (!cotizacion) return { error: "Cotización no encontrada." };
   if (cotizacion.status === "Pagada") {
     return { error: "Esta cotización ya fue pagada." };
+  }
+  if (!cotizacion.servicioId) {
+    return {
+      error:
+        "Este proyecto todavía está en negociación. Espera a que se confirme como servicio antes de reportar el pago.",
+    };
   }
 
   const referencia = String(formData.get("referencia") ?? "").trim();
@@ -254,6 +329,113 @@ export async function reportarPagoTransferencia(
   return { success: true };
 }
 
+export async function eliminarCotizacion(id: number) {
+  const cotizacion = await prisma.cotizacion.findUnique({ where: { id } });
+  if (!cotizacion || cotizacion.status === "Pagada") return;
+
+  const servicioId = cotizacion.servicioId;
+
+  await prisma.archivo.deleteMany({ where: { entidadTipo: "Cotizacion", entidadId: id } });
+  await prisma.eventoSistema.deleteMany({ where: { entidadTipo: "Cotizacion", entidadId: id } });
+  await prisma.tarea.deleteMany({ where: { cotizacionId: id } });
+  await prisma.cotizacion.delete({ where: { id } });
+
+  revalidatePath("/admin/cotizaciones");
+  if (servicioId) revalidatePath(`/admin/servicios/${servicioId}`);
+  revalidatePath("/admin");
+  redirect("/admin/cotizaciones");
+}
+
+export async function convertirEnServicio(cotizacionId: number) {
+  const cotizacion = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } });
+  if (!cotizacion) return;
+  if (cotizacion.status !== "Firmada" || cotizacion.servicioId) return;
+
+  const userId = await currentUserId();
+
+  const servicio = await prisma.servicio.create({
+    data: {
+      clienteId: cotizacion.clienteId,
+      descripcion: cotizacion.descripcion ?? `Cotización #${cotizacion.id}`,
+      detalles: cotizacion.detalles,
+      montoInicial: cotizacion.montoTotal,
+      moneda: cotizacion.moneda,
+      fechaInicio: new Date(),
+      status: "Aprobado",
+      creadoPorId: userId,
+      editadoPorId: userId,
+    },
+  });
+
+  await prisma.cotizacion.update({
+    where: { id: cotizacionId },
+    data: { servicioId: servicio.id },
+  });
+
+  await registrarEvento("cotizacion.convertida_en_servicio", "Cotizacion", cotizacionId, {
+    servicioId: servicio.id,
+  });
+
+  revalidatePath(`/admin/cotizaciones/${cotizacionId}`);
+  revalidatePath("/admin/cotizaciones");
+  revalidatePath("/admin");
+  redirect(`/admin/servicios/${servicio.id}`);
+}
+
+export async function marcarCotizacionGanada(id: number) {
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { id },
+    include: { servicio: true, ordenCambio: true },
+  });
+  if (!cotizacion || cotizacion.status !== "Enviada") return;
+
+  const servicioSeAprueba = cotizacion.servicio?.status === "Cotizado";
+  const ordenSeAprueba = cotizacion.ordenCambio?.status === "Pendiente";
+  const userId = await currentUserId();
+
+  await prisma.$transaction([
+    prisma.cotizacion.update({
+      where: { id },
+      data: { status: "Firmada", fechaFirma: new Date() },
+    }),
+    ...(servicioSeAprueba && cotizacion.servicioId
+      ? [
+          prisma.servicio.update({
+            where: { id: cotizacion.servicioId },
+            data: { status: "Aprobado" as const },
+          }),
+        ]
+      : []),
+    ...(ordenSeAprueba && cotizacion.ordenCambioId
+      ? [
+          prisma.ordenCambio.update({
+            where: { id: cotizacion.ordenCambioId },
+            data: { status: "Aprobada" as const, aprobadoPorId: userId, aprobadoEn: new Date() },
+          }),
+        ]
+      : []),
+  ]);
+
+  await registrarEvento("cotizacion.ganada_manual", "Cotizacion", id, {});
+
+  revalidatePath(`/admin/cotizaciones/${id}`);
+  revalidatePath("/admin/cotizaciones");
+  if (cotizacion.servicioId) revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
+  revalidatePath("/admin");
+}
+
+export async function marcarCotizacionPerdida(id: number) {
+  const cotizacion = await prisma.cotizacion.findUnique({ where: { id } });
+  if (!cotizacion || cotizacion.status !== "Enviada") return;
+
+  await prisma.cotizacion.update({ where: { id }, data: { status: "Perdida" } });
+  await registrarEvento("cotizacion.perdida", "Cotizacion", id, {});
+
+  revalidatePath(`/admin/cotizaciones/${id}`);
+  revalidatePath("/admin/cotizaciones");
+  revalidatePath("/admin");
+}
+
 export async function confirmarPagoCotizacion(cotizacionId: number, pagoId: number) {
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } });
   if (!cotizacion) return;
@@ -276,7 +458,7 @@ export async function confirmarPagoCotizacion(cotizacionId: number, pagoId: numb
   });
 
   revalidatePath(`/admin/cotizaciones/${cotizacionId}`);
-  revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
+  if (cotizacion.servicioId) revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
   revalidatePath("/admin/cotizaciones");
   revalidatePath("/admin");
 }

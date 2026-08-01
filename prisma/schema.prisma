@@ -26,6 +26,7 @@ model Cliente {
   servicios          Servicio[]
   ventasReferidas    Venta[]
   quejas             Queja[]
+  cotizaciones       Cotizacion[]
 }
 
 // ---------- SERVICIOS (desarrollo a la medida) ----------
@@ -53,6 +54,7 @@ model Servicio {
   intermediario           Intermediario? @relation(fields: [intermediarioId], references: [id])
   porcentajeIntermediario Decimal?       @db.Decimal(5, 2)
   status                  StatusServicio @default(Cotizado)
+  tokenPublico            String         @unique @default(uuid())
   creadoEn                DateTime       @default(now())
   actualizadoEn           DateTime       @updatedAt
   creadoPorId             Int?
@@ -63,6 +65,7 @@ model Servicio {
   pagos                   Pago[]
   cotizaciones            Cotizacion[]
   quejas                  Queja[]
+  tareas                  Tarea[]
 }
 
 model OrdenCambio {
@@ -76,6 +79,7 @@ model OrdenCambio {
   aprobadoPor   Usuario?          @relation("OrdenCambioAprobadoPor", fields: [aprobadoPorId], references: [id])
   aprobadoEn    DateTime?
   creadoEn      DateTime          @default(now())
+  cotizaciones  Cotizacion[]
 }
 
 model Pago {
@@ -100,8 +104,14 @@ model Pago {
 // ---------- COTIZACIONES (Fase 1) ----------
 model Cotizacion {
   id               Int              @id @default(autoincrement())
-  servicioId       Int
-  servicio         Servicio         @relation(fields: [servicioId], references: [id])
+  clienteId        Int
+  cliente          Cliente          @relation(fields: [clienteId], references: [id])
+  servicioId       Int?
+  servicio         Servicio?        @relation(fields: [servicioId], references: [id])
+  ordenCambioId    Int?
+  ordenCambio      OrdenCambio?     @relation(fields: [ordenCambioId], references: [id])
+  descripcion      String?
+  detalles         String?
   token            String           @unique
   status           StatusCotizacion @default(Enviada)
   montoSubtotal    Decimal          @db.Decimal(12, 2)
@@ -125,6 +135,41 @@ model Cotizacion {
   creadoEn         DateTime         @default(now())
   actualizadoEn    DateTime         @updatedAt
   pagos            Pago[]
+  tareas           Tarea[]
+}
+
+// ---------- TAREAS ----------
+model Tarea {
+  id           Int            @id @default(autoincrement())
+  titulo       String
+  descripcion  String?
+  prioridad    PrioridadTarea @default(Media)
+  fechaLimite  DateTime?
+  completada   Boolean        @default(false)
+  completadaEn DateTime?
+  servicioId   Int?
+  servicio     Servicio?      @relation(fields: [servicioId], references: [id])
+  cotizacionId Int?
+  cotizacion   Cotizacion?    @relation(fields: [cotizacionId], references: [id])
+  creadoPorId  Int?
+  creadoPor    Usuario?       @relation("TareaCreadoPor", fields: [creadoPorId], references: [id])
+  creadoEn     DateTime       @default(now())
+}
+
+// ---------- GASTOS ----------
+model Gasto {
+  id          Int         @id @default(autoincrement())
+  descripcion String
+  categoria   String
+  ambito      AmbitoGasto @default(Empresa)
+  monto       Decimal     @db.Decimal(12, 2)
+  metodoPago  MetodoPago?
+  fecha       DateTime    @default(now())
+  comprobante String?
+  notas       String?
+  creadoPorId Int?
+  creadoPor   Usuario?    @relation("GastoCreadoPor", fields: [creadoPorId], references: [id])
+  creadoEn    DateTime    @default(now())
 }
 
 // ---------- ARCHIVOS ADJUNTOS (Fase 1) ----------
@@ -307,6 +352,18 @@ enum StatusCotizacion {
   Firmada
   Pagada
   Vencida
+  Perdida
+}
+
+enum PrioridadTarea {
+  Baja
+  Media
+  Alta
+}
+
+enum AmbitoGasto {
+  Personal
+  Empresa
 }
 
 enum TipoDescuento {
@@ -411,6 +468,8 @@ model Usuario {
   ventasCreadas          Venta[]               @relation("VentaCreadoPor")
   ventasEditadas         Venta[]               @relation("VentaEditadoPor")
   ventaEtapaHistorial    VentaEtapaHistorial[] @relation("VentaEtapaRegistradoPor")
+  tareasCreadas          Tarea[]               @relation("TareaCreadoPor")
+  gastosCreados          Gasto[]               @relation("GastoCreadoPor")
 }
 
 enum RolUsuario {

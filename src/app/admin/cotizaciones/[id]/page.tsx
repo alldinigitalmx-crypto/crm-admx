@@ -18,13 +18,25 @@ import {
 } from "@/components/ui/table";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
-import { actualizarCotizacion, confirmarPagoCotizacion } from "@/app/admin/cotizaciones/actions";
+import { DeleteCotizacionButton } from "@/components/cotizaciones/delete-cotizacion-button";
+import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
+import { TareaLista } from "@/components/tareas/tarea-lista";
+import { crearTarea } from "@/app/admin/tareas/actions";
+import {
+  actualizarCotizacion,
+  confirmarPagoCotizacion,
+  convertirEnServicio,
+  eliminarCotizacion,
+  marcarCotizacionGanada,
+  marcarCotizacionPerdida,
+} from "@/app/admin/cotizaciones/actions";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   Enviada: "outline",
   Firmada: "default",
   Pagada: "secondary",
   Vencida: "destructive",
+  Perdida: "destructive",
 };
 
 export default async function CotizacionDetallePage({
@@ -39,8 +51,11 @@ export default async function CotizacionDetallePage({
     ? await prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
         include: {
+          cliente: true,
           servicio: { include: { cliente: true, ordenesCambio: true } },
+          ordenCambio: true,
           pagos: { orderBy: { fecha: "desc" } },
+          tareas: { orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }] },
         },
       })
     : null;
@@ -59,7 +74,12 @@ export default async function CotizacionDetallePage({
       : Number(cotizacion.descuentoValor ?? 0);
 
   const boundUpdate = actualizarCotizacion.bind(null, cotizacion.id);
-  const montoSubtotalActual = montoTotalServicio(cotizacion.servicio);
+  const boundEliminar = eliminarCotizacion.bind(null, cotizacion.id);
+  const boundConvertir = convertirEnServicio.bind(null, cotizacion.id);
+  const boundGanada = marcarCotizacionGanada.bind(null, cotizacion.id);
+  const boundPerdida = marcarCotizacionPerdida.bind(null, cotizacion.id);
+  const montoSubtotalActual = cotizacion.servicio ? montoTotalServicio(cotizacion.servicio) : null;
+  const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,19 +92,34 @@ export default async function CotizacionDetallePage({
             <Badge variant={STATUS_VARIANT[cotizacion.status] ?? "outline"}>
               {cotizacion.status}
             </Badge>
+            {!cotizacion.servicioId && <Badge variant="outline">En negociación</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">
-            Servicio:{" "}
-            <Link href={`/admin/servicios/${cotizacion.servicio.id}`} className="hover:underline">
-              {cotizacion.servicio.descripcion}
-            </Link>{" "}
-            — Cliente:{" "}
-            <Link
-              href={`/admin/clientes/${cotizacion.servicio.cliente.id}`}
-              className="hover:underline"
-            >
-              {cotizacion.servicio.cliente.nombre}
+            {cotizacion.servicio ? (
+              <>
+                Servicio:{" "}
+                <Link
+                  href={`/admin/servicios/${cotizacion.servicio.id}`}
+                  className="hover:underline"
+                >
+                  {cotizacion.servicio.descripcion}
+                </Link>{" "}
+                —{" "}
+              </>
+            ) : (
+              descripcion && <>{descripcion} — </>
+            )}
+            Cliente:{" "}
+            <Link href={`/admin/clientes/${cotizacion.cliente.id}`} className="hover:underline">
+              {cotizacion.cliente.nombre}
             </Link>
+            {cotizacion.ordenCambio && (
+              <>
+                {" "}
+                — Orden de cambio:{" "}
+                <span className="text-foreground">{cotizacion.ordenCambio.descripcion}</span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -95,6 +130,25 @@ export default async function CotizacionDetallePage({
               PDF
             </a>
           </Button>
+          {cotizacion.status === "Enviada" && (
+            <>
+              <form action={boundGanada}>
+                <Button type="submit" variant="secondary">
+                  Marcar como ganada
+                </Button>
+              </form>
+              <form action={boundPerdida}>
+                <Button type="submit" variant="outline">
+                  Marcar como perdida
+                </Button>
+              </form>
+            </>
+          )}
+          {cotizacion.status === "Firmada" && !cotizacion.servicioId && (
+            <form action={boundConvertir}>
+              <Button type="submit">Convertir en servicio</Button>
+            </form>
+          )}
           {cotizacion.status !== "Pagada" && (
             <CotizacionFormDialog
               trigger={
@@ -104,15 +158,34 @@ export default async function CotizacionDetallePage({
                 </Button>
               }
               title="Editar cotización"
-              description={cotizacion.servicio.descripcion}
+              description={descripcion}
               action={boundUpdate}
               montoSubtotal={Number(cotizacion.montoSubtotal)}
               defaultValues={cotizacion}
               submitLabel="Guardar cambios"
             />
           )}
+          {cotizacion.status !== "Pagada" && (
+            <DeleteCotizacionButton action={boundEliminar} />
+          )}
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium">Tareas ({cotizacion.tareas.length})</CardTitle>
+          <TareaFormDialog
+            action={crearTarea}
+            vinculoFijo={{ value: `cotizacion:${cotizacion.id}`, label: descripcion }}
+          />
+        </CardHeader>
+        <CardContent>
+          <TareaLista
+            tareas={cotizacion.tareas}
+            emptyText="Esta negociación no tiene tareas."
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -136,7 +209,7 @@ export default async function CotizacionDetallePage({
             <span>Total</span>
             <span>{formatCurrency(cotizacion.montoTotal)}</span>
           </div>
-          {Number(montoSubtotalActual) !== Number(cotizacion.montoSubtotal) && (
+          {montoSubtotalActual !== null && montoSubtotalActual !== Number(cotizacion.montoSubtotal) && (
             <p className="text-xs text-muted-foreground">
               El servicio cambió desde que se emitió esta cotización — subtotal actual del
               servicio: {formatCurrency(montoSubtotalActual)}.

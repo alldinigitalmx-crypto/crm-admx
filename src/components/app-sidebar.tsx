@@ -13,6 +13,8 @@ import {
   Globe,
   ShieldCheck,
   Code2,
+  ListTodo,
+  Wallet,
 } from "lucide-react";
 
 import {
@@ -33,6 +35,8 @@ const navPrincipal = [
   { title: "Clientes", href: "/admin/clientes", icon: Users },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase },
   { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText },
+  { title: "Tareas", href: "/admin/tareas", icon: ListTodo },
+  { title: "Gastos", href: "/admin/gastos", icon: Wallet },
 ];
 
 const navProximamente = [

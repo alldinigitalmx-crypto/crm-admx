@@ -18,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
   Firmada: "Firmada",
   Pagada: "Pagada",
   Vencida: "Vencida",
+  Perdida: "Perdida",
 };
 
 export default async function CotizacionPublicaPage({
@@ -30,12 +31,16 @@ export default async function CotizacionPublicaPage({
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
     include: {
-      servicio: { include: { cliente: true } },
+      cliente: true,
+      servicio: true,
       pagos: { orderBy: { fecha: "desc" } },
     },
   });
 
   if (!cotizacion) notFound();
+
+  const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? "";
+  const detalles = cotizacion.servicio?.detalles ?? cotizacion.detalles;
 
   const vencida =
     cotizacion.status !== "Pagada" &&
@@ -61,21 +66,17 @@ export default async function CotizacionPublicaPage({
         <h1 className="text-2xl font-semibold">
           Cotización #{String(cotizacion.id).padStart(4, "0")}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Para {cotizacion.servicio.cliente.nombre}
-        </p>
+        <p className="text-sm text-muted-foreground">Para {cotizacion.cliente.nombre}</p>
       </div>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-medium">
-            {cotizacion.servicio.descripcion}
-          </CardTitle>
+          <CardTitle className="text-sm font-medium">{descripcion}</CardTitle>
           <Badge
             variant={
               cotizacion.status === "Pagada"
                 ? "secondary"
-                : vencida
+                : vencida || cotizacion.status === "Perdida"
                   ? "destructive"
                   : "outline"
             }
@@ -84,9 +85,7 @@ export default async function CotizacionPublicaPage({
           </Badge>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
-          {cotizacion.servicio.detalles && (
-            <p className="text-muted-foreground">{cotizacion.servicio.detalles}</p>
-          )}
+          {detalles && <p className="text-muted-foreground">{detalles}</p>}
           <div className="flex justify-between border-t pt-3">
             <span className="text-muted-foreground">Subtotal</span>
             <span>{formatCurrency(cotizacion.montoSubtotal)}</span>
@@ -124,10 +123,7 @@ export default async function CotizacionPublicaPage({
             <CardTitle className="text-sm font-medium">Firma de la cotización</CardTitle>
           </CardHeader>
           <CardContent>
-            <FirmaForm
-              action={firmarAction}
-              nombreDefault={cotizacion.servicio.cliente.nombre}
-            />
+            <FirmaForm action={firmarAction} nombreDefault={cotizacion.cliente.nombre} />
           </CardContent>
         </Card>
       )}
@@ -140,13 +136,17 @@ export default async function CotizacionPublicaPage({
         </Card>
       )}
 
-      {cotizacion.status !== "Pagada" && (
+      {cotizacion.status !== "Pagada" && cotizacion.status !== "Perdida" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Pagar</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {pagoPendiente ? (
+            {!cotizacion.servicioId ? (
+              <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                Estamos formalizando este proyecto. Muy pronto podrás reportar tu pago aquí.
+              </p>
+            ) : pagoPendiente ? (
               <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
                 Ya reportaste un pago por transferencia. Está pendiente de confirmación.
               </p>
