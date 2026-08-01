@@ -22,6 +22,7 @@ const currency = new Intl.NumberFormat("es-MX", {
 const fecha = new Intl.DateTimeFormat("es-MX", {
   day: "2-digit",
   month: "short",
+  timeZone: "UTC",
 });
 
 function KpiCard({
@@ -179,9 +180,11 @@ export default async function AdminDashboardPage() {
             </p>
           ) : (
             serviciosPorStatus.map((s) => (
-              <Badge key={s.status} variant="outline">
-                {s.status}: {s._count}
-              </Badge>
+              <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
+                <Badge variant="outline">
+                  {s.status}: {s._count}
+                </Badge>
+              </Link>
             ))
           )}
         </CardContent>
@@ -202,9 +205,12 @@ export default async function AdminDashboardPage() {
           >
             {cotizacionesPendientes.map((c) => (
               <li key={c.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
+                <Link
+                  href={`/admin/servicios/${c.servicio.id}`}
+                  className="truncate hover:underline"
+                >
                   {c.servicio.cliente.nombre} — {c.servicio.descripcion}
-                </span>
+                </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
                 </span>
@@ -220,9 +226,12 @@ export default async function AdminDashboardPage() {
           >
             {pagosPorConfirmar.map((p) => (
               <li key={p.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
+                <Link
+                  href={`/admin/servicios/${p.servicio.id}`}
+                  className="truncate hover:underline"
+                >
                   {p.servicio.cliente.nombre} — {p.servicio.descripcion}
-                </span>
+                </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {currency.format(Number(p.monto))}
                 </span>
@@ -274,9 +283,12 @@ export default async function AdminDashboardPage() {
           >
             {ordenesCambioPendientes.map((o) => (
               <li key={o.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
+                <Link
+                  href={`/admin/servicios/${o.servicio.id}`}
+                  className="truncate hover:underline"
+                >
                   {o.servicio.cliente.nombre} — {o.descripcion}
-                </span>
+                </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {currency.format(Number(o.monto))}
                 </span>
@@ -287,11 +299,15 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        ¿Buscas Servicios, Cotizaciones u otro módulo?{" "}
+        ¿Buscas Cotizaciones, Quejas u otro módulo? Por ahora solo{" "}
         <Link href="/admin/clientes" className="underline">
-          Por ahora solo Clientes
+          Clientes
         </Link>{" "}
-        está disponible — el resto llega en próximas fases.
+        y{" "}
+        <Link href="/admin/servicios" className="underline">
+          Servicios
+        </Link>{" "}
+        están disponibles — el resto llega en próximas fases.
       </p>
     </div>
   );

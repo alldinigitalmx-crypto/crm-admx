@@ -31,10 +31,10 @@ import {
 const navPrincipal = [
   { title: "Panel", href: "/admin", icon: LayoutDashboard },
   { title: "Clientes", href: "/admin/clientes", icon: Users },
+  { title: "Servicios", href: "/admin/servicios", icon: Briefcase },
 ];
 
 const navProximamente = [
-  { title: "Servicios", icon: Briefcase },
   { title: "Cotizaciones", icon: FileText },
   { title: "Pagos", icon: CreditCard },
   { title: "Productos y Ventas", icon: ShoppingBag },
@@ -68,7 +68,11 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href}
+                    isActive={
+                      item.href === "/admin"
+                        ? pathname === item.href
+                        : pathname.startsWith(item.href)
+                    }
                     tooltip={item.title}
                   >
                     <Link href={item.href}>
