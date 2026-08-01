@@ -36,6 +36,9 @@ export async function GET(
       servicio: {
         descripcion: cotizacion.servicio.descripcion,
         detalles: cotizacion.servicio.detalles,
+        status: cotizacion.servicio.status,
+        fechaInicio: cotizacion.servicio.fechaInicio,
+        fechaFin: cotizacion.servicio.fechaFin,
       },
       cliente: {
         nombre: cotizacion.servicio.cliente.nombre,

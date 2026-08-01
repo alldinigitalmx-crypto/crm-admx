@@ -140,7 +140,10 @@ export async function firmarCotizacion(
   _prevState: PublicActionState,
   formData: FormData
 ): Promise<PublicActionState> {
-  const cotizacion = await prisma.cotizacion.findUnique({ where: { token } });
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { token },
+    include: { servicio: true },
+  });
   if (!cotizacion) return { error: "Cotización no encontrada." };
   if (cotizacion.status !== "Enviada") {
     return { error: "Esta cotización ya fue firmada o no admite firma." };
@@ -159,6 +162,8 @@ export async function firmarCotizacion(
     headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     headersList.get("x-real-ip") ??
     null;
+
+  const servicioSeAprueba = cotizacion.servicio.status === "Cotizado";
 
   await prisma.$transaction([
     prisma.cotizacion.update({
@@ -179,14 +184,25 @@ export async function firmarCotizacion(
         tipo: "Imagen",
       },
     }),
+    ...(servicioSeAprueba
+      ? [
+          prisma.servicio.update({
+            where: { id: cotizacion.servicioId },
+            data: { status: "Aprobado" },
+          }),
+        ]
+      : []),
   ]);
 
   await registrarEvento("cotizacion.firmada", "Cotizacion", cotizacion.id, {
     firmanteNombre,
+    servicioAprobado: servicioSeAprueba,
   });
 
   revalidatePath(`/cotizacion/${token}`);
   revalidatePath(`/admin/cotizaciones/${cotizacion.id}`);
+  revalidatePath(`/admin/servicios/${cotizacion.servicioId}`);
+  revalidatePath("/admin");
   return { success: true };
 }
 
