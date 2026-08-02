@@ -258,7 +258,8 @@ model Producto {
 model Venta {
   id               Int                   @id @default(autoincrement())
   fecha            DateTime              @default(now())
-  canal            CanalVenta            @default(Web)
+  origen           OrigenVenta           @default(Manual)
+  canal            CanalVenta?
   nombreComprador  String?
   emailComprador   String?
   metodoPago       MetodoPago?
@@ -440,10 +441,15 @@ enum CategoriaProducto {
 }
 
 enum CanalVenta {
-  Web
   Referido
   GrupoWhatsApp
   Directo
+  Otro
+}
+
+enum OrigenVenta {
+  TiendaOnline
+  Manual
 }
 
 model Usuario {

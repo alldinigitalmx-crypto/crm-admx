@@ -9,6 +9,7 @@ import {
   FileText,
   CreditCard,
   ShoppingBag,
+  Package,
   LifeBuoy,
   ShieldCheck,
   Code2,
@@ -38,12 +39,11 @@ const navPrincipal = [
   { title: "Tareas", href: "/admin/tareas", icon: ListTodo },
   { title: "Gastos", href: "/admin/gastos", icon: Wallet },
   { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy },
+  { title: "Productos", href: "/admin/productos", icon: Package },
+  { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag },
 ];
 
-const navProximamente = [
-  { title: "Productos y Ventas", icon: ShoppingBag },
-  { title: "Usuarios y Accesos", icon: ShieldCheck },
-];
+const navProximamente = [{ title: "Usuarios y Accesos", icon: ShieldCheck }];
 
 export function AppSidebar() {
   const pathname = usePathname();

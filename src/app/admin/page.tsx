@@ -9,6 +9,7 @@ import {
   LifeBuoy,
   KeyRound,
   ListTodo,
+  ShoppingBag,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
@@ -104,6 +105,7 @@ export default async function AdminDashboardPage() {
     ganadasPorFormalizar,
     convertidasAServicio,
     perdidas,
+    ventasPorOrigen,
   ] = await Promise.all([
     prisma.cliente.count(),
     prisma.servicio.count({ where: { status: { in: ["Aprobado", "EnProceso"] } } }),
@@ -169,7 +171,16 @@ export default async function AdminDashboardPage() {
       _sum: { montoTotal: true },
       where: { status: "Perdida" },
     }),
+    prisma.venta.groupBy({
+      by: ["origen"],
+      _sum: { total: true },
+      _count: true,
+      where: { fecha: { gte: inicioDeMes } },
+    }),
   ]);
+
+  const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
+  const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
 
   return (
     <div className="flex flex-col gap-6">
@@ -267,6 +278,51 @@ export default async function AdminDashboardPage() {
                 <p className="text-xs text-muted-foreground">
                   {currency.format(Number(perdidas._sum.montoTotal ?? 0))}
                 </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold">Ventas por origen</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Mes actual</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/admin/ventas?origen=TiendaOnline">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-4 py-2">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400">
+                  <ShoppingBag className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Tienda Online</p>
+                  <p className="text-xl font-semibold">
+                    {currency.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {ventasTiendaOnline?._count ?? 0} venta
+                    {(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/ventas?origen=Manual">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-4 py-2">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400">
+                  <ShoppingBag className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Manual (otros medios)</p>
+                  <p className="text-xl font-semibold">
+                    {currency.format(Number(ventasManual?._sum.total ?? 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {ventasManual?._count ?? 0} venta
+                    {(ventasManual?._count ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </Link>
@@ -416,8 +472,9 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Clientes, Servicios, Cotizaciones, Pagos, Tareas, Gastos y Quejas ya están
-        disponibles — Productos/Ventas y Usuarios llegan en próximas fases.
+        Clientes, Servicios, Cotizaciones, Pagos, Tareas, Gastos, Quejas y
+        Productos/Ventas ya están disponibles — Usuarios y Accesos llega en
+        próximas fases.
       </p>
     </div>
   );
