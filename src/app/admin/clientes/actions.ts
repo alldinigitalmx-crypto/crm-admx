@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type Etiqueta, type MedioCaptacion } from "@/generated/prisma/client";
 
@@ -81,4 +82,42 @@ export async function updateCliente(
   revalidatePath("/admin/clientes");
   revalidatePath(`/admin/clientes/${id}`);
   redirect(`/admin/clientes/${id}`);
+}
+
+export type PortalFormState = { error?: string } | undefined;
+
+export async function guardarPasswordPortalCliente(
+  clienteId: number,
+  _prevState: PortalFormState,
+  formData: FormData
+): Promise<PortalFormState> {
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
+  if (!cliente) return { error: "Este cliente ya no existe." };
+  if (!cliente.email) {
+    return { error: "Este cliente no tiene un correo registrado. Agrégalo primero." };
+  }
+
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 6) {
+    return { error: "La contraseña debe tener al menos 6 caracteres." };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.cliente.update({
+    where: { id: clienteId },
+    data: { passwordHash, portalActivo: true },
+  });
+
+  revalidatePath(`/admin/clientes/${clienteId}`);
+  return undefined;
+}
+
+export async function desactivarPortalCliente(clienteId: number) {
+  await prisma.cliente.update({
+    where: { id: clienteId },
+    data: { portalActivo: false },
+  });
+
+  revalidatePath(`/admin/clientes/${clienteId}`);
 }

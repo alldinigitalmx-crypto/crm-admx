@@ -17,7 +17,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClienteFormDialog } from "@/components/clientes/cliente-form-dialog";
-import { updateCliente } from "@/app/admin/clientes/actions";
+import { PortalAccessCard } from "@/components/clientes/portal-access-card";
+import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
+import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
+import {
+  desactivarPortalCliente,
+  guardarPasswordPortalCliente,
+  updateCliente,
+} from "@/app/admin/clientes/actions";
+import { actualizarQueja, crearQueja } from "@/app/admin/quejas/actions";
 
 const STATUS_SERVICIO_VARIANT: Record<
   string,
@@ -62,12 +70,18 @@ export default async function ClienteDetallePage({
               intermediario: true,
             },
           },
-          quejas: { orderBy: { creadoEn: "desc" } },
+          quejas: { orderBy: { creadoEn: "desc" }, include: { servicio: true } },
         },
       })
     : null;
 
   if (!cliente) notFound();
+
+  const clienteFijoOpcion = {
+    id: cliente.id,
+    nombre: cliente.nombre,
+    servicios: cliente.servicios.map((s) => ({ id: s.id, descripcion: s.descripcion })),
+  };
 
   const totalServicios = cliente.servicios.length;
   const serviciosActivos = cliente.servicios.filter((s) =>
@@ -158,6 +172,14 @@ export default async function ClienteDetallePage({
           )}
         </CardContent>
       </Card>
+
+      <PortalAccessCard
+        email={cliente.email}
+        portalActivo={cliente.portalActivo}
+        ultimoAcceso={cliente.ultimoAccesoPortal ? formatDate(cliente.ultimoAccesoPortal) : null}
+        guardarPassword={guardarPasswordPortalCliente.bind(null, cliente.id)}
+        desactivar={desactivarPortalCliente.bind(null, cliente.id)}
+      />
 
       <Card>
         <CardHeader>
@@ -298,10 +320,11 @@ export default async function ClienteDetallePage({
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium">
             Quejas ({cliente.quejas.length})
           </CardTitle>
+          <QuejaFormDialog action={crearQueja} clienteFijo={clienteFijoOpcion} />
         </CardHeader>
         <CardContent>
           {cliente.quejas.length === 0 ? (
@@ -316,6 +339,7 @@ export default async function ClienteDetallePage({
                   <TableHead>Descripción</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fecha</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -329,6 +353,12 @@ export default async function ClienteDetallePage({
                       <Badge variant="outline">{q.status}</Badge>
                     </TableCell>
                     <TableCell>{formatDate(q.creadoEn)}</TableCell>
+                    <TableCell>
+                      <QuejaDetalleDialog
+                        queja={{ ...q, cliente: { nombre: cliente.nombre } }}
+                        action={actualizarQueja.bind(null, q.id)}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

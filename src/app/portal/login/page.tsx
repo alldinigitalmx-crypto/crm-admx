@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThemedLogo } from "@/components/themed-logo";
-import { Code2, Mail, Lock, Briefcase, FileText, CreditCard } from "lucide-react";
+import { Code2, Mail, Lock, Briefcase, FileText, LifeBuoy } from "lucide-react";
 
-export default async function LoginPage({
+export default async function PortalLoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
@@ -18,14 +18,14 @@ export default async function LoginPage({
   async function login(formData: FormData) {
     "use server";
     try {
-      await signIn("admin-login", {
+      await signIn("cliente-login", {
         email: formData.get("email"),
         password: formData.get("password"),
-        redirectTo: "/admin",
+        redirectTo: "/portal",
       });
     } catch (err) {
       if (err instanceof AuthError) {
-        redirect("/login?error=1");
+        redirect("/portal/login?error=1");
       }
       throw err;
     }
@@ -56,11 +56,10 @@ export default async function LoginPage({
 
         <div className="relative max-w-md">
           <h1 className="text-3xl font-semibold text-white xl:text-4xl">
-            Toda tu operación, en un solo panel.
+            Tu proyecto, siempre a la vista.
           </h1>
           <p className="mt-3 text-slate-400">
-            Servicios, cotizaciones, pagos y clientes centralizados para Admx
-            Dev.
+            Portal de clientes de Admx Dev — avance, cotizaciones y soporte en un solo lugar.
           </p>
 
           <ul className="mt-9 space-y-4">
@@ -68,25 +67,25 @@ export default async function LoginPage({
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
                 <Briefcase className="size-3.5 text-blue-400" />
               </span>
-              Servicios y cotizaciones en un solo lugar
+              Avance y evidencia de tu proyecto
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
                 <FileText className="size-3.5 text-violet-400" />
               </span>
-              Portal de clientes con seguimiento de avance
+              Cotizaciones pendientes de firma o pago
             </li>
             <li className="flex items-center gap-3 text-sm text-slate-300">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
-                <CreditCard className="size-3.5 text-teal-400" />
+                <LifeBuoy className="size-3.5 text-teal-400" />
               </span>
-              Cobros con Mercado Pago, PayPal y transferencia
+              Reporta y da seguimiento a tus quejas
             </li>
           </ul>
         </div>
 
         <p className="relative text-xs text-slate-500">
-          © {new Date().getFullYear()} Admx Dev · Panel interno
+          © {new Date().getFullYear()} Admx Dev · Portal del cliente
         </p>
       </div>
 
@@ -100,9 +99,9 @@ export default async function LoginPage({
           <div className="w-full max-w-sm">
             <ThemedLogo className="mb-6 h-14 w-auto" />
 
-            <h2 className="text-2xl font-semibold">Bienvenido de vuelta</h2>
+            <h2 className="text-2xl font-semibold">Portal del cliente</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Entra con tu cuenta para continuar
+              Entra con el correo y contraseña que te compartió Admx Dev
             </p>
 
             {error && (
@@ -121,22 +120,14 @@ export default async function LoginPage({
                     name="email"
                     type="email"
                     required
-                    placeholder="tucorreo@empresa.com"
+                    placeholder="tucorreo@ejemplo.com"
                     className="pl-9"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <a
-                    href="#"
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </a>
-                </div>
+                <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input

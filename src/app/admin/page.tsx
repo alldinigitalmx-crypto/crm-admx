@@ -334,9 +334,9 @@ export default async function AdminDashboardPage() {
           >
             {quejasNuevas.map((q) => (
               <li key={q.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
+                <Link href="/admin/quejas" className="truncate hover:underline">
                   {q.cliente.nombre} — {q.categoria}
-                </span>
+                </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {fecha.format(q.creadoEn)}
                 </span>
@@ -416,8 +416,8 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        ¿Buscas Quejas u otro módulo? Por ahora Clientes, Servicios, Cotizaciones, Pagos,
-        Tareas y Gastos están disponibles — el resto llega en próximas fases.
+        Clientes, Servicios, Cotizaciones, Pagos, Tareas, Gastos y Quejas ya están
+        disponibles — Productos/Ventas y Usuarios llegan en próximas fases.
       </p>
     </div>
   );

@@ -10,7 +10,6 @@ import {
   CreditCard,
   ShoppingBag,
   LifeBuoy,
-  Globe,
   ShieldCheck,
   Code2,
   ListTodo,
@@ -38,12 +37,11 @@ const navPrincipal = [
   { title: "Pagos", href: "/admin/pagos", icon: CreditCard },
   { title: "Tareas", href: "/admin/tareas", icon: ListTodo },
   { title: "Gastos", href: "/admin/gastos", icon: Wallet },
+  { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy },
 ];
 
 const navProximamente = [
   { title: "Productos y Ventas", icon: ShoppingBag },
-  { title: "Quejas / Help Desk", icon: LifeBuoy },
-  { title: "Portal del Cliente", icon: Globe },
   { title: "Usuarios y Accesos", icon: ShieldCheck },
 ];
 

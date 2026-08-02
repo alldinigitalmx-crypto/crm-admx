@@ -20,3 +20,10 @@ export function comisionIntermediario(
   if (!porcentaje) return 0;
   return montoTotal * (Number(porcentaje) / 100);
 }
+
+export function calcularAvance(tareas: { completada: boolean }[]) {
+  const total = tareas.length;
+  const completadas = tareas.filter((t) => t.completada).length;
+  const porcentaje = total > 0 ? Math.round((completadas / total) * 100) : 0;
+  return { total, completadas, porcentaje };
+}

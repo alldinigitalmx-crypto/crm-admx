@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/format";
+import { calcularAvance } from "@/lib/servicio";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -35,9 +36,8 @@ export default async function ServicioPublicoPage({
     orderBy: { creadoEn: "desc" },
   });
 
-  const totalTareas = servicio.tareas.length;
-  const tareasCompletadas = servicio.tareas.filter((t) => t.completada).length;
-  const avance = totalTareas > 0 ? Math.round((tareasCompletadas / totalTareas) * 100) : 0;
+  const { total: totalTareas, completadas: tareasCompletadas, porcentaje: avance } =
+    calcularAvance(servicio.tareas);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-4 py-10">
