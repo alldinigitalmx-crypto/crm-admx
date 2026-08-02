@@ -25,6 +25,7 @@ import { TareaLista } from "@/components/tareas/tarea-lista";
 import { EvidenciaForm } from "@/components/servicios/evidencia-form";
 import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
 import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
+import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
 import {
   aprobarOrdenCambio,
   createOrdenCambio,
@@ -39,7 +40,9 @@ import {
   actualizarPago,
   confirmarPago,
   crearPago,
+  eliminarComprobantePago,
   eliminarPago,
+  subirComprobantePago,
 } from "@/app/admin/pagos/actions";
 
 const COTIZACION_STATUS_VARIANT: Record<
@@ -107,14 +110,19 @@ export default async function ServicioDetallePage({
 
   if (!servicio) notFound();
 
-  const [clientes, intermediarios, evidencias] = await Promise.all([
+  const [clientes, intermediarios, evidencias, comprobantesPago] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.intermediario.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.archivo.findMany({
       where: { entidadTipo: "Servicio", entidadId: servicio.id },
       orderBy: { creadoEn: "desc" },
     }),
+    prisma.archivo.findMany({
+      where: { entidadTipo: "Pago", entidadId: { in: servicio.pagos.map((p) => p.id) } },
+      orderBy: { creadoEn: "desc" },
+    }),
   ]);
+  const comprobantePorPago = new Map(comprobantesPago.map((a) => [a.entidadId, a]));
 
   const montoTotal = montoTotalServicio(servicio);
   const ordenesAprobadasMonto = montoTotal - Number(servicio.montoInicial);
@@ -383,7 +391,7 @@ export default async function ServicioDetallePage({
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Comisión</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-28" />
+                  <TableHead className="w-36" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -410,6 +418,16 @@ export default async function ServicioDetallePage({
                             </Button>
                           </form>
                         )}
+                        <PagoDetalleDialog
+                          pago={{
+                            ...p,
+                            servicio: { descripcion: servicio.descripcion, cliente: servicio.cliente },
+                          }}
+                          comprobanteArchivo={comprobantePorPago.get(p.id) ?? null}
+                          servicioId={servicio.id}
+                          subirComprobante={subirComprobantePago.bind(null, p.id)}
+                          eliminarComprobante={eliminarComprobantePago}
+                        />
                         <PagoFormDialog
                           trigger={
                             <Button size="icon" variant="ghost" className="size-7">

@@ -375,6 +375,7 @@ enum EntidadArchivo {
   Servicio
   Cotizacion
   Queja
+  Pago
 }
 
 enum TipoArchivo {

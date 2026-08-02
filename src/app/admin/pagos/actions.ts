@@ -132,11 +132,52 @@ export async function eliminarPago(id: number) {
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago) return;
 
+  await prisma.archivo.deleteMany({ where: { entidadTipo: "Pago", entidadId: id } });
   await prisma.pago.delete({ where: { id } });
 
   revalidatePath("/admin/pagos");
   revalidatePath(`/admin/servicios/${pago.servicioId}`);
   revalidatePath("/admin");
+}
+
+export type ComprobanteFormState = { error?: string } | undefined;
+
+export async function subirComprobantePago(
+  pagoId: number,
+  _prevState: ComprobanteFormState,
+  formData: FormData
+): Promise<ComprobanteFormState> {
+  const dataUrl = String(formData.get("imagen") ?? "");
+  if (!dataUrl.startsWith("data:image")) {
+    return { error: "Selecciona una imagen." };
+  }
+
+  const pago = await prisma.pago.findUnique({ where: { id: pagoId } });
+  if (!pago) return { error: "Este pago ya no existe." };
+
+  const userId = await currentUserId();
+
+  await prisma.archivo.create({
+    data: {
+      entidadTipo: "Pago",
+      entidadId: pagoId,
+      nombre: `comprobante-pago-${pagoId}`,
+      url: dataUrl,
+      tipo: "Imagen",
+      subidoPorId: userId,
+    },
+  });
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${pago.servicioId}`);
+  return undefined;
+}
+
+export async function eliminarComprobantePago(archivoId: number, servicioId: number) {
+  await prisma.archivo.delete({ where: { id: archivoId } });
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${servicioId}`);
 }
 
 export async function confirmarPago(id: number) {

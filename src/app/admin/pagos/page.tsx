@@ -16,11 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
 import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
+import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
 import {
   actualizarPago,
   confirmarPago,
   crearPago,
+  eliminarComprobantePago,
   eliminarPago,
+  subirComprobantePago,
 } from "@/app/admin/pagos/actions";
 import type { MetodoPago, Prisma } from "@/generated/prisma/client";
 
@@ -71,6 +74,12 @@ export default async function PagosPage({
     include: { servicio: { include: { cliente: true } } },
     orderBy: { fecha: "desc" },
   });
+
+  const comprobantes = await prisma.archivo.findMany({
+    where: { entidadTipo: "Pago", entidadId: { in: pagos.map((p) => p.id) } },
+    orderBy: { creadoEn: "desc" },
+  });
+  const comprobantePorPago = new Map(comprobantes.map((a) => [a.entidadId, a]));
 
   const totalMonto = pagos.reduce((acc, p) => acc + Number(p.monto), 0);
   const totalComision = pagos.reduce((acc, p) => acc + Number(p.comision ?? 0), 0);
@@ -190,7 +199,7 @@ export default async function PagosPage({
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Comisión</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-28" />
+                  <TableHead className="w-36" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -227,6 +236,13 @@ export default async function PagosPage({
                             </Button>
                           </form>
                         )}
+                        <PagoDetalleDialog
+                          pago={p}
+                          comprobanteArchivo={comprobantePorPago.get(p.id) ?? null}
+                          servicioId={p.servicio.id}
+                          subirComprobante={subirComprobantePago.bind(null, p.id)}
+                          eliminarComprobante={eliminarComprobantePago}
+                        />
                         <PagoFormDialog
                           trigger={
                             <Button size="icon" variant="ghost" className="size-7">
