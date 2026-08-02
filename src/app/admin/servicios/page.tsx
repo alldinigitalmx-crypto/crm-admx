@@ -4,6 +4,8 @@ import { Plus, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -45,10 +47,18 @@ export default async function ServiciosPage({
 }) {
   const { clienteId, status, intermediarioId, desde, hasta } = await searchParams;
 
-  const [clientes, intermediarios] = await Promise.all([
+  const [clientes, intermediarios, usuarios, usuario] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.intermediario.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.usuario.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
+    currentUsuario(),
   ]);
+
+  const verTodo = await puedeVerTodo(usuario, "Servicios");
 
   const where: Prisma.ServicioWhereInput = {};
   if (clienteId) where.clienteId = Number(clienteId);
@@ -60,6 +70,7 @@ export default async function ServiciosPage({
       ...(hasta ? { lte: new Date(hasta) } : {}),
     };
   }
+  if (!verTodo && usuario) where.responsableId = usuario.id;
 
   const hasFiltros = Boolean(clienteId || status || intermediarioId || desde || hasta);
 
@@ -91,6 +102,8 @@ export default async function ServiciosPage({
           action={createServicio}
           clientes={clientes}
           intermediarios={intermediarios}
+          usuarios={usuarios}
+          usuarioActualId={usuario?.id}
           submitLabel="Crear servicio"
         />
       </div>

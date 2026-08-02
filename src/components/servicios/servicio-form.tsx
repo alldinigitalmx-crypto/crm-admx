@@ -27,6 +27,7 @@ type ServicioDefaults = {
   status: string;
   intermediarioId: number | null;
   porcentajeIntermediario: (number | string | { toString(): string }) | null;
+  responsableId: number | null;
 };
 
 function toDateInputValue(d: Date | null | undefined) {
@@ -38,6 +39,8 @@ export function ServicioForm({
   action,
   clientes,
   intermediarios,
+  usuarios,
+  usuarioActualId,
   defaultValues,
   submitLabel,
   onCancel,
@@ -48,6 +51,8 @@ export function ServicioForm({
   ) => Promise<ServicioFormState>;
   clientes: { id: number; nombre: string }[];
   intermediarios: { id: number; nombre: string }[];
+  usuarios: { id: number; nombre: string }[];
+  usuarioActualId?: number;
   defaultValues?: ServicioDefaults;
   submitLabel: string;
   onCancel?: () => void;
@@ -167,6 +172,32 @@ export function ServicioForm({
               {intermediarios.map((i) => (
                 <SelectItem key={i.id} value={String(i.id)}>
                   {i.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="responsableId">Responsable *</Label>
+          <Select
+            name="responsableId"
+            required
+            defaultValue={
+              defaultValues?.responsableId
+                ? String(defaultValues.responsableId)
+                : usuarioActualId
+                  ? String(usuarioActualId)
+                  : undefined
+            }
+          >
+            <SelectTrigger id="responsableId" className="w-full">
+              <SelectValue placeholder="Selecciona un responsable" />
+            </SelectTrigger>
+            <SelectContent>
+              {usuarios.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.nombre}
                 </SelectItem>
               ))}
             </SelectContent>

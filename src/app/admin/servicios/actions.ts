@@ -3,16 +3,15 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
 import { Prisma, type StatusServicio } from "@/generated/prisma/client";
 
 export type ServicioFormState = { error?: string } | undefined;
 export type OrdenCambioFormState = { error?: string; success?: boolean } | undefined;
 
 async function currentUserId() {
-  const session = await auth();
-  const id = session?.user?.id;
-  return id ? Number(id) : null;
+  const usuario = await currentUsuario();
+  return usuario?.id ?? null;
 }
 
 function parseServicioForm(formData: FormData) {
@@ -25,6 +24,7 @@ function parseServicioForm(formData: FormData) {
   const statusRaw = String(formData.get("status") ?? "Cotizado");
   const intermediarioIdRaw = String(formData.get("intermediarioId") ?? "");
   const porcentajeRaw = String(formData.get("porcentajeIntermediario") ?? "");
+  const responsableIdRaw = String(formData.get("responsableId") ?? "");
 
   const tieneIntermediario = intermediarioIdRaw && intermediarioIdRaw !== "none";
 
@@ -38,6 +38,7 @@ function parseServicioForm(formData: FormData) {
     status: statusRaw as StatusServicio,
     intermediarioId: tieneIntermediario ? Number(intermediarioIdRaw) : null,
     porcentajeIntermediario: tieneIntermediario && porcentajeRaw ? porcentajeRaw : null,
+    responsableId: responsableIdRaw ? Number(responsableIdRaw) : null,
   };
 }
 
@@ -74,6 +75,7 @@ export async function createServicio(
         status: data.status,
         intermediarioId: data.intermediarioId,
         porcentajeIntermediario: data.porcentajeIntermediario,
+        responsableId: data.responsableId ?? userId,
         creadoPorId: userId,
         editadoPorId: userId,
       },
@@ -115,6 +117,7 @@ export async function updateServicio(
         status: data.status,
         intermediarioId: data.intermediarioId,
         porcentajeIntermediario: data.porcentajeIntermediario,
+        responsableId: data.responsableId,
         editadoPorId: userId,
       },
     });

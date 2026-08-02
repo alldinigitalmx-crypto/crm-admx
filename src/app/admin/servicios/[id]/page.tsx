@@ -5,6 +5,8 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio, comisionIntermediario } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,9 +112,18 @@ export default async function ServicioDetallePage({
 
   if (!servicio) notFound();
 
-  const [clientes, intermediarios, evidencias, comprobantesPago] = await Promise.all([
+  const usuarioActual = await currentUsuario();
+  const verTodoServicios = await puedeVerTodo(usuarioActual, "Servicios");
+  if (!verTodoServicios && servicio.responsableId !== usuarioActual?.id) notFound();
+
+  const [clientes, intermediarios, usuarios, evidencias, comprobantesPago] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.intermediario.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.usuario.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
     prisma.archivo.findMany({
       where: { entidadTipo: "Servicio", entidadId: servicio.id },
       orderBy: { creadoEn: "desc" },
@@ -178,7 +189,22 @@ export default async function ServicioDetallePage({
             action={boundUpdateServicio}
             clientes={clientes}
             intermediarios={intermediarios}
-            defaultValues={servicio}
+            usuarios={usuarios}
+            usuarioActualId={usuarioActual?.id}
+            defaultValues={{
+              clienteId: servicio.clienteId,
+              descripcion: servicio.descripcion,
+              detalles: servicio.detalles,
+              fechaInicio: servicio.fechaInicio,
+              fechaFin: servicio.fechaFin,
+              montoInicial: Number(servicio.montoInicial),
+              status: servicio.status,
+              intermediarioId: servicio.intermediarioId,
+              porcentajeIntermediario: servicio.porcentajeIntermediario
+                ? Number(servicio.porcentajeIntermediario)
+                : null,
+              responsableId: servicio.responsableId,
+            }}
             submitLabel="Guardar cambios"
           />
         </div>

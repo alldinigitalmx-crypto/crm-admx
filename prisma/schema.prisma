@@ -61,6 +61,8 @@ model Servicio {
   creadoPor               Usuario?       @relation("ServicioCreadoPor", fields: [creadoPorId], references: [id])
   editadoPorId            Int?
   editadoPor              Usuario?       @relation("ServicioEditadoPor", fields: [editadoPorId], references: [id])
+  responsableId           Int?
+  responsable             Usuario?       @relation("ServicioResponsable", fields: [responsableId], references: [id])
   ordenesCambio           OrdenCambio[]
   pagos                   Pago[]
   cotizaciones            Cotizacion[]
@@ -153,6 +155,8 @@ model Tarea {
   cotizacion   Cotizacion?    @relation(fields: [cotizacionId], references: [id])
   creadoPorId  Int?
   creadoPor    Usuario?       @relation("TareaCreadoPor", fields: [creadoPorId], references: [id])
+  asignadoAId  Int?
+  asignadoA    Usuario?       @relation("TareaAsignadoA", fields: [asignadoAId], references: [id])
   creadoEn     DateTime       @default(now())
 }
 
@@ -213,6 +217,8 @@ model Queja {
   respondidoPorId Int?
   respondidoPor   Usuario?       @relation("QuejaRespondidoPor", fields: [respondidoPorId], references: [id])
   respondidoEn    DateTime?
+  asignadoAId     Int?
+  asignadoA       Usuario?       @relation("QuejaAsignadoA", fields: [asignadoAId], references: [id])
   creadoEn        DateTime       @default(now())
   actualizadoEn   DateTime       @updatedAt
 }
@@ -232,11 +238,12 @@ model TicketAcceso {
 }
 
 model ModuloPermiso {
-  id        Int           @id @default(autoincrement())
+  id        Int                  @id @default(autoincrement())
   usuarioId Int
-  usuario   Usuario       @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario              @relation(fields: [usuarioId], references: [id])
   modulo    ModuloSistema
   nivel     NivelPermiso
+  alcance   AlcanceModuloPermiso @default(Propio)
 
   @@unique([usuarioId, modulo])
 }
@@ -424,6 +431,11 @@ enum NivelPermiso {
   Editar
 }
 
+enum AlcanceModuloPermiso {
+  Propio
+  Todo
+}
+
 enum TipoEntrega {
   Inmediata
   LargoPlazo
@@ -477,6 +489,9 @@ model Usuario {
   ventaEtapaHistorial    VentaEtapaHistorial[] @relation("VentaEtapaRegistradoPor")
   tareasCreadas          Tarea[]               @relation("TareaCreadoPor")
   gastosCreados          Gasto[]               @relation("GastoCreadoPor")
+  serviciosResponsable   Servicio[]            @relation("ServicioResponsable")
+  tareasAsignadas        Tarea[]               @relation("TareaAsignadoA")
+  quejasAsignadas        Queja[]               @relation("QuejaAsignadoA")
 }
 
 enum RolUsuario {

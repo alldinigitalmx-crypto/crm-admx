@@ -23,6 +23,7 @@ type ServicioDefaults = {
   status: string;
   intermediarioId: number | null;
   porcentajeIntermediario: (number | string | { toString(): string }) | null;
+  responsableId: number | null;
 };
 
 export function ServicioFormDialog({
@@ -32,6 +33,8 @@ export function ServicioFormDialog({
   action,
   clientes,
   intermediarios,
+  usuarios,
+  usuarioActualId,
   defaultValues,
   submitLabel,
 }: {
@@ -44,6 +47,8 @@ export function ServicioFormDialog({
   ) => Promise<ServicioFormState>;
   clientes: { id: number; nombre: string }[];
   intermediarios: { id: number; nombre: string }[];
+  usuarios: { id: number; nombre: string }[];
+  usuarioActualId?: number;
   defaultValues?: ServicioDefaults;
   submitLabel: string;
 }) {
@@ -61,6 +66,8 @@ export function ServicioFormDialog({
           action={action}
           clientes={clientes}
           intermediarios={intermediarios}
+          usuarios={usuarios}
+          usuarioActualId={usuarioActualId}
           defaultValues={defaultValues}
           submitLabel={submitLabel}
           onCancel={() => setOpen(false)}
