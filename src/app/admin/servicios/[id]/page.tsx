@@ -23,6 +23,8 @@ import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
 import { TareaLista } from "@/components/tareas/tarea-lista";
 import { EvidenciaForm } from "@/components/servicios/evidencia-form";
+import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
+import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
 import {
   aprobarOrdenCambio,
   createOrdenCambio,
@@ -33,6 +35,12 @@ import {
 } from "@/app/admin/servicios/actions";
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
 import { crearTarea } from "@/app/admin/tareas/actions";
+import {
+  actualizarPago,
+  confirmarPago,
+  crearPago,
+  eliminarPago,
+} from "@/app/admin/pagos/actions";
 
 const COTIZACION_STATUS_VARIANT: Record<
   string,
@@ -344,8 +352,21 @@ export default async function ServicioDetallePage({
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium">Pagos ({servicio.pagos.length})</CardTitle>
+          <PagoFormDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                <Plus />
+                Nuevo pago
+              </Button>
+            }
+            title="Nuevo pago"
+            description={servicio.descripcion}
+            action={crearPago}
+            servicioFijo={{ id: servicio.id, label: servicio.descripcion }}
+            submitLabel="Registrar pago"
+          />
         </CardHeader>
         <CardContent>
           {servicio.pagos.length === 0 ? (
@@ -358,8 +379,11 @@ export default async function ServicioDetallePage({
                 <TableRow>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Método</TableHead>
+                  <TableHead>Cuenta</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Comisión</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -367,12 +391,40 @@ export default async function ServicioDetallePage({
                   <TableRow key={p.id}>
                     <TableCell>{formatDate(p.fecha)}</TableCell>
                     <TableCell>{p.metodoPago}</TableCell>
+                    <TableCell>{p.cuenta ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={p.confirmado ? "secondary" : "outline"}>
                         {p.confirmado ? "Confirmado" : "Pendiente"}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      {p.comision ? formatCurrency(p.comision) : "—"}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        {!p.confirmado && (
+                          <form action={confirmarPago.bind(null, p.id)}>
+                            <Button type="submit" size="sm" variant="secondary">
+                              Confirmar
+                            </Button>
+                          </form>
+                        )}
+                        <PagoFormDialog
+                          trigger={
+                            <Button size="icon" variant="ghost" className="size-7">
+                              <Pencil className="size-4" />
+                            </Button>
+                          }
+                          title="Editar pago"
+                          action={actualizarPago.bind(null, p.id)}
+                          servicioFijo={{ id: servicio.id, label: servicio.descripcion }}
+                          defaultValues={p}
+                          submitLabel="Guardar cambios"
+                        />
+                        <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

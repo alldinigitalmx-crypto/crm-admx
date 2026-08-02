@@ -35,12 +35,12 @@ const navPrincipal = [
   { title: "Clientes", href: "/admin/clientes", icon: Users },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase },
   { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText },
+  { title: "Pagos", href: "/admin/pagos", icon: CreditCard },
   { title: "Tareas", href: "/admin/tareas", icon: ListTodo },
   { title: "Gastos", href: "/admin/gastos", icon: Wallet },
 ];
 
 const navProximamente = [
-  { title: "Pagos", icon: CreditCard },
   { title: "Productos y Ventas", icon: ShoppingBag },
   { title: "Quejas / Help Desk", icon: LifeBuoy },
   { title: "Portal del Cliente", icon: Globe },

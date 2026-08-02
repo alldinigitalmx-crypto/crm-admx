@@ -110,7 +110,7 @@ export default async function AdminDashboardPage() {
     prisma.servicio.count(),
     prisma.pago.aggregate({
       _sum: { monto: true },
-      where: { fecha: { gte: inicioDeMes } },
+      where: { fecha: { gte: inicioDeMes }, confirmado: true },
     }),
     prisma.servicio.groupBy({ by: ["status"], _count: true }),
     prisma.cotizacion.findMany({
@@ -120,7 +120,7 @@ export default async function AdminDashboardPage() {
       include: { cliente: true, servicio: true },
     }),
     prisma.pago.findMany({
-      where: { metodoPago: "Transferencia", confirmado: false },
+      where: { confirmado: false },
       orderBy: { fecha: "asc" },
       take: 10,
       include: { servicio: { include: { cliente: true } } },
@@ -302,7 +302,7 @@ export default async function AdminDashboardPage() {
           </PendienteCard>
 
           <PendienteCard
-            title="Transferencias por confirmar"
+            title="Pagos por confirmar"
             icon={Landmark}
             count={pagosPorConfirmar.length}
             emptyText="No hay pagos pendientes de confirmar."
@@ -416,7 +416,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        ¿Buscas Quejas, Pagos u otro módulo? Por ahora Clientes, Servicios, Cotizaciones,
+        ¿Buscas Quejas u otro módulo? Por ahora Clientes, Servicios, Cotizaciones, Pagos,
         Tareas y Gastos están disponibles — el resto llega en próximas fases.
       </p>
     </div>

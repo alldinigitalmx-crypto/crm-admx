@@ -1,0 +1,170 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { registrarEvento } from "@/lib/evento";
+import type { Moneda, MetodoPago } from "@/generated/prisma/client";
+
+export type PagoFormState = { error?: string } | undefined;
+
+async function currentUserId() {
+  const session = await auth();
+  const id = session?.user?.id;
+  return id ? Number(id) : null;
+}
+
+function parsePagoForm(formData: FormData) {
+  const servicioIdRaw = String(formData.get("servicioId") ?? "");
+  const fechaRaw = String(formData.get("fecha") ?? "");
+  const metodoPago = String(formData.get("metodoPago") ?? "") as MetodoPago;
+  const montoRaw = String(formData.get("monto") ?? "");
+  const comisionRaw = String(formData.get("comision") ?? "");
+  const monedaRaw = String(formData.get("moneda") ?? "");
+  const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
+  const cuenta = String(formData.get("cuenta") ?? "").trim() || null;
+  const comprobante = String(formData.get("comprobante") ?? "").trim() || null;
+  const confirmado = formData.get("confirmado") === "on";
+
+  return {
+    servicioId: servicioIdRaw ? Number(servicioIdRaw) : null,
+    fecha: fechaRaw ? new Date(fechaRaw) : new Date(),
+    metodoPago,
+    montoRaw,
+    comisionRaw,
+    moneda,
+    cuenta,
+    comprobante,
+    confirmado,
+  };
+}
+
+function validatePagoForm(data: ReturnType<typeof parsePagoForm>) {
+  if (!data.servicioId) return "Selecciona un servicio.";
+  if (!data.metodoPago) return "Selecciona un método de pago.";
+  if (!data.montoRaw || Number.isNaN(Number(data.montoRaw)) || Number(data.montoRaw) <= 0) {
+    return "El monto debe ser un número mayor a cero.";
+  }
+  if (data.comisionRaw && (Number.isNaN(Number(data.comisionRaw)) || Number(data.comisionRaw) < 0)) {
+    return "La comisión debe ser un número válido.";
+  }
+  return null;
+}
+
+export async function crearPago(
+  _prevState: PagoFormState,
+  formData: FormData
+): Promise<PagoFormState> {
+  const data = parsePagoForm(formData);
+  const error = validatePagoForm(data);
+  if (error) return { error };
+
+  const userId = await currentUserId();
+
+  const pago = await prisma.pago.create({
+    data: {
+      servicioId: data.servicioId!,
+      fecha: data.fecha,
+      metodoPago: data.metodoPago,
+      monto: data.montoRaw,
+      comision: data.comisionRaw || null,
+      moneda: data.moneda,
+      cuenta: data.cuenta,
+      comprobante: data.comprobante,
+      confirmado: data.confirmado,
+      confirmadoPorId: data.confirmado ? userId : null,
+      confirmadoEn: data.confirmado ? new Date() : null,
+    },
+  });
+
+  await registrarEvento("pago.creado", "Pago", pago.id, {
+    servicioId: data.servicioId,
+    monto: data.montoRaw,
+  });
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${data.servicioId}`);
+  revalidatePath("/admin");
+  return undefined;
+}
+
+export async function actualizarPago(
+  id: number,
+  _prevState: PagoFormState,
+  formData: FormData
+): Promise<PagoFormState> {
+  const pago = await prisma.pago.findUnique({ where: { id } });
+  if (!pago) return { error: "Este pago ya no existe." };
+
+  const data = parsePagoForm(formData);
+  const error = validatePagoForm(data);
+  if (error) return { error };
+
+  const userId = await currentUserId();
+  const seConfirmaAhora = data.confirmado && !pago.confirmado;
+
+  await prisma.pago.update({
+    where: { id },
+    data: {
+      servicioId: data.servicioId!,
+      fecha: data.fecha,
+      metodoPago: data.metodoPago,
+      monto: data.montoRaw,
+      comision: data.comisionRaw || null,
+      moneda: data.moneda,
+      cuenta: data.cuenta,
+      comprobante: data.comprobante,
+      confirmado: data.confirmado,
+      confirmadoPorId: seConfirmaAhora ? userId : pago.confirmadoPorId,
+      confirmadoEn: seConfirmaAhora ? new Date() : pago.confirmadoEn,
+    },
+  });
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${data.servicioId}`);
+  if (pago.servicioId !== data.servicioId) revalidatePath(`/admin/servicios/${pago.servicioId}`);
+  revalidatePath("/admin");
+  return undefined;
+}
+
+export async function eliminarPago(id: number) {
+  const pago = await prisma.pago.findUnique({ where: { id } });
+  if (!pago) return;
+
+  await prisma.pago.delete({ where: { id } });
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${pago.servicioId}`);
+  revalidatePath("/admin");
+}
+
+export async function confirmarPago(id: number) {
+  const pago = await prisma.pago.findUnique({ where: { id } });
+  if (!pago || pago.confirmado) return;
+
+  const userId = await currentUserId();
+
+  await prisma.$transaction([
+    prisma.pago.update({
+      where: { id },
+      data: { confirmado: true, confirmadoPorId: userId, confirmadoEn: new Date() },
+    }),
+    ...(pago.cotizacionId
+      ? [
+          prisma.cotizacion.update({
+            where: { id: pago.cotizacionId },
+            data: { status: "Pagada" as const, pagoConfirmado: true, fechaPago: new Date() },
+          }),
+        ]
+      : []),
+  ]);
+
+  await registrarEvento("pago.confirmado", "Pago", id, {});
+
+  revalidatePath("/admin/pagos");
+  revalidatePath(`/admin/servicios/${pago.servicioId}`);
+  if (pago.cotizacionId) revalidatePath(`/admin/cotizaciones/${pago.cotizacionId}`);
+  revalidatePath("/admin/cotizaciones");
+  revalidatePath("/admin");
+}
