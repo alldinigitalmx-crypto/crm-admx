@@ -12,6 +12,7 @@ import {
   Package,
   LifeBuoy,
   ShieldCheck,
+  Handshake,
   Code2,
   ListTodo,
   Wallet,
@@ -25,7 +26,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
@@ -41,9 +41,9 @@ const navPrincipal = [
   { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy },
   { title: "Productos", href: "/admin/productos", icon: Package },
   { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag },
+  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake },
+  { title: "Usuarios y Accesos", href: "/admin/usuarios", icon: ShieldCheck },
 ];
-
-const navProximamente = [{ title: "Usuarios y Accesos", icon: ShieldCheck }];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -82,16 +82,6 @@ export function AppSidebar() {
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-
-              {navProximamente.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton disabled tooltip={item.title}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                  <SidebarMenuBadge>Pronto</SidebarMenuBadge>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

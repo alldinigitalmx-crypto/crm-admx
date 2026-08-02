@@ -408,9 +408,9 @@ export default async function AdminDashboardPage() {
           >
             {ticketsPendientes.map((t) => (
               <li key={t.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
+                <Link href="/admin/usuarios" className="truncate hover:underline">
                   {t.usuarioSolicitante.nombre} — {t.moduloSolicitado}
-                </span>
+                </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {fecha.format(t.fechaSolicitud)}
                 </span>
@@ -472,9 +472,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Clientes, Servicios, Cotizaciones, Pagos, Tareas, Gastos, Quejas y
-        Productos/Ventas ya están disponibles — Usuarios y Accesos llega en
-        próximas fases.
+        Todos los módulos de Fase 1 están disponibles.
       </p>
     </div>
   );
