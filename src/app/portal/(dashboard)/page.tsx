@@ -185,7 +185,19 @@ export default async function PortalPage() {
                       {q.descripcion}
                     </p>
                   </div>
-                  <QuejaDetalleDialog queja={{ ...q, cliente: { nombre: cliente.nombre } }} />
+                  <QuejaDetalleDialog
+                    queja={{
+                      id: q.id,
+                      categoria: q.categoria,
+                      descripcion: q.descripcion,
+                      status: q.status,
+                      respuesta: q.respuesta,
+                      creadoEn: q.creadoEn,
+                      respondidoEn: q.respondidoEn,
+                      cliente: { nombre: cliente.nombre },
+                      servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                    }}
+                  />
                 </div>
               ))}
             </div>

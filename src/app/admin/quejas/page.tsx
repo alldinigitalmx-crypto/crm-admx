@@ -180,7 +180,20 @@ export default async function QuejasPage({
                     <TableCell>{formatDate(q.creadoEn)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <QuejaDetalleDialog queja={q} action={actualizarQueja.bind(null, q.id)} />
+                        <QuejaDetalleDialog
+                          queja={{
+                            id: q.id,
+                            categoria: q.categoria,
+                            descripcion: q.descripcion,
+                            status: q.status,
+                            respuesta: q.respuesta,
+                            creadoEn: q.creadoEn,
+                            respondidoEn: q.respondidoEn,
+                            cliente: { nombre: q.cliente.nombre },
+                            servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                          }}
+                          action={actualizarQueja.bind(null, q.id)}
+                        />
                         <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
                       </div>
                     </TableCell>

@@ -355,7 +355,17 @@ export default async function ClienteDetallePage({
                     <TableCell>{formatDate(q.creadoEn)}</TableCell>
                     <TableCell>
                       <QuejaDetalleDialog
-                        queja={{ ...q, cliente: { nombre: cliente.nombre } }}
+                        queja={{
+                          id: q.id,
+                          categoria: q.categoria,
+                          descripcion: q.descripcion,
+                          status: q.status,
+                          respuesta: q.respuesta,
+                          creadoEn: q.creadoEn,
+                          respondidoEn: q.respondidoEn,
+                          cliente: { nombre: cliente.nombre },
+                          servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                        }}
                         action={actualizarQueja.bind(null, q.id)}
                       />
                     </TableCell>
