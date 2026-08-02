@@ -237,7 +237,21 @@ export default async function PagosPage({
                           </form>
                         )}
                         <PagoDetalleDialog
-                          pago={p}
+                          pago={{
+                            id: p.id,
+                            fecha: p.fecha,
+                            metodoPago: p.metodoPago,
+                            monto: Number(p.monto),
+                            comision: p.comision ? Number(p.comision) : null,
+                            moneda: p.moneda,
+                            cuenta: p.cuenta,
+                            comprobante: p.comprobante,
+                            confirmado: p.confirmado,
+                            servicio: {
+                              descripcion: p.servicio.descripcion,
+                              cliente: { nombre: p.servicio.cliente.nombre },
+                            },
+                          }}
                           comprobanteArchivo={comprobantePorPago.get(p.id) ?? null}
                           servicioId={p.servicio.id}
                           subirComprobante={subirComprobantePago.bind(null, p.id)}
@@ -252,7 +266,17 @@ export default async function PagosPage({
                           title="Editar pago"
                           action={actualizarPago.bind(null, p.id)}
                           servicios={servicioOpciones}
-                          defaultValues={p}
+                          defaultValues={{
+                            servicioId: p.servicioId,
+                            fecha: p.fecha,
+                            metodoPago: p.metodoPago,
+                            monto: Number(p.monto),
+                            comision: p.comision ? Number(p.comision) : null,
+                            moneda: p.moneda,
+                            cuenta: p.cuenta,
+                            comprobante: p.comprobante,
+                            confirmado: p.confirmado,
+                          }}
                           submitLabel="Guardar cambios"
                         />
                         <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
