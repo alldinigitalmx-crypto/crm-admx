@@ -196,6 +196,7 @@ export default async function PortalPage() {
                       respondidoEn: q.respondidoEn,
                       cliente: { nombre: cliente.nombre },
                       servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                      asignadoAId: q.asignadoAId,
                     }}
                   />
                 </div>

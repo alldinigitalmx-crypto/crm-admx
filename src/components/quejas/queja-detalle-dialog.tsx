@@ -44,18 +44,23 @@ export type QuejaDetalle = {
   respondidoEn: Date | null;
   cliente: { nombre: string };
   servicio: { descripcion: string } | null;
+  asignadoAId: number | null;
 };
 
 function ResponderForm({
   quejaId,
   status,
   respuesta,
+  asignadoAId,
+  usuarios,
   action,
   onSuccess,
 }: {
   quejaId: number;
   status: string;
   respuesta: string | null;
+  asignadoAId: number | null;
+  usuarios: { id: number; nombre: string }[];
   action: (prevState: QuejaFormState, formData: FormData) => Promise<QuejaFormState>;
   onSuccess?: () => void;
 }) {
@@ -98,6 +103,25 @@ function ResponderForm({
           placeholder="Escribe tu respuesta para el cliente..."
         />
       </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`asignadoAId-${quejaId}`}>Asignado a</Label>
+        <Select
+          name="asignadoAId"
+          defaultValue={asignadoAId ? String(asignadoAId) : "none"}
+        >
+          <SelectTrigger id={`asignadoAId-${quejaId}`} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sin asignar</SelectItem>
+            {usuarios.map((u) => (
+              <SelectItem key={u.id} value={String(u.id)}>
+                {u.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <Button type="submit" size="sm" disabled={isPending} className="self-start">
         {isPending ? "Guardando..." : "Guardar"}
       </Button>
@@ -108,9 +132,11 @@ function ResponderForm({
 export function QuejaDetalleDialog({
   queja,
   action,
+  usuarios = [],
 }: {
   queja: QuejaDetalle;
   action?: (prevState: QuejaFormState, formData: FormData) => Promise<QuejaFormState>;
+  usuarios?: { id: number; nombre: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -173,6 +199,8 @@ export function QuejaDetalleDialog({
               quejaId={queja.id}
               status={queja.status}
               respuesta={queja.respuesta}
+              asignadoAId={queja.asignadoAId}
+              usuarios={usuarios}
               action={action}
               onSuccess={() => setOpen(false)}
             />

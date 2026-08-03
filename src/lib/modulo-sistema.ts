@@ -8,6 +8,7 @@ export const MODULOS: ModuloSistema[] = [
   "Productos",
   "Ventas",
   "Quejas",
+  "Tareas",
   "Usuarios",
   "Portal",
 ];
@@ -20,6 +21,7 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   Productos: "Productos",
   Ventas: "Ventas",
   Quejas: "Quejas / Help Desk",
+  Tareas: "Tareas",
   Usuarios: "Usuarios y Accesos",
   Portal: "Portal del cliente",
 };

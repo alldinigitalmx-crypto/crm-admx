@@ -417,6 +417,7 @@ enum ModuloSistema {
   Quejas
   Usuarios
   Portal
+  Tareas
 }
 
 enum StatusTicketAcceso {

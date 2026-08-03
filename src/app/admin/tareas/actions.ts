@@ -3,15 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
 import type { PrioridadTarea } from "@/generated/prisma/client";
 
 export type TareaFormState = { error?: string } | undefined;
 
 async function currentUserId() {
-  const session = await auth();
-  const id = session?.user?.id;
-  return id ? Number(id) : null;
+  const usuario = await currentUsuario();
+  return usuario?.id ?? null;
 }
 
 function revalidateTareaPaths(servicioId: number | null, cotizacionId: number | null) {
@@ -37,6 +36,8 @@ export async function crearTarea(
   const servicioId = tipo === "servicio" ? Number(idRaw) : null;
   const cotizacionId = tipo === "cotizacion" ? Number(idRaw) : null;
 
+  const asignadoAIdRaw = String(formData.get("asignadoAId") ?? "");
+
   const userId = await currentUserId();
 
   await prisma.tarea.create({
@@ -48,6 +49,7 @@ export async function crearTarea(
       servicioId,
       cotizacionId,
       creadoPorId: userId,
+      asignadoAId: asignadoAIdRaw ? Number(asignadoAIdRaw) : userId,
     },
   });
 

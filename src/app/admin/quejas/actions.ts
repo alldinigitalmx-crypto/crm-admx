@@ -3,16 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
 import { registrarEvento } from "@/lib/evento";
 import type { CategoriaQueja, StatusQueja } from "@/generated/prisma/client";
 
 export type QuejaFormState = { error?: string } | undefined;
 
 async function currentUserId() {
-  const session = await auth();
-  const id = session?.user?.id;
-  return id ? Number(id) : null;
+  const usuario = await currentUsuario();
+  return usuario?.id ?? null;
 }
 
 export async function crearQueja(
@@ -56,6 +55,9 @@ export async function actualizarQueja(
   if (!status) return { error: "Selecciona un status." };
 
   const respuesta = String(formData.get("respuesta") ?? "").trim() || null;
+  const asignadoAIdRaw = String(formData.get("asignadoAId") ?? "");
+  const asignadoAId =
+    asignadoAIdRaw && asignadoAIdRaw !== "none" ? Number(asignadoAIdRaw) : null;
   const userId = await currentUserId();
   const seResponde = Boolean(respuesta) && respuesta !== queja.respuesta;
 
@@ -64,6 +66,7 @@ export async function actualizarQueja(
     data: {
       status,
       respuesta,
+      asignadoAId,
       respondidoPorId: seResponde ? userId : queja.respondidoPorId,
       respondidoEn: seResponde ? new Date() : queja.respondidoEn,
     },

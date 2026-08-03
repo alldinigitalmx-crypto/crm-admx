@@ -19,6 +19,8 @@ export function TareaFormDialog({
   action,
   vinculos,
   vinculoFijo,
+  usuarios,
+  usuarioActualId,
   triggerLabel = "Nueva tarea",
 }: {
   action: (
@@ -27,6 +29,8 @@ export function TareaFormDialog({
   ) => Promise<TareaFormState>;
   vinculos?: VinculoOption[];
   vinculoFijo?: { value: string; label: string };
+  usuarios: { id: number; nombre: string }[];
+  usuarioActualId?: number;
   triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,6 +54,8 @@ export function TareaFormDialog({
           action={action}
           vinculos={vinculos}
           vinculoFijo={vinculoFijo}
+          usuarios={usuarios}
+          usuarioActualId={usuarioActualId}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

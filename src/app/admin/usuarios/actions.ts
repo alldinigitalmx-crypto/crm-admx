@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import type {
+  AlcanceModuloPermiso,
   NivelPermiso,
   RolUsuario,
   StatusTicketAcceso,
@@ -106,17 +107,21 @@ export async function actualizarUsuario(
   return undefined;
 }
 
-export async function guardarPermisos(usuarioId: number, permisos: Record<string, string>) {
+export async function guardarPermisos(
+  usuarioId: number,
+  permisos: Record<string, { nivel: string; alcance: string }>
+) {
   await prisma.$transaction(
     MODULOS.map((modulo) => {
-      const nivel = permisos[modulo] ?? "none";
-      if (nivel === "none") {
+      const { nivel = "none", alcance = "Propio" } = permisos[modulo] ?? {};
+      if (nivel === "none" && alcance === "Propio") {
         return prisma.moduloPermiso.deleteMany({ where: { usuarioId, modulo } });
       }
+      const nivelGuardado = (nivel === "none" ? "Ver" : nivel) as NivelPermiso;
       return prisma.moduloPermiso.upsert({
         where: { usuarioId_modulo: { usuarioId, modulo } },
-        create: { usuarioId, modulo, nivel: nivel as NivelPermiso },
-        update: { nivel: nivel as NivelPermiso },
+        create: { usuarioId, modulo, nivel: nivelGuardado, alcance: alcance as AlcanceModuloPermiso },
+        update: { nivel: nivelGuardado, alcance: alcance as AlcanceModuloPermiso },
       });
     })
   );

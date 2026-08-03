@@ -3,9 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
 import { TareaLista } from "@/components/tareas/tarea-lista";
 import { crearTarea } from "@/app/admin/tareas/actions";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
+import type { Prisma } from "@/generated/prisma/client";
 
 export default async function TareasPage() {
-  const [servicios, cotizaciones, tareas] = await Promise.all([
+  const usuario = await currentUsuario();
+  const verTodo = await puedeVerTodo(usuario, "Tareas");
+
+  const tareaWhere: Prisma.TareaWhereInput =
+    !verTodo && usuario ? { asignadoAId: usuario.id } : {};
+
+  const [servicios, cotizaciones, usuarios, tareas] = await Promise.all([
     prisma.servicio.findMany({
       where: { status: { notIn: ["Entregado", "Cancelado"] } },
       select: { id: true, descripcion: true },
@@ -16,7 +25,13 @@ export default async function TareasPage() {
       include: { cliente: true },
       orderBy: { creadoEn: "desc" },
     }),
+    prisma.usuario.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
     prisma.tarea.findMany({
+      where: tareaWhere,
       orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }],
       include: { servicio: true, cotizacion: { include: { cliente: true } } },
     }),
@@ -43,7 +58,12 @@ export default async function TareasPage() {
             {completadas.length} completada{completadas.length === 1 ? "" : "s"}
           </p>
         </div>
-        <TareaFormDialog action={crearTarea} vinculos={vinculos} />
+        <TareaFormDialog
+          action={crearTarea}
+          vinculos={vinculos}
+          usuarios={usuarios}
+          usuarioActualId={usuario?.id}
+        />
       </div>
 
       <Card>

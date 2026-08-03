@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Plus, ChevronRight } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -25,18 +27,31 @@ export default async function ClientesPage({
   const { q } = await searchParams;
   const query = q?.trim();
 
-  const clientes = await prisma.cliente.findMany({
-    where: query
-      ? {
-          OR: [
-            { nombre: { contains: query, mode: "insensitive" } },
-            { email: { contains: query, mode: "insensitive" } },
-            { pais: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    orderBy: { creadoEn: "desc" },
-  });
+  const [clientes, usuario] = await Promise.all([
+    prisma.cliente.findMany({
+      where: query
+        ? {
+            OR: [
+              { nombre: { contains: query, mode: "insensitive" } },
+              { email: { contains: query, mode: "insensitive" } },
+              { pais: { contains: query, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
+      orderBy: { creadoEn: "desc" },
+    }),
+    currentUsuario(),
+  ]);
+
+  const verTodo = await puedeVerTodo(usuario, "Clientes");
+  let clientesPropios: Set<number> | null = null;
+  if (!verTodo && usuario) {
+    const servicios = await prisma.servicio.findMany({
+      where: { responsableId: usuario.id },
+      select: { clienteId: true },
+    });
+    clientesPropios = new Set(servicios.map((s) => s.clienteId));
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -94,37 +109,48 @@ export default async function ClientesPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clientes.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/admin/clientes/${c.id}`}
-                        className="hover:underline"
-                      >
-                        {c.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {c.etiqueta ? (
-                        <Badge variant="outline">{c.etiqueta}</Badge>
+                {clientes.map((c) => {
+                  const esPropio = !clientesPropios || clientesPropios.has(c.id);
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/admin/clientes/${c.id}`}
+                          className="hover:underline"
+                        >
+                          {c.nombre}
+                        </Link>
+                      </TableCell>
+                      {esPropio ? (
+                        <>
+                          <TableCell>
+                            {c.etiqueta ? (
+                              <Badge variant="outline">{c.etiqueta}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{c.pais ?? "—"}</TableCell>
+                          <TableCell>{c.email ?? "—"}</TableCell>
+                          <TableCell>{c.medioCaptacion ?? "—"}</TableCell>
+                        </>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <TableCell colSpan={4} className="text-muted-foreground">
+                          No tienes servicios asignados de este cliente
+                        </TableCell>
                       )}
-                    </TableCell>
-                    <TableCell>{c.pais ?? "—"}</TableCell>
-                    <TableCell>{c.email ?? "—"}</TableCell>
-                    <TableCell>{c.medioCaptacion ?? "—"}</TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/clientes/${c.id}`}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label={`Ver detalle de ${c.nombre}`}
-                      >
-                        <ChevronRight className="size-4" />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        <Link
+                          href={`/admin/clientes/${c.id}`}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Ver detalle de ${c.nombre}`}
+                        >
+                          <ChevronRight className="size-4" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

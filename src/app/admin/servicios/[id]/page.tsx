@@ -316,6 +316,8 @@ export default async function ServicioDetallePage({
           <TareaFormDialog
             action={crearTarea}
             vinculoFijo={{ value: `servicio:${servicio.id}`, label: servicio.descripcion }}
+            usuarios={usuarios}
+            usuarioActualId={usuarioActual?.id}
           />
         </CardHeader>
         <CardContent>

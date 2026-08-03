@@ -5,6 +5,7 @@ import { FileDown, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,10 +63,18 @@ export default async function CotizacionDetallePage({
 
   if (!cotizacion) notFound();
 
-  const archivos = await prisma.archivo.findMany({
-    where: { entidadTipo: "Cotizacion", entidadId: cotizacion.id },
-    orderBy: { creadoEn: "desc" },
-  });
+  const [archivos, usuarios, usuarioActual] = await Promise.all([
+    prisma.archivo.findMany({
+      where: { entidadTipo: "Cotizacion", entidadId: cotizacion.id },
+      orderBy: { creadoEn: "desc" },
+    }),
+    prisma.usuario.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
+    currentUsuario(),
+  ]);
   const firma = archivos.find((a) => a.nombre.startsWith("firma-"));
 
   const montoDescuento =
@@ -177,6 +186,8 @@ export default async function CotizacionDetallePage({
           <TareaFormDialog
             action={crearTarea}
             vinculoFijo={{ value: `cotizacion:${cotizacion.id}`, label: descripcion }}
+            usuarios={usuarios}
+            usuarioActualId={usuarioActual?.id}
           />
         </CardHeader>
         <CardContent>

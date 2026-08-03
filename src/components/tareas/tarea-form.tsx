@@ -21,6 +21,8 @@ export function TareaForm({
   action,
   vinculos,
   vinculoFijo,
+  usuarios,
+  usuarioActualId,
   onSuccess,
 }: {
   action: (
@@ -29,6 +31,8 @@ export function TareaForm({
   ) => Promise<TareaFormState>;
   vinculos?: VinculoOption[];
   vinculoFijo?: { value: string; label: string };
+  usuarios: { id: number; nombre: string }[];
+  usuarioActualId?: number;
   onSuccess?: () => void;
 }) {
   const wrappedAction = async (prevState: TareaFormState, formData: FormData) => {
@@ -74,6 +78,25 @@ export function TareaForm({
         <div className="flex flex-col gap-2">
           <Label htmlFor="fechaLimite">Fecha límite</Label>
           <Input id="fechaLimite" name="fechaLimite" type="date" />
+        </div>
+
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <Label htmlFor="asignadoAId">Asignado a</Label>
+          <Select
+            name="asignadoAId"
+            defaultValue={usuarioActualId ? String(usuarioActualId) : undefined}
+          >
+            <SelectTrigger id="asignadoAId" className="w-full">
+              <SelectValue placeholder="Selecciona un responsable" />
+            </SelectTrigger>
+            <SelectContent>
+              {usuarios.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {vinculos && (

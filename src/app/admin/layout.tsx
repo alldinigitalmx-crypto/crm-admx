@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { currentUsuario } from "@/lib/current-usuario";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AdminTopbar } from "@/components/admin-topbar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -15,7 +15,7 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  const usuario = await prisma.usuario.findUnique({ where: { id: Number(session.user.id) } });
+  const usuario = await currentUsuario();
   if (!usuario?.activo) {
     redirect("/login");
   }

@@ -5,6 +5,8 @@ import { Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,6 +78,31 @@ export default async function ClienteDetallePage({
     : null;
 
   if (!cliente) notFound();
+
+  const usuarioActual = await currentUsuario();
+  const verTodoClientes = await puedeVerTodo(usuarioActual, "Clientes");
+  const esPropio =
+    verTodoClientes ||
+    cliente.servicios.some((s) => s.responsableId === usuarioActual?.id);
+
+  if (!esPropio) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold">{cliente.nombre}</h1>
+          <p className="text-sm text-muted-foreground">
+            No tienes servicios asignados de este cliente — solo puedes ver su nombre.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const usuarios = await prisma.usuario.findMany({
+    where: { activo: true },
+    select: { id: true, nombre: true },
+    orderBy: { nombre: "asc" },
+  });
 
   const clienteFijoOpcion = {
     id: cliente.id,
@@ -365,8 +392,10 @@ export default async function ClienteDetallePage({
                           respondidoEn: q.respondidoEn,
                           cliente: { nombre: cliente.nombre },
                           servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                          asignadoAId: q.asignadoAId,
                         }}
                         action={actualizarQueja.bind(null, q.id)}
+                        usuarios={usuarios}
                       />
                     </TableCell>
                   </TableRow>

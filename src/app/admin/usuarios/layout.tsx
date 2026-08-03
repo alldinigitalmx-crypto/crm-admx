@@ -1,17 +1,13 @@
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { currentUsuario } from "@/lib/current-usuario";
 
 export default async function UsuariosLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  const usuario = await prisma.usuario.findUnique({
-    where: { id: Number(session?.user?.id) },
-  });
+  const usuario = await currentUsuario();
 
   if (usuario?.rol !== "Admin") {
     redirect("/admin");

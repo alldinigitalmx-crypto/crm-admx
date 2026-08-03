@@ -118,6 +118,9 @@ export default async function UsuariosPage() {
                 const permisos = Object.fromEntries(
                   u.moduloPermisos.map((p) => [p.modulo, p.nivel])
                 );
+                const alcances = Object.fromEntries(
+                  u.moduloPermisos.map((p) => [p.modulo, p.alcance])
+                );
                 return (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.nombre}</TableCell>
@@ -134,6 +137,7 @@ export default async function UsuariosPage() {
                       <PermisosDialog
                         usuarioId={u.id}
                         permisos={permisos}
+                        alcances={alcances}
                         trigger={
                           <Button size="sm" variant="outline">
                             <ShieldCheck className="size-4" />

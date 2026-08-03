@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { puedeVerTodo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -39,19 +41,32 @@ export default async function QuejasPage({
 }) {
   const { status, categoria, clienteId } = await searchParams;
 
-  const clientesConServicios = await prisma.cliente.findMany({
-    select: {
-      id: true,
-      nombre: true,
-      servicios: { select: { id: true, descripcion: true }, orderBy: { creadoEn: "desc" } },
-    },
-    orderBy: { nombre: "asc" },
-  });
+  const [clientesConServicios, usuarios, usuario] = await Promise.all([
+    prisma.cliente.findMany({
+      select: {
+        id: true,
+        nombre: true,
+        servicios: { select: { id: true, descripcion: true }, orderBy: { creadoEn: "desc" } },
+      },
+      orderBy: { nombre: "asc" },
+    }),
+    prisma.usuario.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
+    currentUsuario(),
+  ]);
+
+  const verTodo = await puedeVerTodo(usuario, "Quejas");
 
   const where: Prisma.QuejaWhereInput = {};
   if (status) where.status = status as StatusQueja;
   if (categoria) where.categoria = categoria as CategoriaQueja;
   if (clienteId) where.clienteId = Number(clienteId);
+  if (!verTodo && usuario) {
+    where.OR = [{ asignadoAId: usuario.id }, { servicio: { responsableId: usuario.id } }];
+  }
 
   const hasFiltros = Boolean(status || categoria || clienteId);
 
@@ -191,8 +206,10 @@ export default async function QuejasPage({
                             respondidoEn: q.respondidoEn,
                             cliente: { nombre: q.cliente.nombre },
                             servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                            asignadoAId: q.asignadoAId,
                           }}
                           action={actualizarQueja.bind(null, q.id)}
+                          usuarios={usuarios}
                         />
                         <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
                       </div>
