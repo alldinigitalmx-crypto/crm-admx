@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -60,6 +60,12 @@ export default async function VentasPage({
 
   const hasFiltros = Boolean(origen || canal || desde || hasta);
 
+  const exportParams = new URLSearchParams();
+  if (origen) exportParams.set("origen", origen);
+  if (canal) exportParams.set("canal", canal);
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
+
   const ventas = await prisma.venta.findMany({
     where,
     include: { detalles: { include: { producto: true } }, referidoPor: true },
@@ -84,21 +90,29 @@ export default async function VentasPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (ventas.length === 1 ? "" : "s")}
           </p>
         </div>
-        {permisos.puedeCrear &&
-          (productoOpciones.length > 0 ? (
-            <VentaFormDialog
-              title="Nueva venta"
-              description="Registra una venta manual o de la tienda online."
-              action={crearVenta}
-              productos={productoOpciones}
-              clientes={clientes}
-              submitLabel="Registrar venta"
-            />
-          ) : (
-            <Button disabled title="Primero registra un producto">
-              Nueva venta
-            </Button>
-          ))}
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/ventas/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          {permisos.puedeCrear &&
+            (productoOpciones.length > 0 ? (
+              <VentaFormDialog
+                title="Nueva venta"
+                description="Registra una venta manual o de la tienda online."
+                action={crearVenta}
+                productos={productoOpciones}
+                clientes={clientes}
+                submitLabel="Registrar venta"
+              />
+            ) : (
+              <Button disabled title="Primero registra un producto">
+                Nueva venta
+              </Button>
+            ))}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

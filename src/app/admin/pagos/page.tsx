@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -76,6 +76,13 @@ export default async function PagosPage({
 
   const hasFiltros = Boolean(servicioId || metodoPago || confirmado || desde || hasta);
 
+  const exportParams = new URLSearchParams();
+  if (servicioId) exportParams.set("servicioId", servicioId);
+  if (metodoPago) exportParams.set("metodoPago", metodoPago);
+  if (confirmado) exportParams.set("confirmado", confirmado);
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
+
   const pagos = await prisma.pago.findMany({
     where,
     include: { servicio: { include: { cliente: true } } },
@@ -104,27 +111,35 @@ export default async function PagosPage({
             {totalComision > 0 ? ` (comisiones: ${formatCurrency(totalComision)})` : ""}
           </p>
         </div>
-        {permisos.puedeCrear &&
-          (servicioOpciones.length > 0 ? (
-            <PagoFormDialog
-              trigger={
-                <Button>
-                  <Plus />
-                  Nuevo pago
-                </Button>
-              }
-              title="Nuevo pago"
-              description="Registra un pago recibido para un servicio."
-              action={crearPago}
-              servicios={servicioOpciones}
-              submitLabel="Registrar pago"
-            />
-          ) : (
-            <Button disabled title="Primero registra un servicio">
-              <Plus />
-              Nuevo pago
-            </Button>
-          ))}
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/pagos/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          {permisos.puedeCrear &&
+            (servicioOpciones.length > 0 ? (
+              <PagoFormDialog
+                trigger={
+                  <Button>
+                    <Plus />
+                    Nuevo pago
+                  </Button>
+                }
+                title="Nuevo pago"
+                description="Registra un pago recibido para un servicio."
+                action={crearPago}
+                servicios={servicioOpciones}
+                submitLabel="Registrar pago"
+              />
+            ) : (
+              <Button disabled title="Primero registra un servicio">
+                <Plus />
+                Nuevo pago
+              </Button>
+            ))}
+        </div>
       </div>
 
       <Card>

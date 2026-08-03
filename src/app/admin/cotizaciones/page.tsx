@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
@@ -76,6 +76,10 @@ export default async function CotizacionesPage({
 
   const hasFiltros = Boolean(clienteId || status);
 
+  const exportParams = new URLSearchParams();
+  if (clienteId) exportParams.set("clienteId", clienteId);
+  if (status) exportParams.set("status", status);
+
   const cotizaciones = await prisma.cotizacion.findMany({
     where,
     include: { cliente: true, servicio: true },
@@ -92,28 +96,36 @@ export default async function CotizacionesPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (cotizaciones.length === 1 ? "" : "s")}
           </p>
         </div>
-        {permisos.puedeCrear &&
-          (clientes.length > 0 ? (
-            <CotizacionFormDialog
-              trigger={
-                <Button>
-                  <Plus />
-                  Nueva cotización
-                </Button>
-              }
-              title="Nueva cotización"
-              description="Para un servicio existente, o una nueva negociación con un cliente."
-              action={crearCotizacion}
-              servicios={servicioOpciones.length > 0 ? servicioOpciones : undefined}
-              clientes={clientes}
-              submitLabel="Crear cotización"
-            />
-          ) : (
-            <Button disabled title="Primero registra un cliente">
-              <Plus />
-              Nueva cotización
-            </Button>
-          ))}
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/cotizaciones/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          {permisos.puedeCrear &&
+            (clientes.length > 0 ? (
+              <CotizacionFormDialog
+                trigger={
+                  <Button>
+                    <Plus />
+                    Nueva cotización
+                  </Button>
+                }
+                title="Nueva cotización"
+                description="Para un servicio existente, o una nueva negociación con un cliente."
+                action={crearCotizacion}
+                servicios={servicioOpciones.length > 0 ? servicioOpciones : undefined}
+                clientes={clientes}
+                submitLabel="Crear cotización"
+              />
+            ) : (
+              <Button disabled title="Primero registra un cliente">
+                <Plus />
+                Nueva cotización
+              </Button>
+            ))}
+        </div>
       </div>
 
       <Card>

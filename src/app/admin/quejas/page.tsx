@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
 import { DeleteQuejaButton } from "@/components/quejas/delete-queja-button";
@@ -72,6 +73,11 @@ export default async function QuejasPage({
 
   const hasFiltros = Boolean(status || categoria || clienteId);
 
+  const exportParams = new URLSearchParams();
+  if (status) exportParams.set("status", status);
+  if (categoria) exportParams.set("categoria", categoria);
+  if (clienteId) exportParams.set("clienteId", clienteId);
+
   const quejas = await prisma.queja.findMany({
     where,
     include: { cliente: true, servicio: true },
@@ -88,19 +94,27 @@ export default async function QuejasPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (quejas.length === 1 ? "" : "s")}
           </p>
         </div>
-        {permisos.puedeCrear &&
-          (clientesConServicios.length > 0 ? (
-            <QuejaFormDialog
-              triggerLabel="Nueva queja"
-              description="Registra una queja o ticket de soporte a nombre de un cliente."
-              action={crearQueja}
-              clientes={clientesConServicios}
-            />
-          ) : (
-            <Button disabled title="Primero registra un cliente">
-              Nueva queja
-            </Button>
-          ))}
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/quejas/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          {permisos.puedeCrear &&
+            (clientesConServicios.length > 0 ? (
+              <QuejaFormDialog
+                triggerLabel="Nueva queja"
+                description="Registra una queja o ticket de soporte a nombre de un cliente."
+                action={crearQueja}
+                clientes={clientesConServicios}
+              />
+            ) : (
+              <Button disabled title="Primero registra un cliente">
+                Nueva queja
+              </Button>
+            ))}
+        </div>
       </div>
 
       <Card>

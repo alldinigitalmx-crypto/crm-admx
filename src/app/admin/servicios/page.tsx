@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
@@ -77,6 +77,13 @@ export default async function ServiciosPage({
 
   const hasFiltros = Boolean(clienteId || status || intermediarioId || desde || hasta);
 
+  const exportParams = new URLSearchParams();
+  if (clienteId) exportParams.set("clienteId", clienteId);
+  if (status) exportParams.set("status", status);
+  if (intermediarioId) exportParams.set("intermediarioId", intermediarioId);
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
+
   const servicios = await prisma.servicio.findMany({
     where,
     include: { cliente: true, intermediario: true, ordenesCambio: true },
@@ -93,24 +100,32 @@ export default async function ServiciosPage({
             {hasFiltros ? " con estos filtros" : " registrado" + (servicios.length === 1 ? "" : "s")}
           </p>
         </div>
-        {permisos.puedeCrear && (
-          <ServicioFormDialog
-            trigger={
-              <Button>
-                <Plus />
-                Nuevo servicio
-              </Button>
-            }
-            title="Nuevo servicio"
-            description="Registra un nuevo servicio o trabajo."
-            action={createServicio}
-            clientes={clientes}
-            intermediarios={intermediarios}
-            usuarios={usuarios}
-            usuarioActualId={usuario?.id}
-            submitLabel="Crear servicio"
-          />
-        )}
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/servicios/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          {permisos.puedeCrear && (
+            <ServicioFormDialog
+              trigger={
+                <Button>
+                  <Plus />
+                  Nuevo servicio
+                </Button>
+              }
+              title="Nuevo servicio"
+              description="Registra un nuevo servicio o trabajo."
+              action={createServicio}
+              clientes={clientes}
+              intermediarios={intermediarios}
+              usuarios={usuarios}
+              usuarioActualId={usuario?.id}
+              submitLabel="Crear servicio"
+            />
+          )}
+        </div>
       </div>
 
       <Card>
