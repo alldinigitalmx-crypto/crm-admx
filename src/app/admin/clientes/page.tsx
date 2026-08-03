@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, ChevronRight } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { puedeVerTodo } from "@/lib/alcance";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -27,23 +28,24 @@ export default async function ClientesPage({
   const { q } = await searchParams;
   const query = q?.trim();
 
-  const [clientes, usuario] = await Promise.all([
-    prisma.cliente.findMany({
-      where: query
-        ? {
-            OR: [
-              { nombre: { contains: query, mode: "insensitive" } },
-              { email: { contains: query, mode: "insensitive" } },
-              { pais: { contains: query, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
-      orderBy: { creadoEn: "desc" },
-    }),
-    currentUsuario(),
-  ]);
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Clientes");
+  if (!permisos.puedeVer) redirect("/admin");
 
-  const verTodo = await puedeVerTodo(usuario, "Clientes");
+  const clientes = await prisma.cliente.findMany({
+    where: query
+      ? {
+          OR: [
+            { nombre: { contains: query, mode: "insensitive" } },
+            { email: { contains: query, mode: "insensitive" } },
+            { pais: { contains: query, mode: "insensitive" } },
+          ],
+        }
+      : undefined,
+    orderBy: { creadoEn: "desc" },
+  });
+
+  const verTodo = permisos.verTodo;
   let clientesPropios: Set<number> | null = null;
   if (!verTodo && usuario) {
     const servicios = await prisma.servicio.findMany({
@@ -63,18 +65,20 @@ export default async function ClientesPage({
             {query ? ` encontrado${clientes.length === 1 ? "" : "s"} para "${query}"` : " registrado" + (clientes.length === 1 ? "" : "s")}
           </p>
         </div>
-        <ClienteFormDialog
-          trigger={
-            <Button>
-              <Plus />
-              Nuevo cliente
-            </Button>
-          }
-          title="Nuevo cliente"
-          description="Registra un nuevo cliente en el sistema."
-          action={createCliente}
-          submitLabel="Crear cliente"
-        />
+        {permisos.puedeCrear && (
+          <ClienteFormDialog
+            trigger={
+              <Button>
+                <Plus />
+                Nuevo cliente
+              </Button>
+            }
+            title="Nuevo cliente"
+            description="Registra un nuevo cliente en el sistema."
+            action={createCliente}
+            submitLabel="Crear cliente"
+          />
+        )}
       </div>
 
       <Card>

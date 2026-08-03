@@ -1,9 +1,22 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { currentUsuario } from "@/lib/current-usuario";
+import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AdminTopbar } from "@/components/admin-topbar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import type { ModuloSistema } from "@/generated/prisma/client";
+
+const MODULOS_SIDEBAR: ModuloSistema[] = [
+  "Clientes",
+  "Servicios",
+  "Cotizaciones",
+  "Pagos",
+  "Productos",
+  "Ventas",
+  "Quejas",
+  "Tareas",
+];
 
 export default async function AdminLayout({
   children,
@@ -20,6 +33,18 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
+  const esAdminUsuario = esAdmin(usuario);
+  const modulosVisibles = esAdminUsuario
+    ? MODULOS_SIDEBAR
+    : (
+        await Promise.all(
+          MODULOS_SIDEBAR.map(async (modulo) => {
+            const permisos = await permisosModulo(usuario, modulo);
+            return permisos.puedeVer ? modulo : null;
+          })
+        )
+      ).filter((m): m is ModuloSistema => m !== null);
+
   async function signOutAction() {
     "use server";
     await signOut({ redirectTo: "/login" });
@@ -27,7 +52,7 @@ export default async function AdminLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar modulosVisibles={modulosVisibles} esAdmin={esAdminUsuario} />
       <SidebarInset>
         <AdminTopbar
           userEmail={session.user.email}

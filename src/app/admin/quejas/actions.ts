@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
+import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import type { CategoriaQueja, StatusQueja } from "@/generated/prisma/client";
 
@@ -18,6 +19,10 @@ export async function crearQueja(
   _prevState: QuejaFormState,
   formData: FormData
 ): Promise<QuejaFormState> {
+  if (!(await requiereNivel("Quejas", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const clienteIdRaw = String(formData.get("clienteId") ?? "");
   const clienteId = clienteIdRaw ? Number(clienteIdRaw) : null;
   if (!clienteId) return { error: "Selecciona un cliente." };
@@ -48,6 +53,10 @@ export async function actualizarQueja(
   _prevState: QuejaFormState,
   formData: FormData
 ): Promise<QuejaFormState> {
+  if (!(await requiereNivel("Quejas", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const queja = await prisma.queja.findUnique({ where: { id } });
   if (!queja) return { error: "Esta queja ya no existe." };
 
@@ -81,6 +90,8 @@ export async function actualizarQueja(
 }
 
 export async function eliminarQueja(id: number) {
+  if (!(await requiereNivel("Quejas", "Editar"))) return;
+
   const queja = await prisma.queja.findUnique({ where: { id } });
   if (!queja) return;
 

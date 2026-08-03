@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
+import { requiereNivel } from "@/lib/alcance";
 import type { PrioridadTarea } from "@/generated/prisma/client";
 
 export type TareaFormState = { error?: string } | undefined;
@@ -24,6 +25,10 @@ export async function crearTarea(
   _prevState: TareaFormState,
   formData: FormData
 ): Promise<TareaFormState> {
+  if (!(await requiereNivel("Tareas", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Escribe un título para la tarea." };
 
@@ -58,6 +63,8 @@ export async function crearTarea(
 }
 
 export async function completarTarea(id: number, completada: boolean) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+
   const tarea = await prisma.tarea.update({
     where: { id },
     data: { completada, completadaEn: completada ? new Date() : null },
@@ -67,6 +74,8 @@ export async function completarTarea(id: number, completada: boolean) {
 }
 
 export async function eliminarTarea(id: number) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+
   const tarea = await prisma.tarea.findUnique({ where: { id } });
   if (!tarea) return;
 

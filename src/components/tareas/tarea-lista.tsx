@@ -29,10 +29,12 @@ export function TareaLista({
   tareas,
   mostrarVinculo = false,
   emptyText = "No hay tareas.",
+  puedeEditar = true,
 }: {
   tareas: TareaConVinculo[];
   mostrarVinculo?: boolean;
   emptyText?: string;
+  puedeEditar?: boolean;
 }) {
   if (tareas.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyText}</p>;
@@ -76,23 +78,25 @@ export function TareaLista({
               </div>
             </div>
 
-            <div className="flex shrink-0 gap-1">
-              <form action={completarTarea.bind(null, t.id, !t.completada)}>
-                <Button type="submit" size="icon" variant="ghost" className="size-7">
-                  {t.completada ? <RotateCcw className="size-4" /> : <Check className="size-4" />}
-                </Button>
-              </form>
-              <form action={eliminarTarea.bind(null, t.id)}>
-                <Button
-                  type="submit"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </form>
-            </div>
+            {puedeEditar && (
+              <div className="flex shrink-0 gap-1">
+                <form action={completarTarea.bind(null, t.id, !t.completada)}>
+                  <Button type="submit" size="icon" variant="ghost" className="size-7">
+                    {t.completada ? <RotateCcw className="size-4" /> : <Check className="size-4" />}
+                  </Button>
+                </form>
+                <form action={eliminarTarea.bind(null, t.id)}>
+                  <Button
+                    type="submit"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </form>
+              </div>
+            )}
           </li>
         );
       })}

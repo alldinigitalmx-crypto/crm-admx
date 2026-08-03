@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FileDown, Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,10 @@ export default async function CotizacionDetallePage({
   const { id } = await params;
   const cotizacionId = Number(id);
 
+  const usuarioSesion = await currentUsuario();
+  const permisos = await permisosModulo(usuarioSesion, "Cotizaciones");
+  if (!permisos.puedeVer) redirect("/admin");
+
   const cotizacion = cotizacionId
     ? await prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
@@ -63,7 +68,7 @@ export default async function CotizacionDetallePage({
 
   if (!cotizacion) notFound();
 
-  const [archivos, usuarios, usuarioActual] = await Promise.all([
+  const [archivos, usuarios] = await Promise.all([
     prisma.archivo.findMany({
       where: { entidadTipo: "Cotizacion", entidadId: cotizacion.id },
       orderBy: { creadoEn: "desc" },
@@ -73,8 +78,8 @@ export default async function CotizacionDetallePage({
       select: { id: true, nombre: true },
       orderBy: { nombre: "asc" },
     }),
-    currentUsuario(),
   ]);
+  const usuarioActual = usuarioSesion;
   const firma = archivos.find((a) => a.nombre.startsWith("firma-"));
 
   const montoDescuento =
@@ -139,7 +144,7 @@ export default async function CotizacionDetallePage({
               PDF
             </a>
           </Button>
-          {cotizacion.status === "Enviada" && (
+          {permisos.puedeEditar && cotizacion.status === "Enviada" && (
             <>
               <form action={boundGanada}>
                 <Button type="submit" variant="secondary">
@@ -153,12 +158,12 @@ export default async function CotizacionDetallePage({
               </form>
             </>
           )}
-          {cotizacion.status === "Firmada" && !cotizacion.servicioId && (
+          {permisos.puedeEditar && cotizacion.status === "Firmada" && !cotizacion.servicioId && (
             <form action={boundConvertir}>
               <Button type="submit">Convertir en servicio</Button>
             </form>
           )}
-          {cotizacion.status !== "Pagada" && (
+          {permisos.puedeEditar && cotizacion.status !== "Pagada" && (
             <CotizacionFormDialog
               trigger={
                 <Button variant="outline">
@@ -174,7 +179,7 @@ export default async function CotizacionDetallePage({
               submitLabel="Guardar cambios"
             />
           )}
-          {cotizacion.status !== "Pagada" && (
+          {permisos.puedeEditar && cotizacion.status !== "Pagada" && (
             <DeleteCotizacionButton action={boundEliminar} />
           )}
         </div>

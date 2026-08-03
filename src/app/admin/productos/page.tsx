@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -35,6 +38,10 @@ export default async function ProductosPage({
 }) {
   const { categoria, activo } = await searchParams;
 
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Productos");
+  if (!permisos.puedeVer) redirect("/admin");
+
   const where: Prisma.ProductoWhereInput = {};
   if (categoria) where.categoria = categoria as CategoriaProducto;
   if (activo) where.activo = activo === "true";
@@ -58,7 +65,9 @@ export default async function ProductosPage({
               : " registrado" + (productos.length === 1 ? "" : "s")}
           </p>
         </div>
-        <ProductoFormDialog title="Nuevo producto" action={crearProducto} submitLabel="Crear producto" />
+        {permisos.puedeCrear && (
+          <ProductoFormDialog title="Nuevo producto" action={crearProducto} submitLabel="Crear producto" />
+        )}
       </div>
 
       <Card>
@@ -131,26 +140,30 @@ export default async function ProductosPage({
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <ProductoFormDialog
-                          trigger={
-                            <Button size="icon" variant="ghost" className="size-7">
-                              <Pencil className="size-4" />
-                            </Button>
-                          }
-                          title="Editar producto"
-                          action={actualizarProducto.bind(null, p.id)}
-                          defaultValues={{
-                            nombre: p.nombre,
-                            descripcion: p.descripcion,
-                            categoria: p.categoria,
-                            precio: Number(p.precio),
-                            costoReferencia: p.costoReferencia ? Number(p.costoReferencia) : null,
-                            requiereCotizacion: p.requiereCotizacion,
-                            activo: p.activo,
-                          }}
-                          submitLabel="Guardar cambios"
-                        />
-                        <DeleteProductoButton action={eliminarProducto.bind(null, p.id)} />
+                        {permisos.puedeEditar && (
+                          <ProductoFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar producto"
+                            action={actualizarProducto.bind(null, p.id)}
+                            defaultValues={{
+                              nombre: p.nombre,
+                              descripcion: p.descripcion,
+                              categoria: p.categoria,
+                              precio: Number(p.precio),
+                              costoReferencia: p.costoReferencia ? Number(p.costoReferencia) : null,
+                              requiereCotizacion: p.requiereCotizacion,
+                              activo: p.activo,
+                            }}
+                            submitLabel="Guardar cambios"
+                          />
+                        )}
+                        {permisos.puedeEditar && (
+                          <DeleteProductoButton action={eliminarProducto.bind(null, p.id)} />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

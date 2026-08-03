@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, ChevronRight } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
-import { puedeVerTodo } from "@/lib/alcance";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -58,7 +59,9 @@ export default async function ServiciosPage({
     currentUsuario(),
   ]);
 
-  const verTodo = await puedeVerTodo(usuario, "Servicios");
+  const permisos = await permisosModulo(usuario, "Servicios");
+  if (!permisos.puedeVer) redirect("/admin");
+  const verTodo = permisos.verTodo;
 
   const where: Prisma.ServicioWhereInput = {};
   if (clienteId) where.clienteId = Number(clienteId);
@@ -90,22 +93,24 @@ export default async function ServiciosPage({
             {hasFiltros ? " con estos filtros" : " registrado" + (servicios.length === 1 ? "" : "s")}
           </p>
         </div>
-        <ServicioFormDialog
-          trigger={
-            <Button>
-              <Plus />
-              Nuevo servicio
-            </Button>
-          }
-          title="Nuevo servicio"
-          description="Registra un nuevo servicio o trabajo."
-          action={createServicio}
-          clientes={clientes}
-          intermediarios={intermediarios}
-          usuarios={usuarios}
-          usuarioActualId={usuario?.id}
-          submitLabel="Crear servicio"
-        />
+        {permisos.puedeCrear && (
+          <ServicioFormDialog
+            trigger={
+              <Button>
+                <Plus />
+                Nuevo servicio
+              </Button>
+            }
+            title="Nuevo servicio"
+            description="Registra un nuevo servicio o trabajo."
+            action={createServicio}
+            clientes={clientes}
+            intermediarios={intermediarios}
+            usuarios={usuarios}
+            usuarioActualId={usuario?.id}
+            submitLabel="Crear servicio"
+          />
+        )}
       </div>
 
       <Card>

@@ -3,16 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
+import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import type { Moneda, MetodoPago } from "@/generated/prisma/client";
 
 export type PagoFormState = { error?: string } | undefined;
 
 async function currentUserId() {
-  const session = await auth();
-  const id = session?.user?.id;
-  return id ? Number(id) : null;
+  const usuario = await currentUsuario();
+  return usuario?.id ?? null;
 }
 
 function parsePagoForm(formData: FormData) {
@@ -56,6 +56,10 @@ export async function crearPago(
   _prevState: PagoFormState,
   formData: FormData
 ): Promise<PagoFormState> {
+  if (!(await requiereNivel("Pagos", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const data = parsePagoForm(formData);
   const error = validatePagoForm(data);
   if (error) return { error };
@@ -94,6 +98,10 @@ export async function actualizarPago(
   _prevState: PagoFormState,
   formData: FormData
 ): Promise<PagoFormState> {
+  if (!(await requiereNivel("Pagos", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago) return { error: "Este pago ya no existe." };
 
@@ -129,6 +137,8 @@ export async function actualizarPago(
 }
 
 export async function eliminarPago(id: number) {
+  if (!(await requiereNivel("Pagos", "Editar"))) return;
+
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago) return;
 
@@ -147,6 +157,10 @@ export async function subirComprobantePago(
   _prevState: ComprobanteFormState,
   formData: FormData
 ): Promise<ComprobanteFormState> {
+  if (!(await requiereNivel("Pagos", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const dataUrl = String(formData.get("imagen") ?? "");
   if (!dataUrl.startsWith("data:image")) {
     return { error: "Selecciona una imagen." };
@@ -174,6 +188,8 @@ export async function subirComprobantePago(
 }
 
 export async function eliminarComprobantePago(archivoId: number, servicioId: number) {
+  if (!(await requiereNivel("Pagos", "Editar"))) return;
+
   await prisma.archivo.delete({ where: { id: archivoId } });
 
   revalidatePath("/admin/pagos");
@@ -181,6 +197,8 @@ export async function eliminarComprobantePago(archivoId: number, servicioId: num
 }
 
 export async function confirmarPago(id: number) {
+  if (!(await requiereNivel("Pagos", "Editar"))) return;
+
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago || pago.confirmado) return;
 

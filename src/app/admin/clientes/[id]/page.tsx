@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
-import { puedeVerTodo } from "@/lib/alcance";
+import { permisosModulo } from "@/lib/alcance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,9 +80,11 @@ export default async function ClienteDetallePage({
   if (!cliente) notFound();
 
   const usuarioActual = await currentUsuario();
-  const verTodoClientes = await puedeVerTodo(usuarioActual, "Clientes");
+  const permisos = await permisosModulo(usuarioActual, "Clientes");
+  if (!permisos.puedeVer) redirect("/admin");
+
   const esPropio =
-    verTodoClientes ||
+    permisos.verTodo ||
     cliente.servicios.some((s) => s.responsableId === usuarioActual?.id);
 
   if (!esPropio) {
@@ -144,19 +146,21 @@ export default async function ClienteDetallePage({
             Cliente desde {formatDate(cliente.creadoEn)}
           </p>
         </div>
-        <ClienteFormDialog
-          trigger={
-            <Button variant="outline">
-              <Pencil />
-              Editar
-            </Button>
-          }
-          title="Editar cliente"
-          description={cliente.nombre}
-          action={updateCliente.bind(null, cliente.id)}
-          defaultValues={cliente}
-          submitLabel="Guardar cambios"
-        />
+        {permisos.puedeEditar && (
+          <ClienteFormDialog
+            trigger={
+              <Button variant="outline">
+                <Pencil />
+                Editar
+              </Button>
+            }
+            title="Editar cliente"
+            description={cliente.nombre}
+            action={updateCliente.bind(null, cliente.id)}
+            defaultValues={cliente}
+            submitLabel="Guardar cambios"
+          />
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

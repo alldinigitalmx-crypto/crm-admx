@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -29,6 +32,10 @@ export default async function VentasPage({
   searchParams: Promise<{ origen?: string; canal?: string; desde?: string; hasta?: string }>;
 }) {
   const { origen, canal, desde, hasta } = await searchParams;
+
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Ventas");
+  if (!permisos.puedeVer) redirect("/admin");
 
   const [productos, clientes] = await Promise.all([
     prisma.producto.findMany({
@@ -77,20 +84,21 @@ export default async function VentasPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (ventas.length === 1 ? "" : "s")}
           </p>
         </div>
-        {productoOpciones.length > 0 ? (
-          <VentaFormDialog
-            title="Nueva venta"
-            description="Registra una venta manual o de la tienda online."
-            action={crearVenta}
-            productos={productoOpciones}
-            clientes={clientes}
-            submitLabel="Registrar venta"
-          />
-        ) : (
-          <Button disabled title="Primero registra un producto">
-            Nueva venta
-          </Button>
-        )}
+        {permisos.puedeCrear &&
+          (productoOpciones.length > 0 ? (
+            <VentaFormDialog
+              title="Nueva venta"
+              description="Registra una venta manual o de la tienda online."
+              action={crearVenta}
+              productos={productoOpciones}
+              clientes={clientes}
+              submitLabel="Registrar venta"
+            />
+          ) : (
+            <Button disabled title="Primero registra un producto">
+              Nueva venta
+            </Button>
+          ))}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -237,20 +245,24 @@ export default async function VentasPage({
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <VentaDetalleDialog venta={ventaDetalle} />
-                          <VentaFormDialog
-                            trigger={
-                              <Button size="icon" variant="ghost" className="size-7">
-                                <Pencil className="size-4" />
-                              </Button>
-                            }
-                            title="Editar venta"
-                            action={actualizarVenta.bind(null, v.id)}
-                            productos={productoOpciones}
-                            clientes={clientes}
-                            defaultValues={ventaEditDefaults}
-                            submitLabel="Guardar cambios"
-                          />
-                          <DeleteVentaButton action={eliminarVenta.bind(null, v.id)} />
+                          {permisos.puedeEditar && (
+                            <VentaFormDialog
+                              trigger={
+                                <Button size="icon" variant="ghost" className="size-7">
+                                  <Pencil className="size-4" />
+                                </Button>
+                              }
+                              title="Editar venta"
+                              action={actualizarVenta.bind(null, v.id)}
+                              productos={productoOpciones}
+                              clientes={clientes}
+                              defaultValues={ventaEditDefaults}
+                              submitLabel="Guardar cambios"
+                            />
+                          )}
+                          {permisos.puedeEditar && (
+                            <DeleteVentaButton action={eliminarVenta.bind(null, v.id)} />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

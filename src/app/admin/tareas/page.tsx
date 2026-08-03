@@ -1,18 +1,21 @@
+import { redirect } from "next/navigation";
+
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
 import { TareaLista } from "@/components/tareas/tarea-lista";
 import { crearTarea } from "@/app/admin/tareas/actions";
 import { currentUsuario } from "@/lib/current-usuario";
-import { puedeVerTodo } from "@/lib/alcance";
+import { permisosModulo } from "@/lib/alcance";
 import type { Prisma } from "@/generated/prisma/client";
 
 export default async function TareasPage() {
   const usuario = await currentUsuario();
-  const verTodo = await puedeVerTodo(usuario, "Tareas");
+  const permisos = await permisosModulo(usuario, "Tareas");
+  if (!permisos.puedeVer) redirect("/admin");
 
   const tareaWhere: Prisma.TareaWhereInput =
-    !verTodo && usuario ? { asignadoAId: usuario.id } : {};
+    !permisos.verTodo && usuario ? { asignadoAId: usuario.id } : {};
 
   const [servicios, cotizaciones, usuarios, tareas] = await Promise.all([
     prisma.servicio.findMany({
@@ -58,12 +61,14 @@ export default async function TareasPage() {
             {completadas.length} completada{completadas.length === 1 ? "" : "s"}
           </p>
         </div>
-        <TareaFormDialog
-          action={crearTarea}
-          vinculos={vinculos}
-          usuarios={usuarios}
-          usuarioActualId={usuario?.id}
-        />
+        {permisos.puedeCrear && (
+          <TareaFormDialog
+            action={crearTarea}
+            vinculos={vinculos}
+            usuarios={usuarios}
+            usuarioActualId={usuario?.id}
+          />
+        )}
       </div>
 
       <Card>
@@ -75,6 +80,7 @@ export default async function TareasPage() {
             tareas={pendientes}
             mostrarVinculo
             emptyText="No tienes tareas pendientes."
+            puedeEditar={permisos.puedeEditar}
           />
         </CardContent>
       </Card>
@@ -88,6 +94,7 @@ export default async function TareasPage() {
             tareas={completadas}
             mostrarVinculo
             emptyText="Aún no completas ninguna tarea."
+            puedeEditar={permisos.puedeEditar}
           />
         </CardContent>
       </Card>

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
-import { puedeVerTodo } from "@/lib/alcance";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -58,13 +59,14 @@ export default async function QuejasPage({
     currentUsuario(),
   ]);
 
-  const verTodo = await puedeVerTodo(usuario, "Quejas");
+  const permisos = await permisosModulo(usuario, "Quejas");
+  if (!permisos.puedeVer) redirect("/admin");
 
   const where: Prisma.QuejaWhereInput = {};
   if (status) where.status = status as StatusQueja;
   if (categoria) where.categoria = categoria as CategoriaQueja;
   if (clienteId) where.clienteId = Number(clienteId);
-  if (!verTodo && usuario) {
+  if (!permisos.verTodo && usuario) {
     where.OR = [{ asignadoAId: usuario.id }, { servicio: { responsableId: usuario.id } }];
   }
 
@@ -86,18 +88,19 @@ export default async function QuejasPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (quejas.length === 1 ? "" : "s")}
           </p>
         </div>
-        {clientesConServicios.length > 0 ? (
-          <QuejaFormDialog
-            triggerLabel="Nueva queja"
-            description="Registra una queja o ticket de soporte a nombre de un cliente."
-            action={crearQueja}
-            clientes={clientesConServicios}
-          />
-        ) : (
-          <Button disabled title="Primero registra un cliente">
-            Nueva queja
-          </Button>
-        )}
+        {permisos.puedeCrear &&
+          (clientesConServicios.length > 0 ? (
+            <QuejaFormDialog
+              triggerLabel="Nueva queja"
+              description="Registra una queja o ticket de soporte a nombre de un cliente."
+              action={crearQueja}
+              clientes={clientesConServicios}
+            />
+          ) : (
+            <Button disabled title="Primero registra un cliente">
+              Nueva queja
+            </Button>
+          ))}
       </div>
 
       <Card>
@@ -208,10 +211,12 @@ export default async function QuejasPage({
                             servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
                             asignadoAId: q.asignadoAId,
                           }}
-                          action={actualizarQueja.bind(null, q.id)}
+                          action={permisos.puedeEditar ? actualizarQueja.bind(null, q.id) : undefined}
                           usuarios={usuarios}
                         />
-                        <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
+                        {permisos.puedeEditar && (
+                          <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

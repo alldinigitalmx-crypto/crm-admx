@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
+import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import type {
   CanalVenta,
@@ -17,9 +18,8 @@ export type VentaFormState = { error?: string } | undefined;
 type ItemInput = { productoId: number; cantidad: number; precioUnitario: number };
 
 async function currentUserId() {
-  const session = await auth();
-  const id = session?.user?.id;
-  return id ? Number(id) : null;
+  const usuario = await currentUsuario();
+  return usuario?.id ?? null;
 }
 
 function parseItems(raw: string): ItemInput[] | null {
@@ -80,6 +80,10 @@ export async function crearVenta(
   _prevState: VentaFormState,
   formData: FormData
 ): Promise<VentaFormState> {
+  if (!(await requiereNivel("Ventas", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const data = parseVentaForm(formData);
   const error = validateVentaForm(data);
   if (error) return { error };
@@ -125,6 +129,10 @@ export async function actualizarVenta(
   _prevState: VentaFormState,
   formData: FormData
 ): Promise<VentaFormState> {
+  if (!(await requiereNivel("Ventas", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const venta = await prisma.venta.findUnique({ where: { id } });
   if (!venta) return { error: "Esta venta ya no existe." };
 
@@ -171,6 +179,8 @@ export async function actualizarVenta(
 }
 
 export async function eliminarVenta(id: number) {
+  if (!(await requiereNivel("Ventas", "Editar"))) return;
+
   await prisma.detalleVenta.deleteMany({ where: { ventaId: id } });
   await prisma.venta.delete({ where: { id } });
 

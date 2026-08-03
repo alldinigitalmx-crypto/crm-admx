@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { requiereNivel } from "@/lib/alcance";
 import { Prisma, type Etiqueta, type MedioCaptacion } from "@/generated/prisma/client";
 
 export type ClienteFormState = { error?: string } | undefined;
@@ -37,6 +38,10 @@ export async function createCliente(
   _prevState: ClienteFormState,
   formData: FormData
 ): Promise<ClienteFormState> {
+  if (!(await requiereNivel("Clientes", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const data = parseClienteForm(formData);
   if (!data.nombre) {
     return { error: "El nombre es obligatorio." };
@@ -62,6 +67,10 @@ export async function updateCliente(
   _prevState: ClienteFormState,
   formData: FormData
 ): Promise<ClienteFormState> {
+  if (!(await requiereNivel("Clientes", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const data = parseClienteForm(formData);
   if (!data.nombre) {
     return { error: "El nombre es obligatorio." };
@@ -91,6 +100,10 @@ export async function guardarPasswordPortalCliente(
   _prevState: PortalFormState,
   formData: FormData
 ): Promise<PortalFormState> {
+  if (!(await requiereNivel("Clientes", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
   if (!cliente) return { error: "Este cliente ya no existe." };
   if (!cliente.email) {
@@ -114,6 +127,8 @@ export async function guardarPasswordPortalCliente(
 }
 
 export async function desactivarPortalCliente(clienteId: number) {
+  if (!(await requiereNivel("Clientes", "Editar"))) return;
+
   await prisma.cliente.update({
     where: { id: clienteId },
     data: { portalActivo: false },

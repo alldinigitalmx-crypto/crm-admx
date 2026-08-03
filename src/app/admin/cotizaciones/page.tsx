@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronRight, Plus } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -38,6 +41,10 @@ export default async function CotizacionesPage({
   searchParams: Promise<{ clienteId?: string; status?: string }>;
 }) {
   const { clienteId, status } = await searchParams;
+
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Cotizaciones");
+  if (!permisos.puedeVer) redirect("/admin");
 
   const [clientes, serviciosParaCotizar] = await Promise.all([
     prisma.cliente.findMany({
@@ -85,27 +92,28 @@ export default async function CotizacionesPage({
             {hasFiltros ? " con estos filtros" : " registrada" + (cotizaciones.length === 1 ? "" : "s")}
           </p>
         </div>
-        {clientes.length > 0 ? (
-          <CotizacionFormDialog
-            trigger={
-              <Button>
-                <Plus />
-                Nueva cotización
-              </Button>
-            }
-            title="Nueva cotización"
-            description="Para un servicio existente, o una nueva negociación con un cliente."
-            action={crearCotizacion}
-            servicios={servicioOpciones.length > 0 ? servicioOpciones : undefined}
-            clientes={clientes}
-            submitLabel="Crear cotización"
-          />
-        ) : (
-          <Button disabled title="Primero registra un cliente">
-            <Plus />
-            Nueva cotización
-          </Button>
-        )}
+        {permisos.puedeCrear &&
+          (clientes.length > 0 ? (
+            <CotizacionFormDialog
+              trigger={
+                <Button>
+                  <Plus />
+                  Nueva cotización
+                </Button>
+              }
+              title="Nueva cotización"
+              description="Para un servicio existente, o una nueva negociación con un cliente."
+              action={crearCotizacion}
+              servicios={servicioOpciones.length > 0 ? servicioOpciones : undefined}
+              clientes={clientes}
+              submitLabel="Crear cotización"
+            />
+          ) : (
+            <Button disabled title="Primero registra un cliente">
+              <Plus />
+              Nueva cotización
+            </Button>
+          ))}
       </div>
 
       <Card>

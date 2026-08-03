@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
+import { requiereNivel } from "@/lib/alcance";
 import { Prisma, type CategoriaProducto } from "@/generated/prisma/client";
 
 export type ProductoFormState = { error?: string } | undefined;
@@ -45,6 +46,10 @@ export async function crearProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
+  if (!(await requiereNivel("Productos", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const data = parseProductoForm(formData);
   const error = validateProductoForm(data);
   if (error) return { error };
@@ -71,6 +76,10 @@ export async function actualizarProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
+  if (!(await requiereNivel("Productos", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const data = parseProductoForm(formData);
   const error = validateProductoForm(data);
   if (error) return { error };
@@ -101,6 +110,8 @@ export async function actualizarProducto(
 }
 
 export async function eliminarProducto(id: number) {
+  if (!(await requiereNivel("Productos", "Editar"))) return;
+
   const ventas = await prisma.detalleVenta.count({ where: { productoId: id } });
   if (ventas > 0) return;
 

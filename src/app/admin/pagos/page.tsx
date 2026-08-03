@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -44,6 +47,10 @@ export default async function PagosPage({
   }>;
 }) {
   const { servicioId, metodoPago, confirmado, desde, hasta } = await searchParams;
+
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Pagos");
+  if (!permisos.puedeVer) redirect("/admin");
 
   const servicios = await prisma.servicio.findMany({
     include: { cliente: true },
@@ -97,26 +104,27 @@ export default async function PagosPage({
             {totalComision > 0 ? ` (comisiones: ${formatCurrency(totalComision)})` : ""}
           </p>
         </div>
-        {servicioOpciones.length > 0 ? (
-          <PagoFormDialog
-            trigger={
-              <Button>
-                <Plus />
-                Nuevo pago
-              </Button>
-            }
-            title="Nuevo pago"
-            description="Registra un pago recibido para un servicio."
-            action={crearPago}
-            servicios={servicioOpciones}
-            submitLabel="Registrar pago"
-          />
-        ) : (
-          <Button disabled title="Primero registra un servicio">
-            <Plus />
-            Nuevo pago
-          </Button>
-        )}
+        {permisos.puedeCrear &&
+          (servicioOpciones.length > 0 ? (
+            <PagoFormDialog
+              trigger={
+                <Button>
+                  <Plus />
+                  Nuevo pago
+                </Button>
+              }
+              title="Nuevo pago"
+              description="Registra un pago recibido para un servicio."
+              action={crearPago}
+              servicios={servicioOpciones}
+              submitLabel="Registrar pago"
+            />
+          ) : (
+            <Button disabled title="Primero registra un servicio">
+              <Plus />
+              Nuevo pago
+            </Button>
+          ))}
       </div>
 
       <Card>
@@ -229,7 +237,7 @@ export default async function PagosPage({
                     <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        {!p.confirmado && (
+                        {permisos.puedeEditar && !p.confirmado && (
                           <form action={confirmarPago.bind(null, p.id)}>
                             <Button type="submit" size="sm" variant="secondary">
                               Confirmar
@@ -257,29 +265,33 @@ export default async function PagosPage({
                           subirComprobante={subirComprobantePago.bind(null, p.id)}
                           eliminarComprobante={eliminarComprobantePago}
                         />
-                        <PagoFormDialog
-                          trigger={
-                            <Button size="icon" variant="ghost" className="size-7">
-                              <Pencil className="size-4" />
-                            </Button>
-                          }
-                          title="Editar pago"
-                          action={actualizarPago.bind(null, p.id)}
-                          servicios={servicioOpciones}
-                          defaultValues={{
-                            servicioId: p.servicioId,
-                            fecha: p.fecha,
-                            metodoPago: p.metodoPago,
-                            monto: Number(p.monto),
-                            comision: p.comision ? Number(p.comision) : null,
-                            moneda: p.moneda,
-                            cuenta: p.cuenta,
-                            comprobante: p.comprobante,
-                            confirmado: p.confirmado,
-                          }}
-                          submitLabel="Guardar cambios"
-                        />
-                        <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
+                        {permisos.puedeEditar && (
+                          <PagoFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar pago"
+                            action={actualizarPago.bind(null, p.id)}
+                            servicios={servicioOpciones}
+                            defaultValues={{
+                              servicioId: p.servicioId,
+                              fecha: p.fecha,
+                              metodoPago: p.metodoPago,
+                              monto: Number(p.monto),
+                              comision: p.comision ? Number(p.comision) : null,
+                              moneda: p.moneda,
+                              cuenta: p.cuenta,
+                              comprobante: p.comprobante,
+                              confirmado: p.confirmado,
+                            }}
+                            submitLabel="Guardar cambios"
+                          />
+                        )}
+                        {permisos.puedeEditar && (
+                          <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -18,6 +18,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import type { ModuloSistema } from "@/generated/prisma/client";
 import {
   Sidebar,
   SidebarContent,
@@ -31,22 +32,35 @@ import {
 } from "@/components/ui/sidebar";
 
 const navPrincipal = [
-  { title: "Panel", href: "/admin", icon: LayoutDashboard },
-  { title: "Clientes", href: "/admin/clientes", icon: Users },
-  { title: "Servicios", href: "/admin/servicios", icon: Briefcase },
-  { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText },
-  { title: "Pagos", href: "/admin/pagos", icon: CreditCard },
-  { title: "Tareas", href: "/admin/tareas", icon: ListTodo },
-  { title: "Gastos", href: "/admin/gastos", icon: Wallet },
-  { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy },
-  { title: "Productos", href: "/admin/productos", icon: Package },
-  { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag },
-  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake },
-  { title: "Usuarios y Accesos", href: "/admin/usuarios", icon: ShieldCheck },
-];
+  { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null },
+  { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes" },
+  { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios" },
+  { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones" },
+  { title: "Pagos", href: "/admin/pagos", icon: CreditCard, modulo: "Pagos" },
+  { title: "Tareas", href: "/admin/tareas", icon: ListTodo, modulo: "Tareas" },
+  { title: "Gastos", href: "/admin/gastos", icon: Wallet, modulo: null },
+  { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy, modulo: "Quejas" },
+  { title: "Productos", href: "/admin/productos", icon: Package, modulo: "Productos" },
+  { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag, modulo: "Ventas" },
+  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake, modulo: null },
+  { title: "Usuarios y Accesos", href: "/admin/usuarios", icon: ShieldCheck, modulo: null, soloAdmin: true },
+] as const;
 
-export function AppSidebar() {
+export function AppSidebar({
+  modulosVisibles,
+  esAdmin,
+}: {
+  modulosVisibles: ModuloSistema[];
+  esAdmin: boolean;
+}) {
   const pathname = usePathname();
+  const modulosSet = new Set(modulosVisibles);
+
+  const items = navPrincipal.filter((item) => {
+    if ("soloAdmin" in item && item.soloAdmin) return esAdmin;
+    if (!item.modulo) return true;
+    return modulosSet.has(item.modulo as ModuloSistema);
+  });
 
   return (
     <Sidebar collapsible="icon">
@@ -66,7 +80,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Fase 1</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navPrincipal.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
