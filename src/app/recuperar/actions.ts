@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
+import { passwordResetEmail } from "@/lib/email-templates";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -36,12 +37,7 @@ export async function solicitarRecuperacion(formData: FormData) {
     await sendMail({
       to: usuario.email,
       subject: "Recupera tu contraseña — Admx Dev",
-      html: `
-        <p>Hola ${usuario.nombre},</p>
-        <p>Recibimos una solicitud para restablecer tu contraseña. Este enlace es válido por 1 hora:</p>
-        <p><a href="${resetUrl}">${resetUrl}</a></p>
-        <p>Si no fuiste tú, ignora este correo.</p>
-      `,
+      html: passwordResetEmail(usuario.nombre, resetUrl),
     });
   }
 
