@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
@@ -11,9 +12,9 @@ import { Code2, Mail, Lock, Briefcase, FileText, CreditCard } from "lucide-react
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; restablecido?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, restablecido } = await searchParams;
 
   async function login(formData: FormData) {
     "use server";
@@ -111,6 +112,12 @@ export default async function LoginPage({
               </p>
             )}
 
+            {restablecido && (
+              <p className="mt-4 rounded-lg border border-input bg-muted/40 px-3 py-2 text-sm">
+                Tu contraseña se actualizó. Ya puedes iniciar sesión.
+              </p>
+            )}
+
             <form action={login} className="mt-7 flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email">Correo</Label>
@@ -130,12 +137,12 @@ export default async function LoginPage({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Contraseña</Label>
-                  <a
-                    href="#"
+                  <Link
+                    href="/recuperar"
                     className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                   >
                     ¿Olvidaste tu contraseña?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

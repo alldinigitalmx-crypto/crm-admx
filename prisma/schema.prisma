@@ -466,13 +466,15 @@ enum OrigenVenta {
 }
 
 model Usuario {
-  id           Int        @id @default(autoincrement())
-  email        String     @unique
-  passwordHash String
-  nombre       String
-  rol          RolUsuario @default(Interno)
-  activo       Boolean    @default(true)
-  creadoEn     DateTime   @default(now())
+  id                  Int        @id @default(autoincrement())
+  email               String     @unique
+  passwordHash        String
+  nombre              String
+  rol                 RolUsuario @default(Interno)
+  activo              Boolean    @default(true)
+  creadoEn            DateTime   @default(now())
+  resetTokenHash      String?
+  resetTokenExpiraEn  DateTime?
 
   serviciosCreados       Servicio[]            @relation("ServicioCreadoPor")
   serviciosEditados      Servicio[]            @relation("ServicioEditadoPor")
