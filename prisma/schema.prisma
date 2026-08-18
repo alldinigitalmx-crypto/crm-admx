@@ -158,6 +158,16 @@ model Tarea {
   asignadoAId  Int?
   asignadoA    Usuario?       @relation("TareaAsignadoA", fields: [asignadoAId], references: [id])
   creadoEn     DateTime       @default(now())
+  subtareas    Subtarea[]
+}
+
+model Subtarea {
+  id         Int      @id @default(autoincrement())
+  tareaId    Int
+  tarea      Tarea    @relation(fields: [tareaId], references: [id])
+  titulo     String
+  completada Boolean  @default(false)
+  creadoEn   DateTime @default(now())
 }
 
 // ---------- GASTOS ----------

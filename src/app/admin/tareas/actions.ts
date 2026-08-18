@@ -79,6 +79,7 @@ export async function eliminarTarea(id: number) {
   const tarea = await prisma.tarea.findUnique({ where: { id } });
   if (!tarea) return;
 
+  await prisma.subtarea.deleteMany({ where: { tareaId: id } });
   await prisma.tarea.delete({ where: { id } });
   revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
 }
@@ -132,6 +133,39 @@ export async function cambiarPrioridad(id: number, prioridad: PrioridadTarea) {
 
   const tarea = await prisma.tarea.update({ where: { id }, data: { prioridad } });
   revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+}
+
+export async function crearSubtarea(tareaId: number, titulo: string) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  const limpio = titulo.trim();
+  if (!limpio) return;
+
+  const tarea = await prisma.tarea.findUnique({ where: { id: tareaId } });
+  if (!tarea) return;
+
+  await prisma.subtarea.create({ data: { tareaId, titulo: limpio } });
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+}
+
+export async function alternarSubtarea(id: number, completada: boolean) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+
+  const subtarea = await prisma.subtarea.update({
+    where: { id },
+    data: { completada },
+    include: { tarea: true },
+  });
+  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId);
+}
+
+export async function eliminarSubtarea(id: number) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+
+  const subtarea = await prisma.subtarea.findUnique({ where: { id }, include: { tarea: true } });
+  if (!subtarea) return;
+
+  await prisma.subtarea.delete({ where: { id } });
+  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId);
 }
 
 export async function duplicarTarea(id: number) {

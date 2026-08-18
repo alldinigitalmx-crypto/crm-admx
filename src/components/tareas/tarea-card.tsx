@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
+import { SubtareaChecklist, type SubtareaData } from "@/components/tareas/subtarea-checklist";
 import type { VinculoOption } from "@/components/tareas/tarea-form";
 import {
   actualizarTarea,
@@ -30,6 +31,7 @@ export type TareaCardData = {
   asignadoAId: number | null;
   servicio?: { descripcion: string } | null;
   cotizacion?: { cliente: { nombre: string } } | null;
+  subtareas: SubtareaData[];
 };
 
 const PRIORIDAD_BAR: Record<PrioridadTarea, string> = {
@@ -174,6 +176,8 @@ export function TareaCard({
             </span>
           )}
         </div>
+
+        <SubtareaChecklist tareaId={tarea.id} subtareas={tarea.subtareas} puedeEditar={puedeEditar} />
       </div>
 
       {(puedeEditar || puedeCrear) && (

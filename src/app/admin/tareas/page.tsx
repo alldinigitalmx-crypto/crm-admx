@@ -41,6 +41,7 @@ export default async function TareasPage() {
       include: {
         servicio: { select: { descripcion: true } },
         cotizacion: { select: { cliente: { select: { nombre: true } } } },
+        subtareas: { orderBy: { creadoEn: "asc" } },
       },
     }),
     prisma.tarea.findMany({
