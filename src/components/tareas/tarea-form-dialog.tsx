@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { TareaForm, type VinculoOption } from "@/components/tareas/tarea-form";
+import { TareaForm, type TareaDefaultValues, type VinculoOption } from "@/components/tareas/tarea-form";
 import type { TareaFormState } from "@/app/admin/tareas/actions";
 
 export function TareaFormDialog({
@@ -22,6 +22,11 @@ export function TareaFormDialog({
   usuarios,
   usuarioActualId,
   triggerLabel = "Nueva tarea",
+  trigger,
+  title = "Nueva tarea",
+  description = "Tareas libres con prioridad y fecha límite — aparecen en tu panel.",
+  defaultValues,
+  submitLabel = "Crear tarea",
 }: {
   action: (
     prevState: TareaFormState,
@@ -32,23 +37,28 @@ export function TareaFormDialog({
   usuarios: { id: number; nombre: string }[];
   usuarioActualId?: number;
   triggerLabel?: string;
+  trigger?: React.ReactNode;
+  title?: string;
+  description?: string;
+  defaultValues?: TareaDefaultValues;
+  submitLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Plus />
-          {triggerLabel}
-        </Button>
+        {trigger ?? (
+          <Button size="sm" variant="outline">
+            <Plus />
+            {triggerLabel}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nueva tarea</DialogTitle>
-          <DialogDescription>
-            Tareas libres con prioridad y fecha límite — aparecen en tu panel.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <TareaForm
           action={action}
@@ -56,6 +66,8 @@ export function TareaFormDialog({
           vinculoFijo={vinculoFijo}
           usuarios={usuarios}
           usuarioActualId={usuarioActualId}
+          defaultValues={defaultValues}
+          submitLabel={submitLabel}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

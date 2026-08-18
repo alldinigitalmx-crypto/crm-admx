@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
-import { TareaLista } from "@/components/tareas/tarea-lista";
-import { crearTarea } from "@/app/admin/tareas/actions";
+import { TareaKanban } from "@/components/tareas/tarea-kanban";
+import { TareasResumen } from "@/components/tareas/tareas-resumen";
+import { calcularResumenTareas } from "@/lib/tareas-resumen";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
 import type { Prisma } from "@/generated/prisma/client";
@@ -17,7 +16,10 @@ export default async function TareasPage() {
   const tareaWhere: Prisma.TareaWhereInput =
     !permisos.verTodo && usuario ? { asignadoAId: usuario.id } : {};
 
-  const [servicios, cotizaciones, usuarios, tareas] = await Promise.all([
+  const hace30Dias = new Date();
+  hace30Dias.setDate(hace30Dias.getDate() - 30);
+
+  const [servicios, cotizaciones, usuarios, tareas, completadasRecientes] = await Promise.all([
     prisma.servicio.findMany({
       where: { status: { notIn: ["Entregado", "Cancelado"] } },
       select: { id: true, descripcion: true },
@@ -36,7 +38,14 @@ export default async function TareasPage() {
     prisma.tarea.findMany({
       where: tareaWhere,
       orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }],
-      include: { servicio: true, cotizacion: { include: { cliente: true } } },
+      include: {
+        servicio: { select: { descripcion: true } },
+        cotizacion: { select: { cliente: { select: { nombre: true } } } },
+      },
+    }),
+    prisma.tarea.findMany({
+      where: { ...tareaWhere, completada: true, completadaEn: { gte: hace30Dias } },
+      select: { completadaEn: true },
     }),
   ]);
 
@@ -51,53 +60,32 @@ export default async function TareasPage() {
   const pendientes = tareas.filter((t) => !t.completada);
   const completadas = tareas.filter((t) => t.completada);
 
+  const resumen = calcularResumenTareas(
+    pendientes,
+    completadasRecientes.map((t) => t.completadaEn!)
+  );
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Tareas</h1>
-          <p className="text-sm text-muted-foreground">
-            {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} —{" "}
-            {completadas.length} completada{completadas.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        {permisos.puedeCrear && (
-          <TareaFormDialog
-            action={crearTarea}
-            vinculos={vinculos}
-            usuarios={usuarios}
-            usuarioActualId={usuario?.id}
-          />
-        )}
+      <div>
+        <h1 className="text-2xl font-semibold">Tareas</h1>
+        <p className="text-sm text-muted-foreground">
+          {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} —{" "}
+          {completadas.length} completada{completadas.length === 1 ? "" : "s"}
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Pendientes ({pendientes.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TareaLista
-            tareas={pendientes}
-            mostrarVinculo
-            emptyText="No tienes tareas pendientes."
-            puedeEditar={permisos.puedeEditar}
-          />
-        </CardContent>
-      </Card>
+      <TareasResumen resumen={resumen} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Completadas ({completadas.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TareaLista
-            tareas={completadas}
-            mostrarVinculo
-            emptyText="Aún no completas ninguna tarea."
-            puedeEditar={permisos.puedeEditar}
-          />
-        </CardContent>
-      </Card>
+      <TareaKanban
+        tareasPendientes={pendientes}
+        tareasCompletadas={completadas}
+        puedeEditar={permisos.puedeEditar}
+        puedeCrear={permisos.puedeCrear}
+        vinculos={vinculos}
+        usuarios={usuarios}
+        usuarioActualId={usuario?.id}
+      />
     </div>
   );
 }

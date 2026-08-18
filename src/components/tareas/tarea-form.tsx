@@ -17,6 +17,15 @@ import type { TareaFormState } from "@/app/admin/tareas/actions";
 
 export type VinculoOption = { value: string; label: string };
 
+export type TareaDefaultValues = {
+  titulo: string;
+  descripcion: string | null;
+  prioridad: string;
+  fechaLimite: Date | null;
+  asignadoAId: number | null;
+  vinculo?: string;
+};
+
 export function TareaForm({
   action,
   vinculos,
@@ -24,6 +33,8 @@ export function TareaForm({
   usuarios,
   usuarioActualId,
   onSuccess,
+  defaultValues,
+  submitLabel = "Crear tarea",
 }: {
   action: (
     prevState: TareaFormState,
@@ -34,6 +45,8 @@ export function TareaForm({
   usuarios: { id: number; nombre: string }[];
   usuarioActualId?: number;
   onSuccess?: () => void;
+  defaultValues?: TareaDefaultValues;
+  submitLabel?: string;
 }) {
   const wrappedAction = async (prevState: TareaFormState, formData: FormData) => {
     const result = await action(prevState, formData);
@@ -52,18 +65,30 @@ export function TareaForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="titulo">Título *</Label>
-        <Input id="titulo" name="titulo" required placeholder="Ej. Crear reunión de Meet" />
+        <Input
+          id="titulo"
+          name="titulo"
+          required
+          placeholder="Ej. Crear reunión de Meet"
+          defaultValue={defaultValues?.titulo}
+        />
       </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="descripcion">Descripción</Label>
-        <Textarea id="descripcion" name="descripcion" rows={2} placeholder="Detalles opcionales" />
+        <Textarea
+          id="descripcion"
+          name="descripcion"
+          rows={2}
+          placeholder="Detalles opcionales"
+          defaultValue={defaultValues?.descripcion ?? undefined}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="prioridad">Prioridad</Label>
-          <Select name="prioridad" defaultValue="Media">
+          <Select name="prioridad" defaultValue={defaultValues?.prioridad ?? "Media"}>
             <SelectTrigger id="prioridad" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -77,14 +102,29 @@ export function TareaForm({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="fechaLimite">Fecha límite</Label>
-          <Input id="fechaLimite" name="fechaLimite" type="date" />
+          <Input
+            id="fechaLimite"
+            name="fechaLimite"
+            type="date"
+            defaultValue={
+              defaultValues?.fechaLimite
+                ? new Date(defaultValues.fechaLimite).toISOString().slice(0, 10)
+                : undefined
+            }
+          />
         </div>
 
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="asignadoAId">Asignado a</Label>
           <Select
             name="asignadoAId"
-            defaultValue={usuarioActualId ? String(usuarioActualId) : undefined}
+            defaultValue={
+              defaultValues?.asignadoAId
+                ? String(defaultValues.asignadoAId)
+                : usuarioActualId
+                  ? String(usuarioActualId)
+                  : undefined
+            }
           >
             <SelectTrigger id="asignadoAId" className="w-full">
               <SelectValue placeholder="Selecciona un responsable" />
@@ -102,7 +142,7 @@ export function TareaForm({
         {vinculos && (
           <div className="flex flex-col gap-2 sm:col-span-2">
             <Label htmlFor="vinculo">Vincular a</Label>
-            <Select name="vinculo" defaultValue="none">
+            <Select name="vinculo" defaultValue={defaultValues?.vinculo ?? "none"}>
               <SelectTrigger id="vinculo" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -124,7 +164,7 @@ export function TareaForm({
       </div>
 
       <Button type="submit" disabled={isPending} className="self-start">
-        {isPending ? "Guardando..." : "Crear tarea"}
+        {isPending ? "Guardando..." : submitLabel}
       </Button>
     </form>
   );

@@ -82,3 +82,78 @@ export async function eliminarTarea(id: number) {
   await prisma.tarea.delete({ where: { id } });
   revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
 }
+
+export async function actualizarTarea(
+  id: number,
+  _prevState: TareaFormState,
+  formData: FormData
+): Promise<TareaFormState> {
+  if (!(await requiereNivel("Tareas", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
+  const tarea = await prisma.tarea.findUnique({ where: { id } });
+  if (!tarea) return { error: "Esta tarea ya no existe." };
+
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  if (!titulo) return { error: "Escribe un título para la tarea." };
+
+  const descripcion = String(formData.get("descripcion") ?? "").trim() || null;
+  const prioridad = (String(formData.get("prioridad") ?? "Media") as PrioridadTarea) ?? "Media";
+  const fechaLimiteRaw = String(formData.get("fechaLimite") ?? "");
+
+  const vinculoRaw = String(formData.get("vinculo") ?? "none");
+  const [tipo, idRaw] = vinculoRaw.split(":");
+  const servicioId = tipo === "servicio" ? Number(idRaw) : null;
+  const cotizacionId = tipo === "cotizacion" ? Number(idRaw) : null;
+
+  const asignadoAIdRaw = String(formData.get("asignadoAId") ?? "");
+
+  await prisma.tarea.update({
+    where: { id },
+    data: {
+      titulo,
+      descripcion,
+      prioridad,
+      fechaLimite: fechaLimiteRaw ? new Date(fechaLimiteRaw) : null,
+      servicioId,
+      cotizacionId,
+      asignadoAId: asignadoAIdRaw ? Number(asignadoAIdRaw) : null,
+    },
+  });
+
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(servicioId, cotizacionId);
+  return undefined;
+}
+
+export async function cambiarPrioridad(id: number, prioridad: PrioridadTarea) {
+  if (!(await requiereNivel("Tareas", "Editar"))) return;
+
+  const tarea = await prisma.tarea.update({ where: { id }, data: { prioridad } });
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+}
+
+export async function duplicarTarea(id: number) {
+  if (!(await requiereNivel("Tareas", "Crear"))) return;
+
+  const tarea = await prisma.tarea.findUnique({ where: { id } });
+  if (!tarea) return;
+
+  const userId = await currentUserId();
+
+  await prisma.tarea.create({
+    data: {
+      titulo: `${tarea.titulo} (copia)`,
+      descripcion: tarea.descripcion,
+      prioridad: tarea.prioridad,
+      fechaLimite: tarea.fechaLimite,
+      servicioId: tarea.servicioId,
+      cotizacionId: tarea.cotizacionId,
+      creadoPorId: userId,
+      asignadoAId: tarea.asignadoAId,
+    },
+  });
+
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+}
