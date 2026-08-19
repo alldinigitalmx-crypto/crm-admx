@@ -16,6 +16,7 @@ import {
   agruparRecaudadoGastos,
   topNConOtros,
 } from "@/lib/reportes";
+import { METODO_LABEL } from "@/lib/metodo-pago";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -40,17 +41,6 @@ const STATUS_COLOR: Record<StatusServicio, string> = {
   Cancelado: "bg-red-500 dark:bg-red-400",
 };
 
-const METODO_LABEL: Record<string, string> = {
-  Efectivo: "Efectivo",
-  Transferencia: "Transferencia",
-  MercadoPago: "Mercado Pago",
-  PayPal: "PayPal",
-  Tarjeta: "Tarjeta",
-  WesternUnion: "Western Union",
-  Binance: "Binance",
-  Deposito: "Depósito",
-  Otro: "Otro",
-};
 const METODO_COLOR: Record<string, string> = {
   Efectivo: "bg-emerald-600 dark:bg-emerald-400",
   Transferencia: "bg-blue-600 dark:bg-blue-400",

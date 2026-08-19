@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Plus, Download } from "lucide-react";
+import { ChevronRight, Plus, Download, Send, FileSignature, CheckCircle2, Clock, XCircle } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
 import type { Prisma, StatusCotizacion } from "@/generated/prisma/client";
@@ -31,6 +32,21 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "dest
 };
 
 const STATUSES = ["Enviada", "Firmada", "Pagada", "Vencida", "Perdida"];
+
+const STATUS_COLOR: Record<string, string> = {
+  Enviada: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  Firmada: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  Pagada: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  Vencida: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  Perdida: "bg-red-500/15 text-red-700 dark:text-red-400",
+};
+const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  Enviada: Send,
+  Firmada: FileSignature,
+  Pagada: CheckCircle2,
+  Vencida: Clock,
+  Perdida: XCircle,
+};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -178,58 +194,86 @@ export default async function CotizacionesPage({
                 : "Aún no hay cotizaciones registradas."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Emisión</TableHead>
-                  <TableHead>Vencimiento</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cotizaciones.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/admin/cotizaciones/${c.id}`} className="hover:underline">
-                        {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
-                      </Link>
-                      {!c.servicioId && (
-                        <Badge variant="outline" className="ml-2">
-                          En negociación
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/clientes/${c.cliente.id}`}
-                        className="hover:underline"
-                      >
-                        {c.cliente.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>{c.status}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(c.fechaEmision)}</TableCell>
-                    <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/cotizaciones/${c.id}`}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label={`Ver detalle de la cotización ${c.id}`}
-                      >
-                        <ChevronRight className="size-4" />
-                      </Link>
-                    </TableCell>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Servicio</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Emisión</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {cotizaciones.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/cotizaciones/${c.id}`} className="hover:underline">
+                          {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                        </Link>
+                        {!c.servicioId && (
+                          <Badge variant="outline" className="ml-2">
+                            En negociación
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/clientes/${c.cliente.id}`}
+                          className="hover:underline"
+                        >
+                          {c.cliente.nombre}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>{c.status}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(c.fechaEmision)}</TableCell>
+                      <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/cotizaciones/${c.id}`}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Ver detalle de la cotización ${c.id}`}
+                        >
+                          <ChevronRight className="size-4" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {cotizaciones.map((c) => {
+                  const Icono = STATUS_ICON[c.status] ?? Send;
+                  return (
+                    <MobileRecordCard
+                      key={c.id}
+                      href={`/admin/cotizaciones/${c.id}`}
+                      avatarLabel={<Icono className="size-5" />}
+                      avatarClassName={STATUS_COLOR[c.status]}
+                      title={c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                      subtitle={c.cliente.nombre}
+                      meta={`${formatDate(c.fechaEmision)} · ${formatCurrency(c.montoTotal)}`}
+                      badge={
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[c.status]}`}
+                        >
+                          {c.status}
+                        </span>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

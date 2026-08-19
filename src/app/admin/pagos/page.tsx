@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Pencil, Download } from "lucide-react";
+import { Plus, Pencil, Download, CheckCircle2, Clock } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
+import { METODO_LABEL } from "@/lib/metodo-pago";
 import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
 import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
 import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
@@ -44,6 +46,9 @@ const METODOS = [
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+const CONFIRMADO_COLOR = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+const PENDIENTE_COLOR = "bg-amber-500/15 text-amber-700 dark:text-amber-400";
 
 export default async function PagosPage({
   searchParams,
@@ -221,47 +226,132 @@ export default async function PagosPage({
               {hasFiltros ? "No hay pagos con esos filtros." : "Aún no hay pagos registrados."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Comisión</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-36" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Servicio</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Método</TableHead>
+                    <TableHead>Cuenta</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Comisión</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-36" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagos.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/servicios/${p.servicio.id}`} className="hover:underline">
+                          {p.servicio.descripcion}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/admin/clientes/${p.servicio.cliente.id}`} className="hover:underline">
+                          {p.servicio.cliente.nombre}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{formatDate(p.fecha)}</TableCell>
+                      <TableCell>{p.metodoPago}</TableCell>
+                      <TableCell>{p.cuenta ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                          {p.confirmado ? "Confirmado" : "Pendiente"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.comision ? formatCurrency(p.comision) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          {permisos.puedeEditar && !p.confirmado && (
+                            <form action={confirmarPago.bind(null, p.id)}>
+                              <Button type="submit" size="sm" variant="secondary">
+                                Confirmar
+                              </Button>
+                            </form>
+                          )}
+                          <PagoDetalleDialog
+                            pago={{
+                              id: p.id,
+                              fecha: p.fecha,
+                              metodoPago: p.metodoPago,
+                              monto: Number(p.monto),
+                              comision: p.comision ? Number(p.comision) : null,
+                              moneda: p.moneda,
+                              cuenta: p.cuenta,
+                              comprobante: p.comprobante,
+                              confirmado: p.confirmado,
+                              servicio: {
+                                descripcion: p.servicio.descripcion,
+                                cliente: { nombre: p.servicio.cliente.nombre },
+                              },
+                            }}
+                            comprobanteArchivo={comprobantePorPago.get(p.id) ?? null}
+                            servicioId={p.servicio.id}
+                            subirComprobante={subirComprobantePago.bind(null, p.id)}
+                            eliminarComprobante={eliminarComprobantePago}
+                          />
+                          {permisos.puedeEditar && (
+                            <PagoFormDialog
+                              trigger={
+                                <Button size="icon" variant="ghost" className="size-7">
+                                  <Pencil className="size-4" />
+                                </Button>
+                              }
+                              title="Editar pago"
+                              action={actualizarPago.bind(null, p.id)}
+                              servicios={servicioOpciones}
+                              defaultValues={{
+                                servicioId: p.servicioId,
+                                fecha: p.fecha,
+                                metodoPago: p.metodoPago,
+                                monto: Number(p.monto),
+                                comision: p.comision ? Number(p.comision) : null,
+                                moneda: p.moneda,
+                                cuenta: p.cuenta,
+                                comprobante: p.comprobante,
+                                confirmado: p.confirmado,
+                              }}
+                              submitLabel="Guardar cambios"
+                            />
+                          )}
+                          {permisos.puedeEditar && (
+                            <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
                 {pagos.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/admin/servicios/${p.servicio.id}`} className="hover:underline">
-                        {p.servicio.descripcion}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/admin/clientes/${p.servicio.cliente.id}`} className="hover:underline">
-                        {p.servicio.cliente.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{formatDate(p.fecha)}</TableCell>
-                    <TableCell>{p.metodoPago}</TableCell>
-                    <TableCell>{p.cuenta ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                  <MobileRecordCard
+                    key={p.id}
+                    avatarLabel={p.confirmado ? <CheckCircle2 className="size-5" /> : <Clock className="size-5" />}
+                    avatarClassName={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}
+                    title={p.servicio.descripcion}
+                    subtitle={`${p.servicio.cliente.nombre} · ${METODO_LABEL[p.metodoPago] ?? p.metodoPago}`}
+                    meta={`${formatDate(p.fecha)} · ${formatCurrency(p.monto)}`}
+                    badge={
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR
+                        }`}
+                      >
                         {p.confirmado ? "Confirmado" : "Pendiente"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.comision ? formatCurrency(p.comision) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
+                      </span>
+                    }
+                    actions={
+                      <>
                         {permisos.puedeEditar && !p.confirmado && (
                           <form action={confirmarPago.bind(null, p.id)}>
                             <Button type="submit" size="sm" variant="secondary">
@@ -317,12 +407,12 @@ export default async function PagosPage({
                         {permisos.puedeEditar && (
                           <DeletePagoButton action={eliminarPago.bind(null, p.id)} />
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </>
+                    }
+                  />
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

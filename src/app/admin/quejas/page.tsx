@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
+import { Download, AlertCircle, Eye, CheckCircle2, Archive } from "lucide-react";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
 import { DeleteQuejaButton } from "@/components/quejas/delete-queja-button";
@@ -32,6 +33,19 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "dest
 
 const STATUSES = ["Nueva", "EnRevision", "Resuelta", "Cerrada"];
 const CATEGORIAS = ["Falla", "Cobro", "Atencion", "Otro"];
+
+const STATUS_COLOR: Record<string, string> = {
+  Nueva: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  EnRevision: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  Resuelta: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  Cerrada: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+};
+const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  Nueva: AlertCircle,
+  EnRevision: Eye,
+  Resuelta: CheckCircle2,
+  Cerrada: Archive,
+};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -174,69 +188,119 @@ export default async function QuejasPage({
               {hasFiltros ? "No hay quejas con esos filtros." : "Aún no hay quejas registradas."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quejas.map((q) => (
-                  <TableRow key={q.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/admin/clientes/${q.cliente.id}`} className="hover:underline">
-                        {q.cliente.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {q.servicio ? (
-                        <Link
-                          href={`/admin/servicios/${q.servicio.id}`}
-                          className="hover:underline"
-                        >
-                          {q.servicio.descripcion}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>{q.categoria}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[q.status] ?? "outline"}>{q.status}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(q.creadoEn)}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <QuejaDetalleDialog
-                          queja={{
-                            id: q.id,
-                            categoria: q.categoria,
-                            descripcion: q.descripcion,
-                            status: q.status,
-                            respuesta: q.respuesta,
-                            creadoEn: q.creadoEn,
-                            respondidoEn: q.respondidoEn,
-                            cliente: { nombre: q.cliente.nombre },
-                            servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
-                            asignadoAId: q.asignadoAId,
-                          }}
-                          action={permisos.puedeEditar ? actualizarQueja.bind(null, q.id) : undefined}
-                          usuarios={usuarios}
-                        />
-                        {permisos.puedeEditar && (
-                          <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
-                        )}
-                      </div>
-                    </TableCell>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Servicio</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead className="w-20" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {quejas.map((q) => (
+                    <TableRow key={q.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/clientes/${q.cliente.id}`} className="hover:underline">
+                          {q.cliente.nombre}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {q.servicio ? (
+                          <Link
+                            href={`/admin/servicios/${q.servicio.id}`}
+                            className="hover:underline"
+                          >
+                            {q.servicio.descripcion}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell>{q.categoria}</TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[q.status] ?? "outline"}>{q.status}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(q.creadoEn)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <QuejaDetalleDialog
+                            queja={{
+                              id: q.id,
+                              categoria: q.categoria,
+                              descripcion: q.descripcion,
+                              status: q.status,
+                              respuesta: q.respuesta,
+                              creadoEn: q.creadoEn,
+                              respondidoEn: q.respondidoEn,
+                              cliente: { nombre: q.cliente.nombre },
+                              servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                              asignadoAId: q.asignadoAId,
+                            }}
+                            action={permisos.puedeEditar ? actualizarQueja.bind(null, q.id) : undefined}
+                            usuarios={usuarios}
+                          />
+                          {permisos.puedeEditar && (
+                            <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {quejas.map((q) => {
+                  const Icono = STATUS_ICON[q.status] ?? AlertCircle;
+                  return (
+                    <MobileRecordCard
+                      key={q.id}
+                      avatarLabel={<Icono className="size-5" />}
+                      avatarClassName={STATUS_COLOR[q.status]}
+                      title={q.cliente.nombre}
+                      subtitle={`${q.categoria} · ${q.servicio?.descripcion ?? "Sin servicio"}`}
+                      meta={formatDate(q.creadoEn)}
+                      badge={
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[q.status]}`}
+                        >
+                          {q.status}
+                        </span>
+                      }
+                      actions={
+                        <>
+                          <QuejaDetalleDialog
+                            queja={{
+                              id: q.id,
+                              categoria: q.categoria,
+                              descripcion: q.descripcion,
+                              status: q.status,
+                              respuesta: q.respuesta,
+                              creadoEn: q.creadoEn,
+                              respondidoEn: q.respondidoEn,
+                              cliente: { nombre: q.cliente.nombre },
+                              servicio: q.servicio ? { descripcion: q.servicio.descripcion } : null,
+                              asignadoAId: q.asignadoAId,
+                            }}
+                            action={permisos.puedeEditar ? actualizarQueja.bind(null, q.id) : undefined}
+                            usuarios={usuarios}
+                          />
+                          {permisos.puedeEditar && (
+                            <DeleteQuejaButton action={eliminarQueja.bind(null, q.id)} />
+                          )}
+                        </>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

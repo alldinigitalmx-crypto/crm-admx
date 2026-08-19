@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Building2, User } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { GastoFormDialog } from "@/components/gastos/gasto-form-dialog";
 import { DeleteGastoButton } from "@/components/gastos/delete-gasto-button";
 import { actualizarGasto, crearGasto, eliminarGasto } from "@/app/admin/gastos/actions";
@@ -21,6 +22,11 @@ import type { AmbitoGasto, Prisma } from "@/generated/prisma/client";
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+const AMBITO_COLOR: Record<string, string> = {
+  Empresa: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  Personal: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+};
 
 export default async function GastosPage({
   searchParams,
@@ -135,49 +141,92 @@ export default async function GastosPage({
               {hasFiltros ? "No hay gastos con esos filtros." : "Aún no hay gastos registrados."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Ámbito</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {gastos.map((g) => (
-                  <TableRow key={g.id}>
-                    <TableCell className="font-medium">{g.descripcion}</TableCell>
-                    <TableCell>{g.categoria}</TableCell>
-                    <TableCell>
-                      <Badge variant={g.ambito === "Empresa" ? "outline" : "secondary"}>
-                        {g.ambito}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(g.fecha)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(g.monto)}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <GastoFormDialog
-                          trigger={
-                            <Button size="icon" variant="ghost" className="size-7">
-                              <Pencil className="size-4" />
-                            </Button>
-                          }
-                          title="Editar gasto"
-                          action={actualizarGasto.bind(null, g.id)}
-                          defaultValues={g}
-                          submitLabel="Guardar cambios"
-                        />
-                        <DeleteGastoButton action={eliminarGasto.bind(null, g.id)} />
-                      </div>
-                    </TableCell>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Ámbito</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-20" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {gastos.map((g) => (
+                    <TableRow key={g.id}>
+                      <TableCell className="font-medium">{g.descripcion}</TableCell>
+                      <TableCell>{g.categoria}</TableCell>
+                      <TableCell>
+                        <Badge variant={g.ambito === "Empresa" ? "outline" : "secondary"}>
+                          {g.ambito}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(g.fecha)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(g.monto)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <GastoFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar gasto"
+                            action={actualizarGasto.bind(null, g.id)}
+                            defaultValues={g}
+                            submitLabel="Guardar cambios"
+                          />
+                          <DeleteGastoButton action={eliminarGasto.bind(null, g.id)} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {gastos.map((g) => {
+                  const Icono = g.ambito === "Empresa" ? Building2 : User;
+                  return (
+                    <MobileRecordCard
+                      key={g.id}
+                      avatarLabel={<Icono className="size-5" />}
+                      avatarClassName={AMBITO_COLOR[g.ambito]}
+                      title={g.descripcion}
+                      subtitle={g.categoria}
+                      meta={`${formatDate(g.fecha)} · ${formatCurrency(g.monto)}`}
+                      badge={
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${AMBITO_COLOR[g.ambito]}`}
+                        >
+                          {g.ambito}
+                        </span>
+                      }
+                      actions={
+                        <>
+                          <GastoFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar gasto"
+                            action={actualizarGasto.bind(null, g.id)}
+                            defaultValues={g}
+                            submitLabel="Guardar cambios"
+                          />
+                          <DeleteGastoButton action={eliminarGasto.bind(null, g.id)} />
+                        </>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

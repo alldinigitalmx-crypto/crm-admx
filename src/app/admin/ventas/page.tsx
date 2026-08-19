@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Pencil, Download } from "lucide-react";
+import { Pencil, Download, ShoppingBag, Handshake } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { VentaFormDialog } from "@/components/ventas/venta-form-dialog";
 import { VentaDetalleDialog } from "@/components/ventas/venta-detalle-dialog";
 import { DeleteVentaButton } from "@/components/ventas/delete-venta-button";
@@ -25,6 +26,11 @@ import type { CanalVenta, OrigenVenta, Prisma } from "@/generated/prisma/client"
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+const ORIGEN_COLOR: Record<string, string> = {
+  TiendaOnline: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  Manual: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+};
 
 export default async function VentasPage({
   searchParams,
@@ -79,6 +85,45 @@ export default async function VentasPage({
   const totalManual = ventas
     .filter((v) => v.origen === "Manual")
     .reduce((acc, v) => acc + Number(v.total), 0);
+
+  const ventasConDetalle = ventas.map((v) => ({
+    v,
+    ventaDetalle: {
+      id: v.id,
+      fecha: v.fecha,
+      origen: v.origen,
+      canal: v.canal,
+      nombreComprador: v.nombreComprador,
+      emailComprador: v.emailComprador,
+      metodoPago: v.metodoPago,
+      total: Number(v.total),
+      tipoEntrega: v.tipoEntrega,
+      referidoPor: v.referidoPor ? { nombre: v.referidoPor.nombre } : null,
+      comisionReferido: v.comisionReferido ? Number(v.comisionReferido) : null,
+      detalles: v.detalles.map((d) => ({
+        productoNombre: d.producto.nombre,
+        cantidad: d.cantidad,
+        precioUnitario: Number(d.precioUnitario),
+        subtotal: Number(d.subtotal),
+      })),
+    },
+    ventaEditDefaults: {
+      fecha: v.fecha,
+      origen: v.origen,
+      canal: v.canal,
+      nombreComprador: v.nombreComprador,
+      emailComprador: v.emailComprador,
+      metodoPago: v.metodoPago,
+      tipoEntrega: v.tipoEntrega,
+      referidoPorId: v.referidoPorId,
+      comisionReferido: v.comisionReferido ? Number(v.comisionReferido) : null,
+      items: v.detalles.map((d) => ({
+        productoId: String(d.productoId),
+        cantidad: d.cantidad,
+        precioUnitario: Number(d.precioUnitario),
+      })),
+    },
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -195,55 +240,21 @@ export default async function VentasPage({
               {hasFiltros ? "No hay ventas con esos filtros." : "Aún no hay ventas registradas."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Comprador</TableHead>
-                  <TableHead>Origen</TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="w-28" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ventas.map((v) => {
-                  const ventaDetalle = {
-                    id: v.id,
-                    fecha: v.fecha,
-                    origen: v.origen,
-                    canal: v.canal,
-                    nombreComprador: v.nombreComprador,
-                    emailComprador: v.emailComprador,
-                    metodoPago: v.metodoPago,
-                    total: Number(v.total),
-                    tipoEntrega: v.tipoEntrega,
-                    referidoPor: v.referidoPor ? { nombre: v.referidoPor.nombre } : null,
-                    comisionReferido: v.comisionReferido ? Number(v.comisionReferido) : null,
-                    detalles: v.detalles.map((d) => ({
-                      productoNombre: d.producto.nombre,
-                      cantidad: d.cantidad,
-                      precioUnitario: Number(d.precioUnitario),
-                      subtotal: Number(d.subtotal),
-                    })),
-                  };
-                  const ventaEditDefaults = {
-                    fecha: v.fecha,
-                    origen: v.origen,
-                    canal: v.canal,
-                    nombreComprador: v.nombreComprador,
-                    emailComprador: v.emailComprador,
-                    metodoPago: v.metodoPago,
-                    tipoEntrega: v.tipoEntrega,
-                    referidoPorId: v.referidoPorId,
-                    comisionReferido: v.comisionReferido ? Number(v.comisionReferido) : null,
-                    items: v.detalles.map((d) => ({
-                      productoId: String(d.productoId),
-                      cantidad: d.cantidad,
-                      precioUnitario: Number(d.precioUnitario),
-                    })),
-                  };
-                  return (
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Comprador</TableHead>
+                    <TableHead>Origen</TableHead>
+                    <TableHead>Canal</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="w-28" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => (
                     <TableRow key={v.id}>
                       <TableCell>{formatDate(v.fecha)}</TableCell>
                       <TableCell className="font-medium">
@@ -280,10 +291,54 @@ export default async function VentasPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => (
+                  <MobileRecordCard
+                    key={v.id}
+                    avatarLabel={v.origen === "TiendaOnline" ? <ShoppingBag className="size-5" /> : <Handshake className="size-5" />}
+                    avatarClassName={ORIGEN_COLOR[v.origen]}
+                    title={v.nombreComprador ?? "Comprador anónimo"}
+                    subtitle={v.canal ?? "Sin canal"}
+                    meta={`${formatDate(v.fecha)} · ${formatCurrency(v.total)}`}
+                    badge={
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${ORIGEN_COLOR[v.origen]}`}
+                      >
+                        {v.origen === "TiendaOnline" ? "Tienda Online" : "Manual"}
+                      </span>
+                    }
+                    actions={
+                      <>
+                        <VentaDetalleDialog venta={ventaDetalle} />
+                        {permisos.puedeEditar && (
+                          <VentaFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar venta"
+                            action={actualizarVenta.bind(null, v.id)}
+                            productos={productoOpciones}
+                            clientes={clientes}
+                            defaultValues={ventaEditDefaults}
+                            submitLabel="Guardar cambios"
+                          />
+                        )}
+                        {permisos.puedeEditar && (
+                          <DeleteVentaButton action={eliminarVenta.bind(null, v.id)} />
+                        )}
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

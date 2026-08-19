@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { IntermediarioFormDialog } from "@/components/intermediarios/intermediario-form-dialog";
 import { DeleteIntermediarioButton } from "@/components/intermediarios/delete-intermediario-button";
 import {
@@ -55,25 +56,64 @@ export default async function IntermediariosPage() {
               Aún no hay intermediarios registrados.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Correo</TableHead>
-                  <TableHead>Notas</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Correo</TableHead>
+                    <TableHead>Notas</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {intermediarios.map((i) => (
+                    <TableRow key={i.id}>
+                      <TableCell className="font-medium">{i.nombre}</TableCell>
+                      <TableCell>{i.telefono ?? "—"}</TableCell>
+                      <TableCell>{i.email ?? "—"}</TableCell>
+                      <TableCell className="max-w-64 truncate">{i.notas ?? "—"}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <IntermediarioFormDialog
+                            trigger={
+                              <Button size="icon" variant="ghost" className="size-7">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                            title="Editar intermediario"
+                            action={actualizarIntermediario.bind(null, i.id)}
+                            defaultValues={{
+                              nombre: i.nombre,
+                              telefono: i.telefono,
+                              email: i.email,
+                              notas: i.notas,
+                            }}
+                            submitLabel="Guardar cambios"
+                          />
+                          <DeleteIntermediarioButton
+                            action={eliminarIntermediario.bind(null, i.id)}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
                 {intermediarios.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell className="font-medium">{i.nombre}</TableCell>
-                    <TableCell>{i.telefono ?? "—"}</TableCell>
-                    <TableCell>{i.email ?? "—"}</TableCell>
-                    <TableCell className="max-w-64 truncate">{i.notas ?? "—"}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
+                  <MobileRecordCard
+                    key={i.id}
+                    avatarLabel={i.nombre.trim().charAt(0).toUpperCase() || "?"}
+                    title={i.nombre}
+                    subtitle={i.telefono ?? i.email ?? undefined}
+                    meta={i.telefono && i.email ? i.email : (i.notas ?? undefined)}
+                    actions={
+                      <>
                         <IntermediarioFormDialog
                           trigger={
                             <Button size="icon" variant="ghost" className="size-7">
@@ -93,12 +133,12 @@ export default async function IntermediariosPage() {
                         <DeleteIntermediarioButton
                           action={eliminarIntermediario.bind(null, i.id)}
                         />
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </>
+                    }
+                  />
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

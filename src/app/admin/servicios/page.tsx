@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, ChevronRight, Download } from "lucide-react";
+import {
+  Plus,
+  ChevronRight,
+  Download,
+  FileText,
+  CheckCircle2,
+  Loader,
+  PackageCheck,
+  XCircle,
+} from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
@@ -18,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { createServicio } from "@/app/admin/servicios/actions";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
@@ -31,6 +41,23 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "dest
 };
 
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"];
+
+// Mismos colores de status que en /admin/reportes, para que el significado
+// de cada color sea consistente en toda la app.
+const STATUS_COLOR: Record<string, string> = {
+  Cotizado: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  Aprobado: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  EnProceso: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  Entregado: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  Cancelado: "bg-red-500/15 text-red-700 dark:text-red-400",
+};
+const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  Cotizado: FileText,
+  Aprobado: CheckCircle2,
+  EnProceso: Loader,
+  Entregado: PackageCheck,
+  Cancelado: XCircle,
+};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -206,57 +233,85 @@ export default async function ServiciosPage({
                 : "Aún no hay servicios registrados."}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Intermediario</TableHead>
-                  <TableHead>Inicio</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servicios.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/admin/servicios/${s.id}`} className="hover:underline">
-                        {s.descripcion}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/clientes/${s.cliente.id}`}
-                        className="hover:underline"
-                      >
-                        {s.cliente.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[s.status] ?? "outline"}>
-                        {s.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{s.intermediario?.nombre ?? "—"}</TableCell>
-                    <TableCell>{formatDate(s.fechaInicio)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(montoTotalServicio(s))}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/servicios/${s.id}`}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label={`Ver detalle de ${s.descripcion}`}
-                      >
-                        <ChevronRight className="size-4" />
-                      </Link>
-                    </TableCell>
+            <>
+              {/* Escritorio: tabla clásica */}
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Intermediario</TableHead>
+                    <TableHead>Inicio</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {servicios.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/servicios/${s.id}`} className="hover:underline">
+                          {s.descripcion}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/clientes/${s.cliente.id}`}
+                          className="hover:underline"
+                        >
+                          {s.cliente.nombre}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[s.status] ?? "outline"}>
+                          {s.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{s.intermediario?.nombre ?? "—"}</TableCell>
+                      <TableCell>{formatDate(s.fechaInicio)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(montoTotalServicio(s))}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/admin/servicios/${s.id}`}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Ver detalle de ${s.descripcion}`}
+                        >
+                          <ChevronRight className="size-4" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {servicios.map((s) => {
+                  const Icono = STATUS_ICON[s.status] ?? FileText;
+                  return (
+                    <MobileRecordCard
+                      key={s.id}
+                      href={`/admin/servicios/${s.id}`}
+                      avatarLabel={<Icono className="size-5" />}
+                      avatarClassName={STATUS_COLOR[s.status]}
+                      title={s.descripcion}
+                      subtitle={s.cliente.nombre}
+                      meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s))}`}
+                      badge={
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[s.status]}`}
+                        >
+                          {s.status}
+                        </span>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
