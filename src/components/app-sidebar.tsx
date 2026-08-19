@@ -27,6 +27,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -35,21 +36,42 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+type Grupo = "general" | "operacion" | "negocio" | "admin";
+
+const GRUPO_LABEL: Record<Grupo, string> = {
+  general: "General",
+  operacion: "Operación",
+  negocio: "Negocio",
+  admin: "Administración",
+};
+
 const navPrincipal = [
-  { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null },
-  { title: "Reportes", href: "/admin/reportes", icon: BarChart3, modulo: null },
-  { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes" },
-  { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios" },
-  { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones" },
-  { title: "Pagos", href: "/admin/pagos", icon: CreditCard, modulo: "Pagos" },
-  { title: "Tareas", href: "/admin/tareas", icon: ListTodo, modulo: "Tareas" },
-  { title: "Gastos", href: "/admin/gastos", icon: Wallet, modulo: null },
-  { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy, modulo: "Quejas" },
-  { title: "Productos", href: "/admin/productos", icon: Package, modulo: "Productos" },
-  { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag, modulo: "Ventas" },
-  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake, modulo: null },
-  { title: "Usuarios y Accesos", href: "/admin/usuarios", icon: ShieldCheck, modulo: null, soloAdmin: true },
-] as const;
+  { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null, grupo: "general" },
+  { title: "Reportes", href: "/admin/reportes", icon: BarChart3, modulo: null, grupo: "general" },
+  { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes", grupo: "operacion" },
+  { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios", grupo: "operacion" },
+  { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones", grupo: "operacion" },
+  { title: "Pagos", href: "/admin/pagos", icon: CreditCard, modulo: "Pagos", grupo: "operacion" },
+  { title: "Tareas", href: "/admin/tareas", icon: ListTodo, modulo: "Tareas", grupo: "operacion" },
+  { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy, modulo: "Quejas", grupo: "operacion" },
+  { title: "Productos", href: "/admin/productos", icon: Package, modulo: "Productos", grupo: "negocio" },
+  { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag, modulo: "Ventas", grupo: "negocio" },
+  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake, modulo: null, grupo: "negocio" },
+  { title: "Gastos", href: "/admin/gastos", icon: Wallet, modulo: null, grupo: "negocio" },
+  {
+    title: "Usuarios y Accesos",
+    href: "/admin/usuarios",
+    icon: ShieldCheck,
+    modulo: null,
+    grupo: "admin",
+    soloAdmin: true,
+  },
+] as const satisfies readonly { title: string; href: string; icon: typeof LayoutDashboard; modulo: ModuloSistema | null; grupo: Grupo; soloAdmin?: boolean }[];
+
+// Estado activo con el mismo azul de marca que ya usan los íconos de KPI
+// y avatares en el resto de la app, en vez del gris genérico de shadcn.
+const ITEM_ACTIVE_CLASS =
+  "data-[active=true]:bg-blue-600/10 data-[active=true]:text-blue-700 data-[active=true]:hover:bg-blue-600/15 data-[active=true]:hover:text-blue-700 dark:data-[active=true]:text-blue-400 dark:data-[active=true]:hover:text-blue-400 [&[data-active=true]_svg]:text-blue-600 dark:[&[data-active=true]_svg]:text-blue-400";
 
 export function AppSidebar({
   modulosVisibles,
@@ -74,12 +96,16 @@ export function AppSidebar({
     return modulosSet.has(item.modulo as ModuloSistema);
   });
 
+  const grupos = (["general", "operacion", "negocio", "admin"] as const)
+    .map((grupo) => ({ grupo, items: items.filter((item) => item.grupo === grupo) }))
+    .filter((g) => g.items.length > 0);
+
   const initial = (userName ?? userEmail ?? "?").charAt(0).toUpperCase();
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className={`flex items-center gap-2.5 px-2 ${isMobile ? "py-3" : "py-1.5"}`}>
+        <div className={`flex items-center gap-2.5 px-2 ${isMobile ? "py-3" : "py-2"}`}>
           <div
             className={`flex shrink-0 items-center justify-center rounded-md bg-blue-600 ${
               isMobile ? "size-9" : "size-7"
@@ -98,33 +124,36 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu className={isMobile ? "gap-1.5" : undefined}>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    size={isMobile ? "lg" : "default"}
-                    isActive={
-                      item.href === "/admin"
-                        ? pathname === item.href
-                        : pathname.startsWith(item.href)
-                    }
-                    tooltip={item.title}
-                    className={isMobile ? "gap-3 text-base [&_svg]:size-5" : undefined}
-                    onClick={() => isMobile && setOpenMobile(false)}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {grupos.map(({ grupo, items: itemsGrupo }) => (
+          <SidebarGroup key={grupo}>
+            <SidebarGroupLabel>{GRUPO_LABEL[grupo]}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className={isMobile ? "gap-1.5" : undefined}>
+                {itemsGrupo.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      size={isMobile ? "lg" : "default"}
+                      isActive={
+                        item.href === "/admin"
+                          ? pathname === item.href
+                          : pathname.startsWith(item.href)
+                      }
+                      tooltip={item.title}
+                      className={`${ITEM_ACTIVE_CLASS} ${isMobile ? "gap-3 text-base [&_svg]:size-5" : ""}`}
+                      onClick={() => isMobile && setOpenMobile(false)}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       {isMobile && (
