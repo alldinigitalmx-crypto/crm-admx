@@ -179,6 +179,10 @@ export function VentaForm({
               <SelectItem value="MercadoPago">Mercado Pago</SelectItem>
               <SelectItem value="PayPal">PayPal</SelectItem>
               <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+              <SelectItem value="WesternUnion">Western Union</SelectItem>
+              <SelectItem value="Binance">Binance</SelectItem>
+              <SelectItem value="Deposito">Depósito</SelectItem>
+              <SelectItem value="Otro">Otro</SelectItem>
             </SelectContent>
           </Select>
         </div>

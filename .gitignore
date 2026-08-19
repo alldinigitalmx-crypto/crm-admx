@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# artefactos de importaciones puntuales (mapeos locales, no aplican en otras máquinas)
+scripts/_appsheet-import-checkpoint.json

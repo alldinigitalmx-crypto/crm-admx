@@ -363,6 +363,10 @@ enum MetodoPago {
   MercadoPago
   PayPal
   Tarjeta
+  WesternUnion
+  Binance
+  Deposito
+  Otro
 }
 
 enum StatusCotizacion {
