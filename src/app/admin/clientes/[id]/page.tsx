@@ -20,10 +20,12 @@ import {
 } from "@/components/ui/table";
 import { ClienteFormDialog } from "@/components/clientes/cliente-form-dialog";
 import { PortalAccessCard } from "@/components/clientes/portal-access-card";
+import { DeleteClienteButton } from "@/components/clientes/delete-cliente-button";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
 import {
   desactivarPortalCliente,
+  eliminarCliente,
   guardarPasswordPortalCliente,
   updateCliente,
 } from "@/app/admin/clientes/actions";
@@ -147,19 +149,25 @@ export default async function ClienteDetallePage({
           </p>
         </div>
         {permisos.puedeEditar && (
-          <ClienteFormDialog
-            trigger={
-              <Button variant="outline">
-                <Pencil />
-                Editar
-              </Button>
-            }
-            title="Editar cliente"
-            description={cliente.nombre}
-            action={updateCliente.bind(null, cliente.id)}
-            defaultValues={cliente}
-            submitLabel="Guardar cambios"
-          />
+          <div className="flex gap-2">
+            <ClienteFormDialog
+              trigger={
+                <Button variant="outline">
+                  <Pencil />
+                  Editar
+                </Button>
+              }
+              title="Editar cliente"
+              description={cliente.nombre}
+              action={updateCliente.bind(null, cliente.id)}
+              defaultValues={cliente}
+              submitLabel="Guardar cambios"
+            />
+            <DeleteClienteButton
+              nombre={cliente.nombre}
+              action={eliminarCliente.bind(null, cliente.id)}
+            />
+          </div>
         )}
       </div>
 

@@ -136,3 +136,84 @@ export async function desactivarPortalCliente(clienteId: number) {
 
   revalidatePath(`/admin/clientes/${clienteId}`);
 }
+
+// Elimina un cliente y todo lo que depende de él (servicios, cotizaciones,
+// pagos, tareas/subtareas, quejas y archivos adjuntos). No hay onDelete:
+// Cascade en el schema, así que se borra manualmente en el orden correcto
+// dentro de una sola transacción. Las ventas donde este cliente aparece solo
+// como "referido" (comisión) no se tocan — se les quita la referencia.
+export async function eliminarCliente(id: number) {
+  if (!(await requiereNivel("Clientes", "Editar"))) return;
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      servicios: { select: { id: true } },
+      cotizaciones: { select: { id: true } },
+      quejas: { select: { id: true } },
+    },
+  });
+  if (!cliente) return;
+
+  const servicioIds = cliente.servicios.map((s) => s.id);
+  const cotizacionIds = cliente.cotizaciones.map((c) => c.id);
+  const quejaIds = cliente.quejas.map((q) => q.id);
+
+  const [pagos, tareas, ordenesCambio] = await Promise.all([
+    prisma.pago.findMany({
+      where: {
+        OR: [{ servicioId: { in: servicioIds } }, { cotizacionId: { in: cotizacionIds } }],
+      },
+      select: { id: true },
+    }),
+    prisma.tarea.findMany({
+      where: {
+        OR: [{ servicioId: { in: servicioIds } }, { cotizacionId: { in: cotizacionIds } }],
+      },
+      select: { id: true },
+    }),
+    prisma.ordenCambio.findMany({
+      where: { servicioId: { in: servicioIds } },
+      select: { id: true },
+    }),
+  ]);
+  const pagoIds = pagos.map((p) => p.id);
+  const tareaIds = tareas.map((t) => t.id);
+  const ordenCambioIds = ordenesCambio.map((o) => o.id);
+
+  await prisma.$transaction([
+    prisma.subtarea.deleteMany({ where: { tareaId: { in: tareaIds } } }),
+    prisma.tarea.deleteMany({ where: { id: { in: tareaIds } } }),
+    prisma.archivo.deleteMany({
+      where: {
+        OR: [
+          { entidadTipo: "Servicio", entidadId: { in: servicioIds } },
+          { entidadTipo: "Cotizacion", entidadId: { in: cotizacionIds } },
+          { entidadTipo: "Queja", entidadId: { in: quejaIds } },
+          { entidadTipo: "Pago", entidadId: { in: pagoIds } },
+        ],
+      },
+    }),
+    prisma.eventoSistema.deleteMany({
+      where: {
+        OR: [
+          { entidadTipo: "Cotizacion", entidadId: { in: cotizacionIds } },
+          { entidadTipo: "Queja", entidadId: { in: quejaIds } },
+          { entidadTipo: "Pago", entidadId: { in: pagoIds } },
+        ],
+      },
+    }),
+    prisma.pago.deleteMany({ where: { id: { in: pagoIds } } }),
+    prisma.queja.deleteMany({ where: { id: { in: quejaIds } } }),
+    prisma.cotizacion.deleteMany({ where: { id: { in: cotizacionIds } } }),
+    prisma.ordenCambio.deleteMany({ where: { id: { in: ordenCambioIds } } }),
+    prisma.servicio.deleteMany({ where: { id: { in: servicioIds } } }),
+    prisma.venta.updateMany({ where: { referidoPorId: id }, data: { referidoPorId: null } }),
+    prisma.cliente.delete({ where: { id } }),
+  ]);
+
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin");
+  redirect("/admin/clientes");
+}
