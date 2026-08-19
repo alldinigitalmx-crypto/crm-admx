@@ -52,7 +52,13 @@ export default async function AdminLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar modulosVisibles={modulosVisibles} esAdmin={esAdminUsuario} />
+      <AppSidebar
+        modulosVisibles={modulosVisibles}
+        esAdmin={esAdminUsuario}
+        userEmail={session.user.email}
+        userName={session.user.name}
+        onSignOut={signOutAction}
+      />
       <SidebarInset>
         <AdminTopbar
           userEmail={session.user.email}

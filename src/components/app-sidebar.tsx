@@ -17,20 +17,23 @@ import {
   ListTodo,
   Wallet,
   BarChart3,
+  LogOut,
 } from "lucide-react";
 
 import type { ModuloSistema } from "@/generated/prisma/client";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navPrincipal = [
   { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null },
@@ -51,11 +54,18 @@ const navPrincipal = [
 export function AppSidebar({
   modulosVisibles,
   esAdmin,
+  userEmail,
+  userName,
+  onSignOut,
 }: {
   modulosVisibles: ModuloSistema[];
   esAdmin: boolean;
+  userEmail?: string | null;
+  userName?: string | null;
+  onSignOut?: () => Promise<void>;
 }) {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
   const modulosSet = new Set(modulosVisibles);
 
   const items = navPrincipal.filter((item) => {
@@ -64,14 +74,24 @@ export function AppSidebar({
     return modulosSet.has(item.modulo as ModuloSistema);
   });
 
+  const initial = (userName ?? userEmail ?? "?").charAt(0).toUpperCase();
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-600">
-            <Code2 className="size-4 text-white" />
+        <div className={`flex items-center gap-2.5 px-2 ${isMobile ? "py-3" : "py-1.5"}`}>
+          <div
+            className={`flex shrink-0 items-center justify-center rounded-md bg-blue-600 ${
+              isMobile ? "size-9" : "size-7"
+            }`}
+          >
+            <Code2 className={isMobile ? "size-5 text-white" : "size-4 text-white"} />
           </div>
-          <span className="text-sm font-semibold tracking-wide group-data-[collapsible=icon]:hidden">
+          <span
+            className={`font-semibold tracking-wide group-data-[collapsible=icon]:hidden ${
+              isMobile ? "text-base" : "text-sm"
+            }`}
+          >
             ADMX DEV
           </span>
         </div>
@@ -79,19 +99,21 @@ export function AppSidebar({
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Fase 1</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className={isMobile ? "gap-1.5" : undefined}>
               {items.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
+                    size={isMobile ? "lg" : "default"}
                     isActive={
                       item.href === "/admin"
                         ? pathname === item.href
                         : pathname.startsWith(item.href)
                     }
                     tooltip={item.title}
+                    className={isMobile ? "gap-3 text-base [&_svg]:size-5" : undefined}
+                    onClick={() => isMobile && setOpenMobile(false)}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -104,6 +126,31 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {isMobile && (
+        <SidebarFooter>
+          <div className="flex items-center gap-3 rounded-lg border border-sidebar-border px-2 py-2.5">
+            <Avatar className="size-9 shrink-0">
+              <AvatarFallback>{initial}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{userName ?? "Usuario"}</p>
+              <p className="truncate text-xs text-sidebar-foreground/60">{userEmail}</p>
+            </div>
+            {onSignOut && (
+              <form action={onSignOut}>
+                <button
+                  type="submit"
+                  aria-label="Cerrar sesión"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  <LogOut className="size-5" />
+                </button>
+              </form>
+            )}
+          </div>
+        </SidebarFooter>
+      )}
     </Sidebar>
   );
 }
