@@ -28,6 +28,7 @@ import { EvidenciaForm } from "@/components/servicios/evidencia-form";
 import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
 import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
 import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import {
   aprobarOrdenCambio,
   createOrdenCambio,
@@ -521,8 +522,7 @@ export default async function ServicioDetallePage({
               {evidencias.map((ev) => (
                 <div key={ev.id} className="flex flex-col gap-2 rounded-lg border border-input p-2">
                   {ev.tipo === "Imagen" ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- evidencia guardada como dataURL
-                    <img
+                    <ZoomableImage
                       src={ev.url}
                       alt={ev.nombre}
                       className="h-32 w-full rounded-md object-cover"

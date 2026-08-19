@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type {
   ComprobanteFormState,
@@ -159,8 +160,7 @@ export function PagoDetalleDialog({
             <Label>Comprobante (imagen)</Label>
             {comprobanteArchivo ? (
               <div className="flex flex-col gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- comprobante guardado como dataURL */}
-                <img
+                <ZoomableImage
                   src={comprobanteArchivo.url}
                   alt="Comprobante de pago"
                   className="max-h-72 w-full rounded-lg border border-input object-contain"
