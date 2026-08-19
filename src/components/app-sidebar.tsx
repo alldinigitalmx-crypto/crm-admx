@@ -16,6 +16,7 @@ import {
   Code2,
   ListTodo,
   Wallet,
+  BarChart3,
 } from "lucide-react";
 
 import type { ModuloSistema } from "@/generated/prisma/client";
@@ -33,6 +34,7 @@ import {
 
 const navPrincipal = [
   { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null },
+  { title: "Reportes", href: "/admin/reportes", icon: BarChart3, modulo: null },
   { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes" },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios" },
   { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones" },
