@@ -25,7 +25,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RecaudadoGastosChart } from "@/components/reportes/recaudado-gastos-chart";
 import { DesgloseBarras, type ItemBarra } from "@/components/reportes/desglose-barras";
+import { DonutChart, type DonutItem } from "@/components/reportes/donut-chart";
 import type { StatusServicio } from "@/generated/prisma/client";
+
+// Colores planos (no clases bg-*) para los segmentos de la dona — el mismo
+// tono conceptual que METODO_COLOR de abajo, pero utilizable como stroke SVG.
+const METODO_COLOR_HEX: Record<string, string> = {
+  Efectivo: "#10b981",
+  Transferencia: "#6366f1",
+  "Mercado Pago": "#0ea5e9",
+  PayPal: "#8b5cf6",
+  Tarjeta: "#ec4899",
+  "Western Union": "#f59e0b",
+  Binance: "#f97316",
+  Depósito: "#14b8a6",
+  Otro: "#a1a1aa",
+};
 
 const STATUS_COLOR: Record<StatusServicio, string> = {
   Cotizado: "bg-slate-400 dark:bg-slate-500",
@@ -129,6 +144,11 @@ export default async function ReportesPage({
     valor: f.monto,
     detalle: `${f.count} pago${f.count === 1 ? "" : "s"}`,
     colorClass: f.label === "Otros" ? COLOR_OTROS : (METODO_COLOR[f.label] ?? COLOR_OTROS),
+  }));
+  const metodoDonutItems: DonutItem[] = metodoFilas.map((f) => ({
+    label: f.label,
+    value: f.monto,
+    color: f.label === "Otros" ? METODO_COLOR_HEX.Otro : (METODO_COLOR_HEX[f.label] ?? METODO_COLOR_HEX.Otro),
   }));
   const gastosItems: ItemBarra[] = gastosFilas.map((f, i) => ({
     label: f.label,
@@ -270,7 +290,18 @@ export default async function ReportesPage({
             <CardTitle className="text-sm font-medium">Pagos por método</CardTitle>
           </CardHeader>
           <CardContent>
-            <DesgloseBarras items={metodoItems} vacio="No hay pagos confirmados en este rango." />
+            {metodoItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay pagos confirmados en este rango.</p>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <DonutChart
+                  items={metodoDonutItems}
+                  centerLabel={formatCurrency(totalRecaudado)}
+                  centerSub={`${pagosCount} pago${pagosCount === 1 ? "" : "s"}`}
+                />
+                <DesgloseBarras items={metodoItems} vacio="No hay pagos confirmados en este rango." />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -298,20 +329,40 @@ export default async function ReportesPage({
                   <TableHead>Cliente</TableHead>
                   <TableHead className="text-right">Pagos</TableHead>
                   <TableHead className="text-right">Recaudado</TableHead>
+                  <TableHead className="w-40">% del total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {topClientes.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/admin/clientes/${c.id}`} className="hover:underline">
-                        {c.nombre}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right">{c.count}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(c.monto)}</TableCell>
-                  </TableRow>
-                ))}
+                {topClientes.map((c) => {
+                  const pct = totalRecaudado > 0 ? (c.monto / totalRecaudado) * 100 : 0;
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/clientes/${c.id}`} className="flex items-center gap-2.5 hover:underline">
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {c.nombre.trim().charAt(0).toUpperCase() || "?"}
+                          </span>
+                          {c.nombre}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{c.count}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(c.monto)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
+                            <span
+                              className="block h-full rounded-full bg-primary"
+                              style={{ width: `${Math.max(2, pct)}%` }}
+                            />
+                          </span>
+                          <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                            {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
