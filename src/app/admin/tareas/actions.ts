@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { requiereNivel } from "@/lib/alcance";
+import { requiereNivel, requiereNivelTarea } from "@/lib/alcance";
 import type { PrioridadTarea } from "@/generated/prisma/client";
 
 export type TareaFormState = { error?: string } | undefined;
@@ -63,7 +63,7 @@ export async function crearTarea(
 }
 
 export async function completarTarea(id: number, completada: boolean) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  if (!(await requiereNivelTarea(id, "Editar"))) return;
 
   const tarea = await prisma.tarea.update({
     where: { id },
@@ -74,7 +74,7 @@ export async function completarTarea(id: number, completada: boolean) {
 }
 
 export async function eliminarTarea(id: number) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  if (!(await requiereNivelTarea(id, "Editar"))) return;
 
   const tarea = await prisma.tarea.findUnique({ where: { id } });
   if (!tarea) return;
@@ -89,8 +89,8 @@ export async function actualizarTarea(
   _prevState: TareaFormState,
   formData: FormData
 ): Promise<TareaFormState> {
-  if (!(await requiereNivel("Tareas", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelTarea(id, "Editar"))) {
+    return { error: "No tienes permiso para editar esta tarea." };
   }
 
   const tarea = await prisma.tarea.findUnique({ where: { id } });
@@ -129,14 +129,14 @@ export async function actualizarTarea(
 }
 
 export async function cambiarPrioridad(id: number, prioridad: PrioridadTarea) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  if (!(await requiereNivelTarea(id, "Editar"))) return;
 
   const tarea = await prisma.tarea.update({ where: { id }, data: { prioridad } });
   revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
 }
 
 export async function crearSubtarea(tareaId: number, titulo: string) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  if (!(await requiereNivelTarea(tareaId, "Editar"))) return;
   const limpio = titulo.trim();
   if (!limpio) return;
 
@@ -148,7 +148,12 @@ export async function crearSubtarea(tareaId: number, titulo: string) {
 }
 
 export async function alternarSubtarea(id: number, completada: boolean) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
+  const subtareaExistente = await prisma.subtarea.findUnique({
+    where: { id },
+    select: { tareaId: true },
+  });
+  if (!subtareaExistente) return;
+  if (!(await requiereNivelTarea(subtareaExistente.tareaId, "Editar"))) return;
 
   const subtarea = await prisma.subtarea.update({
     where: { id },
@@ -159,17 +164,16 @@ export async function alternarSubtarea(id: number, completada: boolean) {
 }
 
 export async function eliminarSubtarea(id: number) {
-  if (!(await requiereNivel("Tareas", "Editar"))) return;
-
   const subtarea = await prisma.subtarea.findUnique({ where: { id }, include: { tarea: true } });
   if (!subtarea) return;
+  if (!(await requiereNivelTarea(subtarea.tareaId, "Editar"))) return;
 
   await prisma.subtarea.delete({ where: { id } });
   revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId);
 }
 
 export async function duplicarTarea(id: number) {
-  if (!(await requiereNivel("Tareas", "Crear"))) return;
+  if (!(await requiereNivelTarea(id, "Editar"))) return;
 
   const tarea = await prisma.tarea.findUnique({ where: { id } });
   if (!tarea) return;

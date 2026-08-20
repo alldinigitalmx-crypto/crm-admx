@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requiereNivel } from "@/lib/alcance";
+import { requiereNivel, requiereNivelCliente } from "@/lib/alcance";
 import { Prisma, type Etiqueta, type MedioCaptacion } from "@/generated/prisma/client";
 
 export type ClienteFormState = { error?: string } | undefined;
@@ -67,8 +67,8 @@ export async function updateCliente(
   _prevState: ClienteFormState,
   formData: FormData
 ): Promise<ClienteFormState> {
-  if (!(await requiereNivel("Clientes", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelCliente(id, "Editar"))) {
+    return { error: "No tienes permiso para editar este cliente." };
   }
 
   const data = parseClienteForm(formData);
@@ -100,8 +100,8 @@ export async function guardarPasswordPortalCliente(
   _prevState: PortalFormState,
   formData: FormData
 ): Promise<PortalFormState> {
-  if (!(await requiereNivel("Clientes", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelCliente(clienteId, "Editar"))) {
+    return { error: "No tienes permiso para editar este cliente." };
   }
 
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
@@ -127,7 +127,7 @@ export async function guardarPasswordPortalCliente(
 }
 
 export async function desactivarPortalCliente(clienteId: number) {
-  if (!(await requiereNivel("Clientes", "Editar"))) return;
+  if (!(await requiereNivelCliente(clienteId, "Editar"))) return;
 
   await prisma.cliente.update({
     where: { id: clienteId },
@@ -143,7 +143,7 @@ export async function desactivarPortalCliente(clienteId: number) {
 // dentro de una sola transacción. Las ventas donde este cliente aparece solo
 // como "referido" (comisión) no se tocan — se les quita la referencia.
 export async function eliminarCliente(id: number) {
-  if (!(await requiereNivel("Clientes", "Editar"))) return;
+  if (!(await requiereNivelCliente(id, "Editar"))) return;
 
   const cliente = await prisma.cliente.findUnique({
     where: { id },

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { requiereNivel } from "@/lib/alcance";
+import { requiereNivel, requiereNivelServicio } from "@/lib/alcance";
 import { Prisma, type StatusServicio } from "@/generated/prisma/client";
 
 export type ServicioFormState = { error?: string } | undefined;
@@ -103,8 +103,8 @@ export async function updateServicio(
   _prevState: ServicioFormState,
   formData: FormData
 ): Promise<ServicioFormState> {
-  if (!(await requiereNivel("Servicios", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelServicio(id, "Editar"))) {
+    return { error: "No tienes permiso para editar este servicio." };
   }
 
   const data = parseServicioForm(formData);
@@ -148,8 +148,8 @@ export async function createOrdenCambio(
   _prevState: OrdenCambioFormState,
   formData: FormData
 ): Promise<OrdenCambioFormState> {
-  if (!(await requiereNivel("Servicios", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) {
+    return { error: "No tienes permiso para editar este servicio." };
   }
 
   const descripcion = String(formData.get("descripcion") ?? "").trim();
@@ -170,7 +170,7 @@ export async function createOrdenCambio(
 }
 
 export async function aprobarOrdenCambio(ordenId: number, servicioId: number) {
-  if (!(await requiereNivel("Servicios", "Editar"))) return;
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
 
   const userId = await currentUserId();
 
@@ -184,7 +184,7 @@ export async function aprobarOrdenCambio(ordenId: number, servicioId: number) {
 }
 
 export async function rechazarOrdenCambio(ordenId: number, servicioId: number) {
-  if (!(await requiereNivel("Servicios", "Editar"))) return;
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
 
   const userId = await currentUserId();
 
@@ -204,8 +204,8 @@ export async function subirEvidencia(
   _prevState: EvidenciaFormState,
   formData: FormData
 ): Promise<EvidenciaFormState> {
-  if (!(await requiereNivel("Servicios", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) {
+    return { error: "No tienes permiso para editar este servicio." };
   }
 
   const tipoInput = String(formData.get("tipoEvidencia") ?? "imagen");
@@ -250,7 +250,7 @@ export async function subirEvidencia(
 }
 
 export async function eliminarEvidencia(archivoId: number, servicioId: number) {
-  if (!(await requiereNivel("Servicios", "Editar"))) return;
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
 
   await prisma.archivo.delete({ where: { id: archivoId } });
   revalidatePath(`/admin/servicios/${servicioId}`);

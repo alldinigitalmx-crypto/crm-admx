@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { requiereNivel } from "@/lib/alcance";
+import { requiereNivel, requiereNivelQueja } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import type { CategoriaQueja, StatusQueja } from "@/generated/prisma/client";
 
@@ -53,8 +53,8 @@ export async function actualizarQueja(
   _prevState: QuejaFormState,
   formData: FormData
 ): Promise<QuejaFormState> {
-  if (!(await requiereNivel("Quejas", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelQueja(id, "Editar"))) {
+    return { error: "No tienes permiso para editar esta queja." };
   }
 
   const queja = await prisma.queja.findUnique({ where: { id } });
@@ -90,7 +90,7 @@ export async function actualizarQueja(
 }
 
 export async function eliminarQueja(id: number) {
-  if (!(await requiereNivel("Quejas", "Editar"))) return;
+  if (!(await requiereNivelQueja(id, "Editar"))) return;
 
   const queja = await prisma.queja.findUnique({ where: { id } });
   if (!queja) return;
