@@ -198,15 +198,9 @@ export default async function ReportesPage({
             </a>
           </Button>
           <Button variant="outline" asChild>
-            <a href={`/admin/reportes/export/ingresos?${exportQuery}`}>
+            <a href={`/admin/reportes/export?${exportQuery}`}>
               <Download />
-              Ingresos (Excel)
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href={`/admin/reportes/export/gastos?${exportQuery}`}>
-              <Download />
-              Gastos (Excel)
+              Exportar Excel
             </a>
           </Button>
         </div>

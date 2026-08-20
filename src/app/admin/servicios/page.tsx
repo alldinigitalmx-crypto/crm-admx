@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { createServicio } from "@/app/admin/servicios/actions";
+import { Pagination } from "@/components/ui/pagination";
+import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"];
@@ -38,9 +40,11 @@ export default async function ServiciosPage({
     intermediarioId?: string;
     desde?: string;
     hasta?: string;
+    page?: string;
   }>;
 }) {
-  const { clienteId, status, intermediarioId, desde, hasta } = await searchParams;
+  const { clienteId, status, intermediarioId, desde, hasta, page: pageParam } = await searchParams;
+  const page = parsePage(pageParam);
 
   const [clientes, intermediarios, usuarios, usuario] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
@@ -78,11 +82,29 @@ export default async function ServiciosPage({
   if (desde) exportParams.set("desde", desde);
   if (hasta) exportParams.set("hasta", hasta);
 
-  const servicios = await prisma.servicio.findMany({
-    where,
-    include: { cliente: true, intermediario: true, ordenesCambio: true },
-    orderBy: { creadoEn: "desc" },
-  });
+  const [totalCount, servicios] = await Promise.all([
+    prisma.servicio.count({ where }),
+    prisma.servicio.findMany({
+      where,
+      include: { cliente: true, intermediario: true, ordenesCambio: true },
+      orderBy: { creadoEn: "desc" },
+      skip: paginationSkip(page),
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const paginas = totalPages(totalCount);
+
+  function buildHref(targetPage: number) {
+    const params = new URLSearchParams();
+    if (clienteId) params.set("clienteId", clienteId);
+    if (status) params.set("status", status);
+    if (intermediarioId) params.set("intermediarioId", intermediarioId);
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `/admin/servicios?${qs}` : "/admin/servicios";
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,8 +112,8 @@ export default async function ServiciosPage({
         <div>
           <h1 className="text-2xl font-semibold">Servicios</h1>
           <p className="text-sm text-muted-foreground">
-            {servicios.length} servicio{servicios.length === 1 ? "" : "s"}
-            {hasFiltros ? " con estos filtros" : " registrado" + (servicios.length === 1 ? "" : "s")}
+            {totalCount} servicio{totalCount === 1 ? "" : "s"}
+            {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -286,6 +308,16 @@ export default async function ServiciosPage({
                     />
                   );
                 })}
+              </div>
+
+              <div className="mt-4">
+                <Pagination
+                  page={page}
+                  totalPages={paginas}
+                  totalCount={totalCount}
+                  pageSize={PAGE_SIZE}
+                  buildHref={buildHref}
+                />
               </div>
             </>
           )}

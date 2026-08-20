@@ -8,12 +8,26 @@ export async function buildExcelResponse(
   columns: ExcelColumn[],
   rows: Record<string, unknown>[]
 ) {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet(sheetName);
+  return buildMultiSheetExcelResponse(filename, [{ name: sheetName, columns, rows }]);
+}
 
-  sheet.columns = columns.map((c) => ({ header: c.header, key: c.key, width: c.width ?? 20 }));
-  sheet.getRow(1).font = { bold: true };
-  rows.forEach((row) => sheet.addRow(row));
+export type ExcelSheet = {
+  name: string;
+  columns: ExcelColumn[];
+  rows: Record<string, unknown>[];
+};
+
+/** Un solo .xlsx con varias pestañas — usado por Reportes para juntar
+ * Ingresos y Gastos en una sola descarga en vez de dos archivos sueltos. */
+export async function buildMultiSheetExcelResponse(filename: string, sheets: ExcelSheet[]) {
+  const workbook = new ExcelJS.Workbook();
+
+  for (const { name, columns, rows } of sheets) {
+    const sheet = workbook.addWorksheet(name);
+    sheet.columns = columns.map((c) => ({ header: c.header, key: c.key, width: c.width ?? 20 }));
+    sheet.getRow(1).font = { bold: true };
+    rows.forEach((row) => sheet.addRow(row));
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
 

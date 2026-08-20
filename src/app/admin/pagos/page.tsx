@@ -31,6 +31,8 @@ import {
   eliminarPago,
   subirComprobantePago,
 } from "@/app/admin/pagos/actions";
+import { Pagination } from "@/components/ui/pagination";
+import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
 import type { MetodoPago, Prisma } from "@/generated/prisma/client";
 
 const METODOS = [
@@ -57,9 +59,11 @@ export default async function PagosPage({
     confirmado?: string;
     desde?: string;
     hasta?: string;
+    page?: string;
   }>;
 }) {
-  const { servicioId, metodoPago, confirmado, desde, hasta } = await searchParams;
+  const { servicioId, metodoPago, confirmado, desde, hasta, page: pageParam } = await searchParams;
+  const page = parsePage(pageParam);
 
   const usuario = await currentUsuario();
   const permisos = await permisosModulo(usuario, "Pagos");
@@ -96,11 +100,23 @@ export default async function PagosPage({
   if (desde) exportParams.set("desde", desde);
   if (hasta) exportParams.set("hasta", hasta);
 
-  const pagos = await prisma.pago.findMany({
-    where,
-    include: { servicio: { include: { cliente: true } } },
-    orderBy: { fecha: "desc" },
-  });
+  const [agregados, pagos] = await Promise.all([
+    prisma.pago.aggregate({ where, _sum: { monto: true, comision: true }, _count: true }),
+    prisma.pago.findMany({
+      where,
+      include: { servicio: { include: { cliente: true } } },
+      orderBy: { fecha: "desc" },
+      skip: paginationSkip(page),
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const totalCount = agregados._count;
+  const paginas = totalPages(totalCount);
+  // Suma sobre TODOS los pagos que cumplen el filtro, no solo la página
+  // actual — si no, el total mostrado arriba cambiaría según qué página
+  // esté viendo el usuario.
+  const totalMonto = Number(agregados._sum.monto ?? 0);
+  const totalComision = Number(agregados._sum.comision ?? 0);
 
   const comprobantes = await prisma.archivo.findMany({
     where: { entidadTipo: "Pago", entidadId: { in: pagos.map((p) => p.id) } },
@@ -108,8 +124,17 @@ export default async function PagosPage({
   });
   const comprobantePorPago = new Map(comprobantes.map((a) => [a.entidadId, a]));
 
-  const totalMonto = pagos.reduce((acc, p) => acc + Number(p.monto), 0);
-  const totalComision = pagos.reduce((acc, p) => acc + Number(p.comision ?? 0), 0);
+  function buildHref(targetPage: number) {
+    const params = new URLSearchParams();
+    if (servicioId) params.set("servicioId", servicioId);
+    if (metodoPago) params.set("metodoPago", metodoPago);
+    if (confirmado) params.set("confirmado", confirmado);
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `/admin/pagos?${qs}` : "/admin/pagos";
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,8 +142,8 @@ export default async function PagosPage({
         <div>
           <h1 className="text-2xl font-semibold">Pagos</h1>
           <p className="text-sm text-muted-foreground">
-            {pagos.length} pago{pagos.length === 1 ? "" : "s"}
-            {hasFiltros ? " con estos filtros" : " registrado" + (pagos.length === 1 ? "" : "s")}
+            {totalCount} pago{totalCount === 1 ? "" : "s"}
+            {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
             {" — Total: "}
             {formatCurrency(totalMonto)}
             {totalComision > 0 ? ` (comisiones: ${formatCurrency(totalComision)})` : ""}
@@ -432,6 +457,16 @@ export default async function PagosPage({
                     }
                   />
                 ))}
+              </div>
+
+              <div className="mt-4">
+                <Pagination
+                  page={page}
+                  totalPages={paginas}
+                  totalCount={totalCount}
+                  pageSize={PAGE_SIZE}
+                  buildHref={buildHref}
+                />
               </div>
             </>
           )}

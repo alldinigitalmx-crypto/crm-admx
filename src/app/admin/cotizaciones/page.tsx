@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
+import { Pagination } from "@/components/ui/pagination";
+import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
 import type { Prisma, StatusCotizacion } from "@/generated/prisma/client";
 
 const STATUSES = ["Enviada", "Firmada", "Pagada", "Vencida", "Perdida"];
@@ -32,9 +34,10 @@ const selectClass =
 export default async function CotizacionesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clienteId?: string; status?: string }>;
+  searchParams: Promise<{ clienteId?: string; status?: string; page?: string }>;
 }) {
-  const { clienteId, status } = await searchParams;
+  const { clienteId, status, page: pageParam } = await searchParams;
+  const page = parsePage(pageParam);
 
   const usuario = await currentUsuario();
   const permisos = await permisosModulo(usuario, "Cotizaciones");
@@ -74,11 +77,26 @@ export default async function CotizacionesPage({
   if (clienteId) exportParams.set("clienteId", clienteId);
   if (status) exportParams.set("status", status);
 
-  const cotizaciones = await prisma.cotizacion.findMany({
-    where,
-    include: { cliente: true, servicio: true },
-    orderBy: { creadoEn: "desc" },
-  });
+  const [totalCount, cotizaciones] = await Promise.all([
+    prisma.cotizacion.count({ where }),
+    prisma.cotizacion.findMany({
+      where,
+      include: { cliente: true, servicio: true },
+      orderBy: { creadoEn: "desc" },
+      skip: paginationSkip(page),
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const paginas = totalPages(totalCount);
+
+  function buildHref(targetPage: number) {
+    const params = new URLSearchParams();
+    if (clienteId) params.set("clienteId", clienteId);
+    if (status) params.set("status", status);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `/admin/cotizaciones?${qs}` : "/admin/cotizaciones";
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -86,8 +104,8 @@ export default async function CotizacionesPage({
         <div>
           <h1 className="text-2xl font-semibold">Cotizaciones</h1>
           <p className="text-sm text-muted-foreground">
-            {cotizaciones.length} cotización{cotizaciones.length === 1 ? "" : "es"}
-            {hasFiltros ? " con estos filtros" : " registrada" + (cotizaciones.length === 1 ? "" : "s")}
+            {totalCount} cotización{totalCount === 1 ? "" : "es"}
+            {hasFiltros ? " con estos filtros" : " registrada" + (totalCount === 1 ? "" : "s")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -265,6 +283,16 @@ export default async function CotizacionesPage({
                     />
                   );
                 })}
+              </div>
+
+              <div className="mt-4">
+                <Pagination
+                  page={page}
+                  totalPages={paginas}
+                  totalCount={totalCount}
+                  pageSize={PAGE_SIZE}
+                  buildHref={buildHref}
+                />
               </div>
             </>
           )}

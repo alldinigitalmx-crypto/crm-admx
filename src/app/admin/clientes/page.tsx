@@ -21,6 +21,8 @@ import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ClienteFormDialog } from "@/components/clientes/cliente-form-dialog";
 import { createCliente } from "@/app/admin/clientes/actions";
 import { CLIENTE_ETIQUETA_COLOR as ETIQUETA_COLOR } from "@/lib/status-colors";
+import { Pagination } from "@/components/ui/pagination";
+import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
 import type { Etiqueta, Prisma } from "@/generated/prisma/client";
 
 const ETIQUETAS = ["VIP", "Premium", "Platinum"];
@@ -33,10 +35,11 @@ const AVATAR_DEFAULT = "bg-primary/10 text-primary";
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; etiqueta?: string }>;
+  searchParams: Promise<{ q?: string; etiqueta?: string; page?: string }>;
 }) {
-  const { q, etiqueta } = await searchParams;
+  const { q, etiqueta, page: pageParam } = await searchParams;
   const query = q?.trim();
+  const page = parsePage(pageParam);
 
   const usuario = await currentUsuario();
   const permisos = await permisosModulo(usuario, "Clientes");
@@ -56,16 +59,31 @@ export default async function ClientesPage({
     where.etiqueta = etiqueta as Etiqueta;
   }
 
-  const clientes = await prisma.cliente.findMany({
-    where,
-    orderBy: { creadoEn: "desc" },
-  });
+  const [totalCount, clientes] = await Promise.all([
+    prisma.cliente.count({ where }),
+    prisma.cliente.findMany({
+      where,
+      orderBy: { creadoEn: "desc" },
+      skip: paginationSkip(page),
+      take: PAGE_SIZE,
+    }),
+  ]);
+  const paginas = totalPages(totalCount);
 
   const hasFiltros = Boolean(query || etiqueta);
 
   const exportParams = new URLSearchParams();
   if (query) exportParams.set("q", query);
   if (etiqueta) exportParams.set("etiqueta", etiqueta);
+
+  function buildHref(targetPage: number) {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (etiqueta) params.set("etiqueta", etiqueta);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `/admin/clientes?${qs}` : "/admin/clientes";
+  }
 
   const verTodo = permisos.verTodo;
   let clientesPropios: Set<number> | null = null;
@@ -83,8 +101,8 @@ export default async function ClientesPage({
         <div>
           <h1 className="text-2xl font-semibold">Clientes</h1>
           <p className="text-sm text-muted-foreground">
-            {clientes.length} cliente{clientes.length === 1 ? "" : "s"}
-            {hasFiltros ? " con estos filtros" : " registrado" + (clientes.length === 1 ? "" : "s")}
+            {totalCount} cliente{totalCount === 1 ? "" : "s"}
+            {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -247,6 +265,16 @@ export default async function ClientesPage({
                     />
                   );
                 })}
+              </div>
+
+              <div className="mt-4">
+                <Pagination
+                  page={page}
+                  totalPages={paginas}
+                  totalCount={totalCount}
+                  pageSize={PAGE_SIZE}
+                  buildHref={buildHref}
+                />
               </div>
             </>
           )}
