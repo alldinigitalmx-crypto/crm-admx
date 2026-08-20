@@ -17,6 +17,7 @@ import {
   duplicarTarea,
   eliminarTarea,
 } from "@/app/admin/tareas/actions";
+import { PRIORIDAD_COLOR, PRIORIDAD_BAR } from "@/lib/status-colors";
 import type { PrioridadTarea } from "@/generated/prisma/client";
 
 export type TareaCardData = {
@@ -34,22 +35,10 @@ export type TareaCardData = {
   subtareas: SubtareaData[];
 };
 
-const PRIORIDAD_BAR: Record<PrioridadTarea, string> = {
-  Alta: "bg-red-500",
-  Media: "bg-orange-500",
-  Baja: "bg-emerald-500",
-};
-
 const PRIORIDAD_CICLO: Record<PrioridadTarea, PrioridadTarea> = {
   Baja: "Media",
   Media: "Alta",
   Alta: "Baja",
-};
-
-const PRIORIDAD_BADGE: Record<PrioridadTarea, "default" | "secondary" | "outline" | "destructive"> = {
-  Alta: "destructive",
-  Media: "secondary",
-  Baja: "outline",
 };
 
 function vinculoInfo(tarea: TareaCardData): { icono: string; label: string | null; valor?: string } {
@@ -159,7 +148,7 @@ export function TareaCard({
             className={puedeEditar ? "cursor-pointer" : "cursor-default"}
             title={puedeEditar ? "Click para cambiar prioridad" : undefined}
           >
-            <Badge variant={PRIORIDAD_BADGE[tarea.prioridad]} className="text-[10px]">
+            <Badge className={`text-[10px] ${PRIORIDAD_COLOR[tarea.prioridad]}`}>
               {tarea.prioridad}
             </Badge>
           </button>

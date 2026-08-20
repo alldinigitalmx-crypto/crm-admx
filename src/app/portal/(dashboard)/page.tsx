@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
 import { crearQuejaPortal } from "@/app/portal/actions";
+import { SERVICIO_STATUS_COLOR, COTIZACION_STATUS_COLOR, QUEJA_STATUS_COLOR } from "@/lib/status-colors";
 
 const STATUS_SERVICIO_LABEL: Record<string, string> = {
   Cotizado: "Cotizado",
@@ -17,24 +18,6 @@ const STATUS_SERVICIO_LABEL: Record<string, string> = {
   EnProceso: "En proceso",
   Entregado: "Entregado",
   Cancelado: "Cancelado",
-};
-
-const STATUS_COTIZACION_VARIANT: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  Enviada: "outline",
-  Firmada: "default",
-  Pagada: "secondary",
-  Vencida: "destructive",
-  Perdida: "destructive",
-};
-
-const STATUS_QUEJA_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Nueva: "outline",
-  EnRevision: "default",
-  Resuelta: "secondary",
-  Cerrada: "secondary",
 };
 
 export default async function PortalPage() {
@@ -96,7 +79,7 @@ export default async function PortalPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{s.descripcion}</p>
-                        <Badge variant="outline">
+                        <Badge className={SERVICIO_STATUS_COLOR[s.status]}>
                           {STATUS_SERVICIO_LABEL[s.status] ?? s.status}
                         </Badge>
                       </div>
@@ -132,7 +115,7 @@ export default async function PortalPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{c.descripcion ?? `Cotización #${c.id}`}</p>
-                      <Badge variant={STATUS_COTIZACION_VARIANT[c.status] ?? "outline"}>
+                      <Badge className={COTIZACION_STATUS_COLOR[c.status]}>
                         {c.status}
                       </Badge>
                     </div>
@@ -177,7 +160,7 @@ export default async function PortalPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{q.categoria}</span>
-                      <Badge variant={STATUS_QUEJA_VARIANT[q.status] ?? "outline"}>
+                      <Badge className={QUEJA_STATUS_COLOR[q.status]}>
                         {q.status}
                       </Badge>
                     </div>

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Plus, Download, Send, FileSignature, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ChevronRight, Plus, Download, Send } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
+import { COTIZACION_STATUS_COLOR as STATUS_COLOR, COTIZACION_STATUS_ICON as STATUS_ICON } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -23,30 +24,7 @@ import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
 import type { Prisma, StatusCotizacion } from "@/generated/prisma/client";
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Enviada: "outline",
-  Firmada: "default",
-  Pagada: "secondary",
-  Vencida: "destructive",
-  Perdida: "destructive",
-};
-
 const STATUSES = ["Enviada", "Firmada", "Pagada", "Vencida", "Perdida"];
-
-const STATUS_COLOR: Record<string, string> = {
-  Enviada: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Firmada: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  Pagada: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  Vencida: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  Perdida: "bg-red-500/15 text-red-700 dark:text-red-400",
-};
-const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Enviada: Send,
-  Firmada: FileSignature,
-  Pagada: CheckCircle2,
-  Vencida: Clock,
-  Perdida: XCircle,
-};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -209,16 +187,25 @@ export default async function CotizacionesPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cotizaciones.map((c) => (
+                  {cotizaciones.map((c) => {
+                    const Icono = STATUS_ICON[c.status] ?? Send;
+                    return (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/admin/cotizaciones/${c.id}`}
-                            className="min-w-0 truncate hover:underline"
+                            className="flex min-w-0 items-center gap-2.5 hover:underline"
                             title={c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
                           >
-                            {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                            <span
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-full ${STATUS_COLOR[c.status]}`}
+                            >
+                              <Icono className="size-3.5" />
+                            </span>
+                            <span className="truncate">
+                              {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                            </span>
                           </Link>
                           {!c.servicioId && (
                             <Badge variant="outline" className="shrink-0">
@@ -236,7 +223,7 @@ export default async function CotizacionesPage({
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>{c.status}</Badge>
+                        <Badge className={STATUS_COLOR[c.status]}>{c.status}</Badge>
                       </TableCell>
                       <TableCell className="truncate">{formatDate(c.fechaEmision)}</TableCell>
                       <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
@@ -251,7 +238,7 @@ export default async function CotizacionesPage({
                         </Link>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 

@@ -1,17 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PRIORIDAD_COLOR } from "@/lib/status-colors";
 import type { ResumenTareas } from "@/lib/tareas-resumen";
 
 const PRIORIDAD_LABEL: Record<string, string> = {
   Alta: "Alta prioridad",
   Media: "Prioridad media",
   Baja: "Prioridad baja",
-};
-
-const PRIORIDAD_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Alta: "destructive",
-  Media: "secondary",
-  Baja: "outline",
 };
 
 function Sparkline({ tendencia7 }: { tendencia7: ResumenTareas["tendencia7"] }) {
@@ -97,7 +92,7 @@ export function TareasResumen({ resumen }: { resumen: ResumenTareas }) {
         <CardContent className="flex flex-col gap-1 py-2">
           <p className="text-xs text-muted-foreground">Próxima prioridad</p>
           {proximaPrioridad ? (
-            <Badge variant={PRIORIDAD_VARIANT[proximaPrioridad]} className="w-fit text-sm">
+            <Badge className={`w-fit text-sm ${PRIORIDAD_COLOR[proximaPrioridad]}`}>
               {PRIORIDAD_LABEL[proximaPrioridad]}
             </Badge>
           ) : (

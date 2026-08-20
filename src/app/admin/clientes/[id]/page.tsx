@@ -30,17 +30,13 @@ import {
   updateCliente,
 } from "@/app/admin/clientes/actions";
 import { actualizarQueja, crearQueja } from "@/app/admin/quejas/actions";
-
-const STATUS_SERVICIO_VARIANT: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  Cotizado: "outline",
-  Aprobado: "secondary",
-  EnProceso: "default",
-  Entregado: "secondary",
-  Cancelado: "destructive",
-};
+import {
+  SERVICIO_STATUS_COLOR,
+  COTIZACION_STATUS_COLOR,
+  QUEJA_STATUS_COLOR,
+  CONFIRMADO_COLOR,
+  PENDIENTE_COLOR,
+} from "@/lib/status-colors";
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -251,7 +247,7 @@ export default async function ClienteDetallePage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_SERVICIO_VARIANT[s.status] ?? "outline"}>
+                      <Badge className={SERVICIO_STATUS_COLOR[s.status]}>
                         {s.status}
                       </Badge>
                     </TableCell>
@@ -299,7 +295,7 @@ export default async function ClienteDetallePage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{c.status}</Badge>
+                      <Badge className={COTIZACION_STATUS_COLOR[c.status]}>{c.status}</Badge>
                     </TableCell>
                     <TableCell>{formatDate(c.fechaEmision)}</TableCell>
                     <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
@@ -343,7 +339,7 @@ export default async function ClienteDetallePage({
                     <TableCell>{formatDate(p.fecha)}</TableCell>
                     <TableCell>{p.metodoPago}</TableCell>
                     <TableCell>
-                      <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                      <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
                         {p.confirmado ? "Confirmado" : "Pendiente"}
                       </Badge>
                     </TableCell>
@@ -389,7 +385,7 @@ export default async function ClienteDetallePage({
                       {q.descripcion}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{q.status}</Badge>
+                      <Badge className={QUEJA_STATUS_COLOR[q.status]}>{q.status}</Badge>
                     </TableCell>
                     <TableCell>{formatDate(q.creadoEn)}</TableCell>
                     <TableCell>

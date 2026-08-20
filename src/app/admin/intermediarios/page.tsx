@@ -71,7 +71,14 @@ export default async function IntermediariosPage() {
                 <TableBody>
                   {intermediarios.map((i) => (
                     <TableRow key={i.id}>
-                      <TableCell className="font-medium">{i.nombre}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {i.nombre.trim().charAt(0).toUpperCase() || "?"}
+                          </span>
+                          {i.nombre}
+                        </div>
+                      </TableCell>
                       <TableCell>{i.telefono ?? "—"}</TableCell>
                       <TableCell>{i.email ?? "—"}</TableCell>
                       <TableCell className="max-w-64 truncate">{i.notas ?? "—"}</TableCell>

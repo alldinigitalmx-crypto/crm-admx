@@ -47,36 +47,13 @@ import {
   eliminarPago,
   subirComprobantePago,
 } from "@/app/admin/pagos/actions";
-
-const COTIZACION_STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  Enviada: "outline",
-  Firmada: "default",
-  Pagada: "secondary",
-  Vencida: "destructive",
-};
-
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  Cotizado: "outline",
-  Aprobado: "secondary",
-  EnProceso: "default",
-  Entregado: "secondary",
-  Cancelado: "destructive",
-};
-
-const ORDEN_STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  Pendiente: "outline",
-  Aprobada: "secondary",
-  Rechazada: "destructive",
-};
+import {
+  SERVICIO_STATUS_COLOR,
+  COTIZACION_STATUS_COLOR,
+  ORDEN_STATUS_COLOR,
+  CONFIRMADO_COLOR,
+  PENDIENTE_COLOR,
+} from "@/lib/status-colors";
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -166,7 +143,7 @@ export default async function ServicioDetallePage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold">{servicio.descripcion}</h1>
-            <Badge variant={STATUS_VARIANT[servicio.status] ?? "outline"}>
+            <Badge className={SERVICIO_STATUS_COLOR[servicio.status]}>
               {servicio.status}
             </Badge>
           </div>
@@ -282,7 +259,7 @@ export default async function ServicioDetallePage({
                   <TableRow key={o.id}>
                     <TableCell className="font-medium">{o.descripcion}</TableCell>
                     <TableCell>
-                      <Badge variant={ORDEN_STATUS_VARIANT[o.status] ?? "outline"}>
+                      <Badge className={ORDEN_STATUS_COLOR[o.status]}>
                         {o.status}
                       </Badge>
                     </TableCell>
@@ -368,7 +345,7 @@ export default async function ServicioDetallePage({
                 {servicio.cotizaciones.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell>
-                      <Badge variant={COTIZACION_STATUS_VARIANT[c.status] ?? "outline"}>
+                      <Badge className={COTIZACION_STATUS_COLOR[c.status]}>
                         {c.status}
                       </Badge>
                     </TableCell>
@@ -433,7 +410,7 @@ export default async function ServicioDetallePage({
                     <TableCell>{p.metodoPago}</TableCell>
                     <TableCell>{p.cuenta ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                      <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
                         {p.confirmado ? "Confirmado" : "Pendiente"}
                       </Badge>
                     </TableCell>

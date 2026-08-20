@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ClienteFormDialog } from "@/components/clientes/cliente-form-dialog";
 import { createCliente } from "@/app/admin/clientes/actions";
+import { CLIENTE_ETIQUETA_COLOR as ETIQUETA_COLOR } from "@/lib/status-colors";
 import type { Etiqueta, Prisma } from "@/generated/prisma/client";
 
 const ETIQUETAS = ["VIP", "Premium", "Platinum"];
@@ -27,14 +28,6 @@ const ETIQUETAS = ["VIP", "Premium", "Platinum"];
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
-// Colores por etiqueta — se reutilizan en el avatar y el badge de la
-// tarjeta móvil para que la etiqueta se distinga de un vistazo, como en
-// una vista Deck de AppSheet coloreada por enum.
-const ETIQUETA_COLOR: Record<string, string> = {
-  VIP: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  Premium: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  Platinum: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-};
 const AVATAR_DEFAULT = "bg-primary/10 text-primary";
 
 export default async function ClientesPage({
@@ -173,13 +166,20 @@ export default async function ClientesPage({
                 <TableBody>
                   {clientes.map((c) => {
                     const esPropio = !clientesPropios || clientesPropios.has(c.id);
+                    const inicialFila = c.nombre.trim().charAt(0).toUpperCase() || "?";
+                    const colorFila = c.etiqueta ? ETIQUETA_COLOR[c.etiqueta] : undefined;
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">
                           <Link
                             href={`/admin/clientes/${c.id}`}
-                            className="hover:underline"
+                            className="flex items-center gap-2.5 hover:underline"
                           >
+                            <span
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${colorFila ?? AVATAR_DEFAULT}`}
+                            >
+                              {inicialFila}
+                            </span>
                             {c.nombre}
                           </Link>
                         </TableCell>

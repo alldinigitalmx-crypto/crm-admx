@@ -23,14 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/format";
+import { QUEJA_STATUS_COLOR } from "@/lib/status-colors";
 import type { QuejaFormState } from "@/app/admin/quejas/actions";
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Nueva: "outline",
-  EnRevision: "default",
-  Resuelta: "secondary",
-  Cerrada: "secondary",
-};
 
 const STATUSES = ["Nueva", "EnRevision", "Resuelta", "Cerrada"];
 
@@ -164,7 +158,7 @@ export function QuejaDetalleDialog({
             </div>
             <div>
               <p className="text-muted-foreground">Status</p>
-              <Badge variant={STATUS_VARIANT[queja.status] ?? "outline"}>{queja.status}</Badge>
+              <Badge className={QUEJA_STATUS_COLOR[queja.status]}>{queja.status}</Badge>
             </div>
             <div>
               <p className="text-muted-foreground">Reportada</p>

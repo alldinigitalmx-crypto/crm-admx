@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Plus, Pencil, Building2, User } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { GASTO_AMBITO_COLOR as AMBITO_COLOR, GASTO_AMBITO_ICON } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -22,11 +23,6 @@ import type { AmbitoGasto, Prisma } from "@/generated/prisma/client";
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
-
-const AMBITO_COLOR: Record<string, string> = {
-  Empresa: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Personal: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-};
 
 export default async function GastosPage({
   searchParams,
@@ -155,14 +151,23 @@ export default async function GastosPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {gastos.map((g) => (
+                  {gastos.map((g) => {
+                    const Icono = GASTO_AMBITO_ICON[g.ambito];
+                    return (
                     <TableRow key={g.id}>
-                      <TableCell className="font-medium">{g.descripcion}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${AMBITO_COLOR[g.ambito]}`}
+                          >
+                            <Icono className="size-3.5" />
+                          </span>
+                          {g.descripcion}
+                        </div>
+                      </TableCell>
                       <TableCell>{g.categoria}</TableCell>
                       <TableCell>
-                        <Badge variant={g.ambito === "Empresa" ? "outline" : "secondary"}>
-                          {g.ambito}
-                        </Badge>
+                        <Badge className={AMBITO_COLOR[g.ambito]}>{g.ambito}</Badge>
                       </TableCell>
                       <TableCell>{formatDate(g.fecha)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(g.monto)}</TableCell>
@@ -183,14 +188,14 @@ export default async function GastosPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 
               {/* Móvil: tarjetas tipo app */}
               <div className="flex flex-col gap-2 md:hidden">
                 {gastos.map((g) => {
-                  const Icono = g.ambito === "Empresa" ? Building2 : User;
+                  const Icono = GASTO_AMBITO_ICON[g.ambito];
                   return (
                     <MobileRecordCard
                       key={g.id}

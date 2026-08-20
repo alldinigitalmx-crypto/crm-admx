@@ -5,12 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { completarTarea, eliminarTarea } from "@/app/admin/tareas/actions";
-
-const PRIORIDAD_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Baja: "outline",
-  Media: "secondary",
-  Alta: "destructive",
-};
+import { PRIORIDAD_COLOR } from "@/lib/status-colors";
 
 export type TareaConVinculo = {
   id: number;
@@ -64,7 +59,7 @@ export function TareaLista({
                 <span className="text-xs text-muted-foreground">{t.descripcion}</span>
               )}
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge variant={PRIORIDAD_VARIANT[t.prioridad] ?? "outline"}>{t.prioridad}</Badge>
+                <Badge className={PRIORIDAD_COLOR[t.prioridad]}>{t.prioridad}</Badge>
                 {t.fechaLimite && (
                   <span className={`text-xs ${vencida ? "text-destructive" : "text-muted-foreground"}`}>
                     {formatDate(t.fechaLimite)}

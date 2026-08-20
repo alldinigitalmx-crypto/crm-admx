@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Pencil, Download, ShoppingBag, Handshake } from "lucide-react";
+import { Pencil, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
+import { VENTA_ORIGEN_COLOR as ORIGEN_COLOR, VENTA_ORIGEN_ICON } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -26,11 +27,6 @@ import type { CanalVenta, OrigenVenta, Prisma } from "@/generated/prisma/client"
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
-
-const ORIGEN_COLOR: Record<string, string> = {
-  TiendaOnline: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Manual: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-};
 
 export default async function VentasPage({
   searchParams,
@@ -254,14 +250,23 @@ export default async function VentasPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => (
+                  {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => {
+                    const Icono = VENTA_ORIGEN_ICON[v.origen];
+                    return (
                     <TableRow key={v.id}>
                       <TableCell>{formatDate(v.fecha)}</TableCell>
                       <TableCell className="font-medium">
-                        {v.nombreComprador ?? "—"}
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${ORIGEN_COLOR[v.origen]}`}
+                          >
+                            <Icono className="size-3.5" />
+                          </span>
+                          {v.nombreComprador ?? "—"}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={v.origen === "TiendaOnline" ? "default" : "outline"}>
+                        <Badge className={ORIGEN_COLOR[v.origen]}>
                           {v.origen === "TiendaOnline" ? "Tienda Online" : "Manual"}
                         </Badge>
                       </TableCell>
@@ -291,16 +296,18 @@ export default async function VentasPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 
               {/* Móvil: tarjetas tipo app */}
               <div className="flex flex-col gap-2 md:hidden">
-                {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => (
+                {ventasConDetalle.map(({ v, ventaDetalle, ventaEditDefaults }) => {
+                  const Icono = VENTA_ORIGEN_ICON[v.origen];
+                  return (
                   <MobileRecordCard
                     key={v.id}
-                    avatarLabel={v.origen === "TiendaOnline" ? <ShoppingBag className="size-5" /> : <Handshake className="size-5" />}
+                    avatarLabel={<Icono className="size-5" />}
                     avatarClassName={ORIGEN_COLOR[v.origen]}
                     title={v.nombreComprador ?? "Comprador anónimo"}
                     subtitle={v.canal ?? "Sin canal"}
@@ -336,7 +343,7 @@ export default async function VentasPage({
                       </>
                     }
                   />
-                ))}
+                );})}
               </div>
             </>
           )}

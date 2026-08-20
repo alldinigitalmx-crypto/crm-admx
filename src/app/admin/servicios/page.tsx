@@ -1,21 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Plus,
-  ChevronRight,
-  Download,
-  FileText,
-  CheckCircle2,
-  Loader,
-  PackageCheck,
-  XCircle,
-} from "lucide-react";
+import { Plus, ChevronRight, Download, FileText } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
+import { SERVICIO_STATUS_COLOR as STATUS_COLOR, SERVICIO_STATUS_ICON as STATUS_ICON } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -32,32 +24,7 @@ import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog"
 import { createServicio } from "@/app/admin/servicios/actions";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Cotizado: "outline",
-  Aprobado: "secondary",
-  EnProceso: "default",
-  Entregado: "secondary",
-  Cancelado: "destructive",
-};
-
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"];
-
-// Mismos colores de status que en /admin/reportes, para que el significado
-// de cada color sea consistente en toda la app.
-const STATUS_COLOR: Record<string, string> = {
-  Cotizado: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-  Aprobado: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  EnProceso: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  Entregado: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  Cancelado: "bg-red-500/15 text-red-700 dark:text-red-400",
-};
-const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Cotizado: FileText,
-  Aprobado: CheckCircle2,
-  EnProceso: Loader,
-  Entregado: PackageCheck,
-  Cancelado: XCircle,
-};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -248,15 +215,22 @@ export default async function ServiciosPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {servicios.map((s) => (
+                  {servicios.map((s) => {
+                    const Icono = STATUS_ICON[s.status] ?? FileText;
+                    return (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
                         <Link
                           href={`/admin/servicios/${s.id}`}
-                          className="block truncate hover:underline"
+                          className="flex items-center gap-2.5 hover:underline"
                           title={s.descripcion}
                         >
-                          {s.descripcion}
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${STATUS_COLOR[s.status]}`}
+                          >
+                            <Icono className="size-3.5" />
+                          </span>
+                          <span className="truncate">{s.descripcion}</span>
                         </Link>
                       </TableCell>
                       <TableCell className="truncate">
@@ -268,9 +242,7 @@ export default async function ServiciosPage({
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[s.status] ?? "outline"}>
-                          {s.status}
-                        </Badge>
+                        <Badge className={STATUS_COLOR[s.status]}>{s.status}</Badge>
                       </TableCell>
                       <TableCell className="truncate">{s.intermediario?.nombre ?? "—"}</TableCell>
                       <TableCell className="truncate">{formatDate(s.fechaInicio)}</TableCell>
@@ -287,7 +259,7 @@ export default async function ServiciosPage({
                         </Link>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 

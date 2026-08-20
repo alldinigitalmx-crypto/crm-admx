@@ -32,14 +32,7 @@ import {
   marcarCotizacionGanada,
   marcarCotizacionPerdida,
 } from "@/app/admin/cotizaciones/actions";
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Enviada: "outline",
-  Firmada: "default",
-  Pagada: "secondary",
-  Vencida: "destructive",
-  Perdida: "destructive",
-};
+import { COTIZACION_STATUS_COLOR, CONFIRMADO_COLOR, PENDIENTE_COLOR } from "@/lib/status-colors";
 
 export default async function CotizacionDetallePage({
   params,
@@ -103,7 +96,7 @@ export default async function CotizacionDetallePage({
             <h1 className="text-2xl font-semibold">
               Cotización #{String(cotizacion.id).padStart(4, "0")}
             </h1>
-            <Badge variant={STATUS_VARIANT[cotizacion.status] ?? "outline"}>
+            <Badge className={COTIZACION_STATUS_COLOR[cotizacion.status]}>
               {cotizacion.status}
             </Badge>
             {!cotizacion.servicioId && <Badge variant="outline">En negociación</Badge>}
@@ -297,7 +290,7 @@ export default async function CotizacionDetallePage({
                     <TableCell>{formatDate(p.fecha)}</TableCell>
                     <TableCell>{p.metodoPago}</TableCell>
                     <TableCell>
-                      <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                      <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
                         {p.confirmado ? "Confirmado" : "Pendiente"}
                       </Badge>
                     </TableCell>

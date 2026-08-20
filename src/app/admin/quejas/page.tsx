@@ -17,35 +17,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
-import { Download, AlertCircle, Eye, CheckCircle2, Archive } from "lucide-react";
+import { Download, AlertCircle } from "lucide-react";
+import { QUEJA_STATUS_COLOR as STATUS_COLOR, QUEJA_STATUS_ICON as STATUS_ICON } from "@/lib/status-colors";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
 import { DeleteQuejaButton } from "@/components/quejas/delete-queja-button";
 import { actualizarQueja, crearQueja, eliminarQueja } from "@/app/admin/quejas/actions";
 import type { CategoriaQueja, Prisma, StatusQueja } from "@/generated/prisma/client";
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  Nueva: "outline",
-  EnRevision: "default",
-  Resuelta: "secondary",
-  Cerrada: "secondary",
-};
-
 const STATUSES = ["Nueva", "EnRevision", "Resuelta", "Cerrada"];
 const CATEGORIAS = ["Falla", "Cobro", "Atencion", "Otro"];
-
-const STATUS_COLOR: Record<string, string> = {
-  Nueva: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  EnRevision: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  Resuelta: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  Cerrada: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-};
-const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Nueva: AlertCircle,
-  EnRevision: Eye,
-  Resuelta: CheckCircle2,
-  Cerrada: Archive,
-};
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -202,10 +183,20 @@ export default async function QuejasPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {quejas.map((q) => (
+                  {quejas.map((q) => {
+                    const Icono = STATUS_ICON[q.status] ?? AlertCircle;
+                    return (
                     <TableRow key={q.id}>
                       <TableCell className="font-medium">
-                        <Link href={`/admin/clientes/${q.cliente.id}`} className="hover:underline">
+                        <Link
+                          href={`/admin/clientes/${q.cliente.id}`}
+                          className="flex items-center gap-2.5 hover:underline"
+                        >
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${STATUS_COLOR[q.status]}`}
+                          >
+                            <Icono className="size-3.5" />
+                          </span>
                           {q.cliente.nombre}
                         </Link>
                       </TableCell>
@@ -223,7 +214,7 @@ export default async function QuejasPage({
                       </TableCell>
                       <TableCell>{q.categoria}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[q.status] ?? "outline"}>{q.status}</Badge>
+                        <Badge className={STATUS_COLOR[q.status]}>{q.status}</Badge>
                       </TableCell>
                       <TableCell>{formatDate(q.creadoEn)}</TableCell>
                       <TableCell>
@@ -250,7 +241,7 @@ export default async function QuejasPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 

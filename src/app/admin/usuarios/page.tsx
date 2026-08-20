@@ -25,6 +25,7 @@ import {
 } from "@/components/usuarios/resolver-ticket-dialog";
 import { actualizarUsuario, crearUsuario } from "@/app/admin/usuarios/actions";
 import { MODULO_LABEL } from "@/lib/modulo-sistema";
+import { USUARIO_ROL_COLOR as ROL_COLOR, ACTIVO_COLOR, INACTIVO_COLOR } from "@/lib/status-colors";
 
 export default async function UsuariosPage() {
   const usuarioActual = await currentUsuario();
@@ -154,13 +155,22 @@ export default async function UsuariosPage() {
                 );
                 return (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${ROL_COLOR[u.rol] ?? ROL_COLOR.Interno}`}
+                        >
+                          {u.nombre.trim().charAt(0).toUpperCase() || <UserRound className="size-3.5" />}
+                        </span>
+                        {u.nombre}
+                      </div>
+                    </TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell>
-                      <Badge variant={u.rol === "Admin" ? "default" : "outline"}>{u.rol}</Badge>
+                      <Badge className={ROL_COLOR[u.rol] ?? ROL_COLOR.Interno}>{u.rol}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={u.activo ? "secondary" : "outline"}>
+                      <Badge className={u.activo ? ACTIVO_COLOR : INACTIVO_COLOR}>
                         {u.activo ? "Activo" : "Inactivo"}
                       </Badge>
                     </TableCell>
@@ -212,20 +222,14 @@ export default async function UsuariosPage() {
                 <MobileRecordCard
                   key={u.id}
                   avatarLabel={u.nombre.trim().charAt(0).toUpperCase() || <UserRound className="size-5" />}
-                  avatarClassName={
-                    u.rol === "Admin"
-                      ? "bg-violet-500/15 text-violet-700 dark:text-violet-400"
-                      : "bg-primary/10 text-primary"
-                  }
+                  avatarClassName={ROL_COLOR[u.rol] ?? ROL_COLOR.Interno}
                   title={u.nombre}
                   subtitle={u.email}
                   meta={u.rol}
                   badge={
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        u.activo
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                          : "bg-slate-500/15 text-slate-700 dark:text-slate-300"
+                        u.activo ? ACTIVO_COLOR : INACTIVO_COLOR
                       }`}
                     >
                       {u.activo ? "Activo" : "Inactivo"}

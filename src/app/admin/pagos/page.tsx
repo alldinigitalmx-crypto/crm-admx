@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { METODO_LABEL } from "@/lib/metodo-pago";
+import { CONFIRMADO_COLOR, PENDIENTE_COLOR } from "@/lib/status-colors";
 import { PagoFormDialog } from "@/components/pagos/pago-form-dialog";
 import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
 import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
@@ -46,9 +47,6 @@ const METODOS = [
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
-
-const CONFIRMADO_COLOR = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
-const PENDIENTE_COLOR = "bg-amber-500/15 text-amber-700 dark:text-amber-400";
 
 export default async function PagosPage({
   searchParams,
@@ -248,10 +246,21 @@ export default async function PagosPage({
                       <TableCell className="font-medium">
                         <Link
                           href={`/admin/servicios/${p.servicio.id}`}
-                          className="block truncate hover:underline"
+                          className="flex items-center gap-2.5 hover:underline"
                           title={p.servicio.descripcion}
                         >
-                          {p.servicio.descripcion}
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                              p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR
+                            }`}
+                          >
+                            {p.confirmado ? (
+                              <CheckCircle2 className="size-3.5" />
+                            ) : (
+                              <Clock className="size-3.5" />
+                            )}
+                          </span>
+                          <span className="truncate">{p.servicio.descripcion}</span>
                         </Link>
                       </TableCell>
                       <TableCell>
@@ -271,7 +280,7 @@ export default async function PagosPage({
                         {p.cuenta ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={p.confirmado ? "secondary" : "outline"}>
+                        <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
                           {p.confirmado ? "Confirmado" : "Pendiente"}
                         </Badge>
                       </TableCell>

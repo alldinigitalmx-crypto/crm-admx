@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Pencil, FileText, Code2, Package } from "lucide-react";
+import { Pencil, Package } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
+import {
+  PRODUCTO_CATEGORIA_COLOR as CATEGORIA_COLOR,
+  PRODUCTO_CATEGORIA_ICON as CATEGORIA_ICON,
+  ACTIVO_COLOR,
+  INACTIVO_COLOR,
+} from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -28,19 +34,6 @@ import {
 import type { CategoriaProducto, Prisma } from "@/generated/prisma/client";
 
 const CATEGORIAS = ["Plantilla", "Sistema", "Otro"];
-
-const CATEGORIA_COLOR: Record<string, string> = {
-  Plantilla: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Sistema: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  Otro: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
-};
-const CATEGORIA_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  Plantilla: FileText,
-  Sistema: Code2,
-  Otro: Package,
-};
-const ACTIVO_COLOR = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
-const INACTIVO_COLOR = "bg-slate-500/15 text-slate-700 dark:text-slate-300";
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -142,12 +135,23 @@ export default async function ProductosPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {productos.map((p) => (
+                  {productos.map((p) => {
+                    const Icono = CATEGORIA_ICON[p.categoria] ?? Package;
+                    return (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.nombre}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${CATEGORIA_COLOR[p.categoria]}`}
+                          >
+                            <Icono className="size-3.5" />
+                          </span>
+                          {p.nombre}
+                        </div>
+                      </TableCell>
                       <TableCell>{p.categoria}</TableCell>
                       <TableCell>
-                        <Badge variant={p.activo ? "secondary" : "outline"}>
+                        <Badge className={p.activo ? ACTIVO_COLOR : INACTIVO_COLOR}>
                           {p.activo ? "Activo" : "Inactivo"}
                         </Badge>
                       </TableCell>
@@ -183,7 +187,7 @@ export default async function ProductosPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 
