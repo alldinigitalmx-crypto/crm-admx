@@ -235,15 +235,15 @@ export default async function ServiciosPage({
           ) : (
             <>
               {/* Escritorio: tabla clásica */}
-              <Table className="hidden md:table">
+              <Table className="hidden table-fixed md:table">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Intermediario</TableHead>
-                    <TableHead>Inicio</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-4/12">Descripción</TableHead>
+                    <TableHead className="w-2/12">Cliente</TableHead>
+                    <TableHead className="w-2/12">Status</TableHead>
+                    <TableHead className="w-2/12">Intermediario</TableHead>
+                    <TableHead className="w-1/12">Inicio</TableHead>
+                    <TableHead className="w-1/12 text-right">Monto</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -251,11 +251,15 @@ export default async function ServiciosPage({
                   {servicios.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
-                        <Link href={`/admin/servicios/${s.id}`} className="hover:underline">
+                        <Link
+                          href={`/admin/servicios/${s.id}`}
+                          className="block truncate hover:underline"
+                          title={s.descripcion}
+                        >
                           {s.descripcion}
                         </Link>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="truncate">
                         <Link
                           href={`/admin/clientes/${s.cliente.id}`}
                           className="hover:underline"
@@ -268,8 +272,8 @@ export default async function ServiciosPage({
                           {s.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{s.intermediario?.nombre ?? "—"}</TableCell>
-                      <TableCell>{formatDate(s.fechaInicio)}</TableCell>
+                      <TableCell className="truncate">{s.intermediario?.nombre ?? "—"}</TableCell>
+                      <TableCell className="truncate">{formatDate(s.fechaInicio)}</TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(montoTotalServicio(s))}
                       </TableCell>

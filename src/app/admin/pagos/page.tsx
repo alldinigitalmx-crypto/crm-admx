@@ -228,36 +228,48 @@ export default async function PagosPage({
           ) : (
             <>
               {/* Escritorio: tabla clásica */}
-              <Table className="hidden md:table">
+              <Table className="hidden table-fixed md:table">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Servicio</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Método</TableHead>
-                    <TableHead>Cuenta</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Comisión</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                    <TableHead className="w-36" />
+                    <TableHead className="w-3/12">Servicio</TableHead>
+                    <TableHead className="w-2/12">Cliente</TableHead>
+                    <TableHead className="w-1/12">Fecha</TableHead>
+                    <TableHead className="w-1/12">Método</TableHead>
+                    <TableHead className="w-1/12">Cuenta</TableHead>
+                    <TableHead className="w-1/12">Status</TableHead>
+                    <TableHead className="w-1/12 text-right">Comisión</TableHead>
+                    <TableHead className="w-1/12 text-right">Monto</TableHead>
+                    <TableHead className="w-2/12" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pagos.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
-                        <Link href={`/admin/servicios/${p.servicio.id}`} className="hover:underline">
+                        <Link
+                          href={`/admin/servicios/${p.servicio.id}`}
+                          className="block truncate hover:underline"
+                          title={p.servicio.descripcion}
+                        >
                           {p.servicio.descripcion}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/admin/clientes/${p.servicio.cliente.id}`} className="hover:underline">
+                        <Link
+                          href={`/admin/clientes/${p.servicio.cliente.id}`}
+                          className="block truncate hover:underline"
+                          title={p.servicio.cliente.nombre}
+                        >
                           {p.servicio.cliente.nombre}
                         </Link>
                       </TableCell>
-                      <TableCell>{formatDate(p.fecha)}</TableCell>
-                      <TableCell>{p.metodoPago}</TableCell>
-                      <TableCell>{p.cuenta ?? "—"}</TableCell>
+                      <TableCell className="truncate">{formatDate(p.fecha)}</TableCell>
+                      <TableCell className="truncate" title={p.metodoPago}>
+                        {p.metodoPago}
+                      </TableCell>
+                      <TableCell className="truncate" title={p.cuenta ?? undefined}>
+                        {p.cuenta ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={p.confirmado ? "secondary" : "outline"}>
                           {p.confirmado ? "Confirmado" : "Pendiente"}

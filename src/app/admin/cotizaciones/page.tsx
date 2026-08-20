@@ -196,15 +196,15 @@ export default async function CotizacionesPage({
           ) : (
             <>
               {/* Escritorio: tabla clásica */}
-              <Table className="hidden md:table">
+              <Table className="hidden table-fixed md:table">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Servicio</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Emisión</TableHead>
-                    <TableHead>Vencimiento</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-4/12">Servicio</TableHead>
+                    <TableHead className="w-2/12">Cliente</TableHead>
+                    <TableHead className="w-2/12">Status</TableHead>
+                    <TableHead className="w-1/12">Emisión</TableHead>
+                    <TableHead className="w-1/12">Vencimiento</TableHead>
+                    <TableHead className="w-1/12 text-right">Monto</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -212,16 +212,22 @@ export default async function CotizacionesPage({
                   {cotizaciones.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">
-                        <Link href={`/admin/cotizaciones/${c.id}`} className="hover:underline">
-                          {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
-                        </Link>
-                        {!c.servicioId && (
-                          <Badge variant="outline" className="ml-2">
-                            En negociación
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/cotizaciones/${c.id}`}
+                            className="min-w-0 truncate hover:underline"
+                            title={c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                          >
+                            {c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
+                          </Link>
+                          {!c.servicioId && (
+                            <Badge variant="outline" className="shrink-0">
+                              En negociación
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="truncate">
                         <Link
                           href={`/admin/clientes/${c.cliente.id}`}
                           className="hover:underline"
@@ -232,7 +238,7 @@ export default async function CotizacionesPage({
                       <TableCell>
                         <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>{c.status}</Badge>
                       </TableCell>
-                      <TableCell>{formatDate(c.fechaEmision)}</TableCell>
+                      <TableCell className="truncate">{formatDate(c.fechaEmision)}</TableCell>
                       <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
                       <TableCell>
