@@ -35,7 +35,7 @@ const ETIQUETA_COLOR: Record<string, string> = {
   Premium: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
   Platinum: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
-const AVATAR_DEFAULT = "bg-blue-600/10 text-blue-600 dark:text-blue-400";
+const AVATAR_DEFAULT = "bg-primary/10 text-primary";
 
 export default async function ClientesPage({
   searchParams,

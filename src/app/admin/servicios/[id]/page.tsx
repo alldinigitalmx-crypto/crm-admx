@@ -532,7 +532,7 @@ export default async function ServicioDetallePage({
                       href={ev.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-32 items-center justify-center rounded-md bg-muted text-sm text-blue-600 hover:underline dark:text-blue-400"
+                      className="flex h-32 items-center justify-center rounded-md bg-muted text-sm text-primary hover:underline"
                     >
                       Ver grabación
                     </a>

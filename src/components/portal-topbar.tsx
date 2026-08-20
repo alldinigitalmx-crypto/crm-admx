@@ -15,8 +15,8 @@ export function PortalTopbar({
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4 md:px-6">
       <div className="flex items-center gap-2">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-600">
-          <Code2 className="size-4 text-white" />
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary">
+          <Code2 className="size-4 text-primary-foreground" />
         </div>
         <span className="text-sm font-semibold tracking-wide">ADMX DEV</span>
       </div>

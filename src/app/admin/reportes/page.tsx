@@ -74,10 +74,10 @@ function KpiCard({
 }) {
   const toneClass =
     tone === "good"
-      ? "bg-emerald-600/10 text-emerald-600 dark:text-emerald-400"
+      ? "bg-success/10 text-success"
       : tone === "bad"
-        ? "bg-red-600/10 text-red-600 dark:text-red-400"
-        : "bg-blue-600/10 text-blue-600 dark:text-blue-400";
+        ? "bg-destructive/10 text-destructive"
+        : "bg-primary/10 text-primary";
   return (
     <Card>
       <CardContent className="flex items-center gap-4 py-2">

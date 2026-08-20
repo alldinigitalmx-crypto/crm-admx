@@ -50,7 +50,7 @@ export function SubtareaChecklist({
             </span>
             <span className="h-1 flex-1 max-w-16 overflow-hidden rounded-full bg-muted">
               <span
-                className="block h-full rounded-full bg-blue-600 transition-all duration-300 dark:bg-blue-500"
+                className="block h-full rounded-full bg-primary transition-all duration-300"
                 style={{ width: `${pct}%` }}
               />
             </span>
@@ -74,7 +74,7 @@ export function SubtareaChecklist({
                     alternarSubtarea(s.id, checked);
                   });
                 }}
-                className="size-3 shrink-0 accent-blue-600"
+                className="size-3 shrink-0 accent-primary"
               />
               <span
                 className={`min-w-0 flex-1 truncate text-xs ${s.completada ? "text-muted-foreground line-through" : ""}`}

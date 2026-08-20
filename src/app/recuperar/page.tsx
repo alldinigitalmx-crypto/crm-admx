@@ -57,17 +57,14 @@ export default async function RecuperarPage({
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="mt-2 w-full bg-blue-600 text-white hover:bg-blue-500 focus-visible:ring-blue-500/40"
-              >
+              <Button type="submit" className="mt-2 w-full">
                 Enviar enlace
               </Button>
             </form>
           )}
 
           <p className="mt-6 text-sm text-muted-foreground">
-            <Link href="/login" className="text-blue-600 hover:underline dark:text-blue-400">
+            <Link href="/login" className="text-primary hover:underline">
               Volver a iniciar sesión
             </Link>
           </p>

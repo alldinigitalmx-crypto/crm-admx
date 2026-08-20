@@ -42,7 +42,7 @@ export default async function ServicioPublicoPage({
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-4 py-10">
       <div>
-        <p className="text-sm font-semibold tracking-wide text-blue-600 dark:text-blue-400">
+        <p className="text-sm font-semibold tracking-wide text-primary">
           ADMX DEV
         </p>
         <h1 className="text-2xl font-semibold">{servicio.descripcion}</h1>
@@ -64,7 +64,7 @@ export default async function ServicioPublicoPage({
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
+                className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${avance}%` }}
               />
             </div>
@@ -113,7 +113,7 @@ export default async function ServicioPublicoPage({
                       href={ev.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-40 items-center justify-center rounded-md bg-muted text-sm text-blue-600 hover:underline dark:text-blue-400"
+                      className="flex h-40 items-center justify-center rounded-md bg-muted text-sm text-primary hover:underline"
                     >
                       Ver grabación
                     </a>

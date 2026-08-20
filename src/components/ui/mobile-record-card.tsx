@@ -37,7 +37,7 @@ export function MobileRecordCard({
   const avatar = (
     <div
       className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-        avatarClassName ?? "bg-blue-600/10 text-blue-600 dark:text-blue-400"
+        avatarClassName ?? "bg-primary/10 text-primary"
       }`}
     >
       {avatarLabel}

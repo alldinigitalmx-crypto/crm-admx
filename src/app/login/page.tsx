@@ -44,13 +44,13 @@ export default async function LoginPage({
             backgroundSize: "48px 48px",
           }}
         />
-        <div className="pointer-events-none absolute -left-24 -top-24 size-80 rounded-full bg-blue-600/25 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 -top-24 size-80 rounded-full bg-primary/25 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-0 size-96 rounded-full bg-violet-600/20 blur-3xl" />
         <div className="pointer-events-none absolute right-10 top-1/3 size-56 rounded-full bg-teal-500/10 blur-3xl" />
 
         <div className="relative flex items-center gap-2 text-white">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-blue-600">
-            <Code2 className="size-4.5" />
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+            <Code2 className="size-4.5 text-primary-foreground" />
           </div>
           <span className="text-sm font-semibold tracking-wide">ADMX DEV</span>
         </div>
@@ -67,7 +67,7 @@ export default async function LoginPage({
           <ul className="mt-9 space-y-4">
             <li className="flex items-center gap-3 text-sm text-slate-300">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
-                <Briefcase className="size-3.5 text-blue-400" />
+                <Briefcase className="size-3.5 text-primary" />
               </span>
               Servicios y cotizaciones en un solo lugar
             </li>
@@ -139,7 +139,7 @@ export default async function LoginPage({
                   <Label htmlFor="password">Contraseña</Label>
                   <Link
                     href="/recuperar"
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-xs text-primary hover:underline"
                   >
                     ¿Olvidaste tu contraseña?
                   </Link>
@@ -157,10 +157,7 @@ export default async function LoginPage({
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="mt-2 w-full bg-blue-600 text-white hover:bg-blue-500 focus-visible:ring-blue-500/40"
-              >
+              <Button type="submit" className="mt-2 w-full">
                 Entrar
               </Button>
             </form>

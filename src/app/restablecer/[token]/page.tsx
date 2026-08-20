@@ -65,7 +65,7 @@ export default async function RestablecerPage({
               </p>
               <Link
                 href="/recuperar"
-                className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                className="text-sm text-primary hover:underline"
               >
                 Solicitar un enlace nuevo
               </Link>
@@ -104,10 +104,7 @@ export default async function RestablecerPage({
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="mt-2 w-full bg-blue-600 text-white hover:bg-blue-500 focus-visible:ring-blue-500/40"
-              >
+              <Button type="submit" className="mt-2 w-full">
                 Guardar contraseña
               </Button>
             </form>

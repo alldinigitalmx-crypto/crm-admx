@@ -39,7 +39,7 @@ function KpiCard({
   return (
     <Card>
       <CardContent className="flex items-center gap-4 py-2">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-5" />
         </div>
         <div>
@@ -291,7 +291,7 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/ventas?origen=TiendaOnline">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="flex items-center gap-4 py-2">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <ShoppingBag className="size-5" />
                 </div>
                 <div>
@@ -310,7 +310,7 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/ventas?origen=Manual">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="flex items-center gap-4 py-2">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <ShoppingBag className="size-5" />
                 </div>
                 <div>

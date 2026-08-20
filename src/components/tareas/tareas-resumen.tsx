@@ -37,7 +37,7 @@ function Sparkline({ tendencia7 }: { tendencia7: ResumenTareas["tendencia7"] }) 
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="text-blue-600 dark:text-blue-400"
+        className="text-primary"
       />
       {tendencia7.map((d, i) => {
         const x = i * step;
@@ -48,7 +48,7 @@ function Sparkline({ tendencia7 }: { tendencia7: ResumenTareas["tendencia7"] }) 
             cx={x}
             cy={y}
             r={i === tendencia7.length - 1 ? 2.5 : 1.5}
-            className="fill-blue-600 dark:fill-blue-400"
+            className="fill-primary"
           />
         );
       })}
@@ -71,7 +71,7 @@ export function TareasResumen({ resumen }: { resumen: ResumenTareas }) {
           </p>
           <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-blue-600 transition-all duration-500 dark:bg-blue-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${progresoPct}%` }}
             />
           </div>

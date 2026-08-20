@@ -68,10 +68,10 @@ const navPrincipal = [
   },
 ] as const satisfies readonly { title: string; href: string; icon: typeof LayoutDashboard; modulo: ModuloSistema | null; grupo: Grupo; soloAdmin?: boolean }[];
 
-// Estado activo con el mismo azul de marca que ya usan los íconos de KPI
-// y avatares en el resto de la app, en vez del gris genérico de shadcn.
+// Estado activo con el acento de marca (token --sidebar-accent/--sidebar-primary)
+// en vez del gris genérico de shadcn.
 const ITEM_ACTIVE_CLASS =
-  "data-[active=true]:bg-blue-600/10 data-[active=true]:text-blue-700 data-[active=true]:hover:bg-blue-600/15 data-[active=true]:hover:text-blue-700 dark:data-[active=true]:text-blue-400 dark:data-[active=true]:hover:text-blue-400 [&[data-active=true]_svg]:text-blue-600 dark:[&[data-active=true]_svg]:text-blue-400";
+  "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:hover:bg-sidebar-accent data-[active=true]:hover:text-sidebar-accent-foreground [&[data-active=true]_svg]:text-sidebar-primary";
 
 export function AppSidebar({
   modulosVisibles,
@@ -107,11 +107,17 @@ export function AppSidebar({
       <SidebarHeader>
         <div className={`flex items-center gap-2.5 px-2 ${isMobile ? "py-3" : "py-2"}`}>
           <div
-            className={`flex shrink-0 items-center justify-center rounded-md bg-blue-600 ${
+            className={`flex shrink-0 items-center justify-center rounded-md bg-sidebar-primary ${
               isMobile ? "size-9" : "size-7"
             }`}
           >
-            <Code2 className={isMobile ? "size-5 text-white" : "size-4 text-white"} />
+            <Code2
+              className={
+                isMobile
+                  ? "size-5 text-sidebar-primary-foreground"
+                  : "size-4 text-sidebar-primary-foreground"
+              }
+            />
           </div>
           <span
             className={`font-semibold tracking-wide group-data-[collapsible=icon]:hidden ${

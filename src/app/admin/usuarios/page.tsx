@@ -215,7 +215,7 @@ export default async function UsuariosPage() {
                   avatarClassName={
                     u.rol === "Admin"
                       ? "bg-violet-500/15 text-violet-700 dark:text-violet-400"
-                      : "bg-blue-600/10 text-blue-600 dark:text-blue-400"
+                      : "bg-primary/10 text-primary"
                   }
                   title={u.nombre}
                   subtitle={u.email}

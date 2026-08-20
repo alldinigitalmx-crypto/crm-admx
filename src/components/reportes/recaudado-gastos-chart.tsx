@@ -72,7 +72,7 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+          <span className="size-2.5 rounded-full bg-primary" />
           <span className="text-muted-foreground">Recaudado</span>
         </span>
         <span className="flex items-center gap-1.5">
@@ -150,13 +150,13 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="stroke-blue-600 dark:stroke-blue-400"
+            className="stroke-primary"
           />
 
           {hoverIndex !== null && hovered && (
             <>
               <circle cx={x(hoverIndex)} cy={y(hovered.gastos)} r={3.5} className="fill-orange-500 dark:fill-orange-400" />
-              <circle cx={x(hoverIndex)} cy={y(hovered.recaudado)} r={3.5} className="fill-blue-600 dark:fill-blue-400" />
+              <circle cx={x(hoverIndex)} cy={y(hovered.recaudado)} r={3.5} className="fill-primary" />
             </>
           )}
         </svg>
@@ -173,7 +173,7 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
             <p className="mb-1 font-medium">{hovered.label}</p>
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-muted-foreground">
-                <span className="size-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+                <span className="size-1.5 rounded-full bg-primary" />
                 Recaudado
               </span>
               <span className="tabular-nums">{formatCurrency(hovered.recaudado)}</span>

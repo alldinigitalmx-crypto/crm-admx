@@ -74,7 +74,7 @@ function Columna({
   return (
     <Card
       ref={setNodeRef}
-      className={`transition-colors duration-200 ${isOver ? "ring-2 ring-blue-500/50" : ""}`}
+      className={`transition-colors duration-200 ${isOver ? "ring-2 ring-primary/50" : ""}`}
     >
       <CardHeader>
         <CardTitle className="text-sm font-medium">
