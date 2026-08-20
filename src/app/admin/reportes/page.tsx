@@ -6,17 +6,12 @@ import {
   Briefcase,
   CheckCircle2,
   Users,
+  Download,
+  FileDown,
 } from "lucide-react";
 
-import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
-import {
-  construirRangoFecha,
-  rangoEfectivo,
-  agruparRecaudadoGastos,
-  topNConOtros,
-} from "@/lib/reportes";
-import { METODO_LABEL } from "@/lib/metodo-pago";
+import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -30,9 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RecaudadoGastosChart } from "@/components/reportes/recaudado-gastos-chart";
 import { DesgloseBarras, type ItemBarra } from "@/components/reportes/desglose-barras";
-import type { Prisma, StatusServicio, MetodoPago } from "@/generated/prisma/client";
+import type { StatusServicio } from "@/generated/prisma/client";
 
-const STATUS_ORDEN: StatusServicio[] = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"];
 const STATUS_COLOR: Record<StatusServicio, string> = {
   Cotizado: "bg-slate-400 dark:bg-slate-500",
   Aprobado: "bg-blue-600 dark:bg-blue-400",
@@ -44,12 +38,12 @@ const STATUS_COLOR: Record<StatusServicio, string> = {
 const METODO_COLOR: Record<string, string> = {
   Efectivo: "bg-emerald-600 dark:bg-emerald-400",
   Transferencia: "bg-blue-600 dark:bg-blue-400",
-  MercadoPago: "bg-sky-500 dark:bg-sky-400",
+  "Mercado Pago": "bg-sky-500 dark:bg-sky-400",
   PayPal: "bg-violet-500 dark:bg-violet-400",
   Tarjeta: "bg-pink-500 dark:bg-pink-400",
-  WesternUnion: "bg-amber-500 dark:bg-amber-400",
+  "Western Union": "bg-amber-500 dark:bg-amber-400",
   Binance: "bg-orange-500 dark:bg-orange-400",
-  Deposito: "bg-teal-500 dark:bg-teal-400",
+  Depósito: "bg-teal-500 dark:bg-teal-400",
   Otro: "bg-zinc-400 dark:bg-zinc-500",
 };
 const COLOR_OTROS = "bg-zinc-400 dark:bg-zinc-500";
@@ -106,124 +100,42 @@ export default async function ReportesPage({
   searchParams: Promise<{ desde?: string; hasta?: string }>;
 }) {
   const { desde, hasta } = await searchParams;
-  const rango = construirRangoFecha(desde, hasta);
-
-  const [minPago, minGasto, minServicio] = await Promise.all([
-    prisma.pago.aggregate({ _min: { fecha: true } }),
-    prisma.gasto.aggregate({ _min: { fecha: true } }),
-    prisma.servicio.aggregate({ _min: { fechaInicio: true } }),
-  ]);
-  const candidatos = [minPago._min.fecha, minGasto._min.fecha, minServicio._min.fechaInicio].filter(
-    (d): d is Date => d !== null
-  );
-  const primerRegistro = candidatos.length ? new Date(Math.min(...candidatos.map((d) => d.getTime()))) : null;
-  const { desde: desdeEfectivo, hasta: hastaEfectivo } = rangoEfectivo(desde, hasta, primerRegistro);
-
-  const pagosWhere: Prisma.PagoWhereInput = { confirmado: true };
-  if (rango) pagosWhere.fecha = rango;
-  const gastosWhere: Prisma.GastoWhereInput = { ambito: "Empresa" };
-  if (rango) gastosWhere.fecha = rango;
-  const serviciosNuevosWhere: Prisma.ServicioWhereInput = {};
-  if (rango) serviciosNuevosWhere.fechaInicio = rango;
-  const serviciosEntregadosWhere: Prisma.ServicioWhereInput = { status: "Entregado" };
-  if (rango) serviciosEntregadosWhere.fechaFin = rango;
-  const clientesNuevosWhere: Prisma.ClienteWhereInput = {};
-  if (rango) clientesNuevosWhere.creadoEn = rango;
-
-  const [pagos, gastos, serviciosNuevos, serviciosEntregadosCount, clientesNuevosCount] = await Promise.all([
-    prisma.pago.findMany({
-      where: pagosWhere,
-      select: {
-        fecha: true,
-        monto: true,
-        metodoPago: true,
-        servicio: { select: { cliente: { select: { id: true, nombre: true } } } },
-      },
-      orderBy: { fecha: "asc" },
-    }),
-    prisma.gasto.findMany({
-      where: gastosWhere,
-      select: { fecha: true, monto: true, categoria: true },
-    }),
-    prisma.servicio.findMany({
-      where: serviciosNuevosWhere,
-      select: { status: true },
-    }),
-    prisma.servicio.count({ where: serviciosEntregadosWhere }),
-    prisma.cliente.count({ where: clientesNuevosWhere }),
-  ]);
-
-  const totalRecaudado = pagos.reduce((acc, p) => acc + Number(p.monto), 0);
-  const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
-  const utilidadNeta = totalRecaudado - totalGastos;
-
-  const puntosPeriodo = agruparRecaudadoGastos(
-    pagos.map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })),
-    gastos.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
+  const datos = await obtenerDatosReportes(desde, hasta);
+  const {
     desdeEfectivo,
-    hastaEfectivo
-  );
+    hastaEfectivo,
+    totalRecaudado,
+    totalGastos,
+    utilidadNeta,
+    pagosCount,
+    gastosCount,
+    serviciosEntregadosCount,
+    serviciosNuevosCount,
+    clientesNuevosCount,
+    puntosPeriodo,
+    statusItems: statusFilas,
+    metodoItems: metodoFilas,
+    gastosItems: gastosFilas,
+    topClientes,
+  } = datos;
 
-  const statusCounts = Object.fromEntries(STATUS_ORDEN.map((s) => [s, 0])) as Record<StatusServicio, number>;
-  for (const s of serviciosNuevos) statusCounts[s.status]++;
-  const statusItems: ItemBarra[] = STATUS_ORDEN.map((s) => ({
-    label: s,
-    valor: statusCounts[s],
-    colorClass: STATUS_COLOR[s],
+  const statusItems: ItemBarra[] = statusFilas.map((f) => ({
+    label: f.label,
+    valor: f.count,
+    colorClass: STATUS_COLOR[f.label as StatusServicio] ?? COLOR_OTROS,
   }));
-
-  const metodoTotales = new Map<string, { monto: number; count: number }>();
-  for (const p of pagos) {
-    const cur = metodoTotales.get(p.metodoPago) ?? { monto: 0, count: 0 };
-    cur.monto += Number(p.monto);
-    cur.count += 1;
-    metodoTotales.set(p.metodoPago, cur);
-  }
-  const metodoEntradas = Array.from(metodoTotales.entries()).sort((a, b) => b[1].monto - a[1].monto);
-  const metodoTop = metodoEntradas.slice(0, 8);
-  const metodoResto = metodoEntradas.slice(8);
-  const metodoItems: ItemBarra[] = metodoTop.map(([metodo, v]) => ({
-    label: METODO_LABEL[metodo] ?? metodo,
-    valor: v.monto,
-    detalle: `${v.count} pago${v.count === 1 ? "" : "s"}`,
-    colorClass: METODO_COLOR[metodo as MetodoPago] ?? COLOR_OTROS,
+  const metodoItems: ItemBarra[] = metodoFilas.map((f) => ({
+    label: f.label,
+    valor: f.monto,
+    detalle: `${f.count} pago${f.count === 1 ? "" : "s"}`,
+    colorClass: f.label === "Otros" ? COLOR_OTROS : (METODO_COLOR[f.label] ?? COLOR_OTROS),
   }));
-  if (metodoResto.length > 0) {
-    const monto = metodoResto.reduce((acc, [, v]) => acc + v.monto, 0);
-    const count = metodoResto.reduce((acc, [, v]) => acc + v.count, 0);
-    metodoItems.push({ label: "Otros", valor: monto, detalle: `${count} pagos`, colorClass: COLOR_OTROS });
-  }
-
-  const gastosPorCategoria = new Map<string, { monto: number; count: number }>();
-  for (const g of gastos) {
-    const cur = gastosPorCategoria.get(g.categoria) ?? { monto: 0, count: 0 };
-    cur.monto += Number(g.monto);
-    cur.count += 1;
-    gastosPorCategoria.set(g.categoria, cur);
-  }
-  const gastosTop = topNConOtros(
-    Array.from(gastosPorCategoria.entries()).map(([label, v]) => ({ label, monto: v.monto, count: v.count })),
-    5
-  );
-  const gastosItems: ItemBarra[] = gastosTop.map((item, i) => ({
-    label: item.label,
-    valor: item.monto,
-    detalle: `${item.count} gasto${item.count === 1 ? "" : "s"}`,
-    colorClass: item.label === "Otros" ? COLOR_OTROS : CATEGORICOS_GASTO[i % CATEGORICOS_GASTO.length],
+  const gastosItems: ItemBarra[] = gastosFilas.map((f, i) => ({
+    label: f.label,
+    valor: f.monto,
+    detalle: `${f.count} gasto${f.count === 1 ? "" : "s"}`,
+    colorClass: f.label === "Otros" ? COLOR_OTROS : CATEGORICOS_GASTO[i % CATEGORICOS_GASTO.length],
   }));
-
-  const porCliente = new Map<number, { nombre: string; monto: number; count: number }>();
-  for (const p of pagos) {
-    const c = p.servicio.cliente;
-    const cur = porCliente.get(c.id) ?? { nombre: c.nombre, monto: 0, count: 0 };
-    cur.monto += Number(p.monto);
-    cur.count += 1;
-    porCliente.set(c.id, cur);
-  }
-  const topClientes = Array.from(porCliente.entries())
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.monto - a.monto)
-    .slice(0, 8);
 
   const hoy = new Date();
   const hoyIso = isoDate(hoy);
@@ -244,13 +156,40 @@ export default async function ReportesPage({
   ];
   const presetActivo = presets.find((p) => p.desde === desde && p.hasta === hasta) ?? (!desde && !hasta ? presets[5] : null);
 
+  const exportParams = new URLSearchParams();
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
+  const exportQuery = exportParams.toString();
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Reportes</h1>
-        <p className="text-sm text-muted-foreground">
-          {formatDate(desdeEfectivo)} — {formatDate(hastaEfectivo)}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Reportes</h1>
+          <p className="text-sm text-muted-foreground">
+            {formatDate(desdeEfectivo)} — {formatDate(hastaEfectivo)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/reportes/pdf?${exportQuery}`}>
+              <FileDown />
+              Exportar PDF
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/admin/reportes/export/ingresos?${exportQuery}`}>
+              <Download />
+              Ingresos (Excel)
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/admin/reportes/export/gastos?${exportQuery}`}>
+              <Download />
+              Gastos (Excel)
+            </a>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -293,8 +232,8 @@ export default async function ReportesPage({
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagos.length} pagos confirmados`} />
-        <KpiCard title="Gastos (empresa)" value={formatCurrency(totalGastos)} icon={TrendingDown} tone="bad" sub={`${gastos.length} movimientos`} />
+        <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagosCount} pagos confirmados`} />
+        <KpiCard title="Gastos (empresa)" value={formatCurrency(totalGastos)} icon={TrendingDown} tone="bad" sub={`${gastosCount} movimientos`} />
         <KpiCard
           title="Utilidad neta"
           value={formatCurrency(utilidadNeta)}
@@ -303,7 +242,7 @@ export default async function ReportesPage({
           sub="Recaudado − gastos"
         />
         <KpiCard title="Servicios entregados" value={String(serviciosEntregadosCount)} icon={CheckCircle2} sub="Por fecha de fin" />
-        <KpiCard title="Servicios nuevos" value={String(serviciosNuevos.length)} icon={Briefcase} sub="Por fecha de inicio" />
+        <KpiCard title="Servicios nuevos" value={String(serviciosNuevosCount)} icon={Briefcase} sub="Por fecha de inicio" />
         <KpiCard title="Clientes nuevos" value={String(clientesNuevosCount)} icon={Users} />
       </div>
 
