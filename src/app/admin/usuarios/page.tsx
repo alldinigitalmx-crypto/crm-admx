@@ -1,6 +1,9 @@
 import { Plus, Pencil, ShieldCheck, UserRound } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { currentUsuario } from "@/lib/current-usuario";
+import { esAdmin } from "@/lib/alcance";
 import { formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,6 +27,9 @@ import { actualizarUsuario, crearUsuario } from "@/app/admin/usuarios/actions";
 import { MODULO_LABEL } from "@/lib/modulo-sistema";
 
 export default async function UsuariosPage() {
+  const usuarioActual = await currentUsuario();
+  if (!esAdmin(usuarioActual)) redirect("/admin");
+
   const [usuarios, ticketsPendientes] = await Promise.all([
     prisma.usuario.findMany({
       orderBy: { creadoEn: "asc" },

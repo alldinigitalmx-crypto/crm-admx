@@ -12,6 +12,8 @@ import type {
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { currentUsuario } from "@/lib/current-usuario";
+import { esAdmin } from "@/lib/alcance";
 import { MODULOS } from "@/lib/modulo-sistema";
 
 export type UsuarioFormState = { error?: string } | undefined;
@@ -20,6 +22,15 @@ async function currentUsuarioId() {
   const session = await auth();
   const id = session?.user?.id;
   return id ? Number(id) : null;
+}
+
+// Gestionar usuarios, permisos y tickets de acceso es exclusivo de Admin —
+// se revisa el rol fresco en base de datos (no el del JWT) en cada acción,
+// nunca solo en la página, porque estas funciones son invocables
+// directamente sin pasar por la UI.
+async function requiereAdmin() {
+  const usuario = await currentUsuario();
+  return esAdmin(usuario);
 }
 
 function parseUsuarioForm(formData: FormData) {
@@ -49,6 +60,10 @@ export async function crearUsuario(
   _prevState: UsuarioFormState,
   formData: FormData
 ): Promise<UsuarioFormState> {
+  if (!(await requiereAdmin())) {
+    return { error: "No tienes permiso para crear usuarios." };
+  }
+
   const data = parseUsuarioForm(formData);
   const error = validateUsuarioForm(data, { requirePassword: true });
   if (error) return { error };
@@ -81,6 +96,10 @@ export async function actualizarUsuario(
   _prevState: UsuarioFormState,
   formData: FormData
 ): Promise<UsuarioFormState> {
+  if (!(await requiereAdmin())) {
+    return { error: "No tienes permiso para editar usuarios." };
+  }
+
   const data = parseUsuarioForm(formData);
   const error = validateUsuarioForm(data, { requirePassword: false });
   if (error) return { error };
@@ -111,6 +130,8 @@ export async function guardarPermisos(
   usuarioId: number,
   permisos: Record<string, { nivel: string; alcance: string }>
 ) {
+  if (!(await requiereAdmin())) return;
+
   await prisma.$transaction(
     MODULOS.map((modulo) => {
       const { nivel = "none", alcance = "Propio" } = permisos[modulo] ?? {};
@@ -134,6 +155,8 @@ export async function resolverTicketAcceso(
   decision: StatusTicketAcceso,
   nivel: NivelPermiso = "Ver"
 ) {
+  if (!(await requiereAdmin())) return;
+
   const resueltoPorId = await currentUsuarioId();
 
   const ticket = await prisma.ticketAcceso.update({
