@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -17,6 +17,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Admx Dev — Panel",
   description: "CRM interno de Admx Dev",
+};
+
+// Color de la barra del navegador y fondo de la splash de "Agregar a
+// pantalla de inicio" — mismo tono que el panel de marca del login.
+export const viewport: Viewport = {
+  themeColor: "#020617",
 };
 
 export default function RootLayout({
