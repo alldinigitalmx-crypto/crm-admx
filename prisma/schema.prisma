@@ -106,8 +106,11 @@ model Pago {
 // ---------- COTIZACIONES (Fase 1) ----------
 model Cotizacion {
   id               Int              @id @default(autoincrement())
-  clienteId        Int
-  cliente          Cliente          @relation(fields: [clienteId], references: [id])
+  // Nulo cuando la cotización todavía es de un prospecto sin registrar
+  // como cliente — ver prospectoNombre.
+  clienteId        Int?
+  cliente          Cliente?         @relation(fields: [clienteId], references: [id])
+  prospectoNombre  String?
   servicioId       Int?
   servicio         Servicio?        @relation(fields: [servicioId], references: [id])
   ordenCambioId    Int?

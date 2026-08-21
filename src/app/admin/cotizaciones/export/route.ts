@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
 import { buildExcelResponse } from "@/lib/excel";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import type { Prisma, StatusCotizacion } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     ],
     cotizaciones.map((c) => ({
       servicio: c.servicio?.descripcion ?? c.descripcion ?? "",
-      cliente: c.cliente.nombre,
+      cliente: nombreClienteCotizacion(c),
       status: c.status,
       fechaEmision: c.fechaEmision,
       fechaVencimiento: c.fechaVencimiento,

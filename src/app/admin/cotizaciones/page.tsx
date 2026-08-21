@@ -24,6 +24,7 @@ import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-
 import { crearCotizacion } from "@/app/admin/cotizaciones/actions";
 import { Pagination } from "@/components/ui/pagination";
 import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import type { Prisma, StatusCotizacion } from "@/generated/prisma/client";
 
 const STATUSES = ["Enviada", "Firmada", "Pagada", "Vencida", "Perdida"];
@@ -233,12 +234,18 @@ export default async function CotizacionesPage({
                         </div>
                       </TableCell>
                       <TableCell className="truncate">
-                        <Link
-                          href={`/admin/clientes/${c.cliente.id}`}
-                          className="hover:underline"
-                        >
-                          {c.cliente.nombre}
-                        </Link>
+                        {c.cliente ? (
+                          <Link
+                            href={`/admin/clientes/${c.cliente.id}`}
+                            className="hover:underline"
+                          >
+                            {c.cliente.nombre}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {nombreClienteCotizacion(c)} (prospecto)
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge className={STATUS_COLOR[c.status]}>{c.status}</Badge>
@@ -271,7 +278,7 @@ export default async function CotizacionesPage({
                       avatarLabel={<Icono className="size-5" />}
                       avatarClassName={STATUS_COLOR[c.status]}
                       title={c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
-                      subtitle={c.cliente.nombre}
+                      subtitle={nombreClienteCotizacion(c)}
                       meta={`${formatDate(c.fechaEmision)} · ${formatCurrency(c.montoTotal)}`}
                       badge={
                         <span

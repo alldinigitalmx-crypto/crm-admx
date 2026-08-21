@@ -65,7 +65,8 @@ export async function crearCotizacion(
   const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
   const userId = await currentUserId();
 
-  let clienteId: number;
+  let clienteId: number | null;
+  let prospectoNombre: string | null = null;
   let ordenCambioId: number | null = null;
   let descripcion: string | null = null;
   let detalles: string | null = null;
@@ -90,10 +91,19 @@ export async function crearCotizacion(
     clienteId = servicio.clienteId;
     montoSubtotal = ordenCambio ? Number(ordenCambio.monto) : montoTotalServicio(servicio);
   } else {
-    const clienteIdRaw = Number(formData.get("clienteId") ?? "");
-    if (!clienteIdRaw) return { error: "Selecciona un cliente." };
-    const cliente = await prisma.cliente.findUnique({ where: { id: clienteIdRaw } });
-    if (!cliente) return { error: "El cliente ya no existe." };
+    const clienteIdRaw = String(formData.get("clienteId") ?? "");
+
+    if (clienteIdRaw === "__prospecto__") {
+      prospectoNombre = String(formData.get("prospectoNombre") ?? "").trim();
+      if (!prospectoNombre) return { error: "Escribe el nombre del prospecto." };
+      clienteId = null;
+    } else {
+      const id = Number(clienteIdRaw);
+      if (!id) return { error: "Selecciona un cliente." };
+      const cliente = await prisma.cliente.findUnique({ where: { id } });
+      if (!cliente) return { error: "El cliente ya no existe." };
+      clienteId = cliente.id;
+    }
 
     descripcion = String(formData.get("descripcion") ?? "").trim();
     if (!descripcion) return { error: "Describe brevemente qué se está cotizando." };
@@ -104,7 +114,6 @@ export async function crearCotizacion(
       return { error: "Indica el monto de la cotización." };
     }
 
-    clienteId = cliente.id;
     montoSubtotal = montoSubtotalRaw;
   }
 
@@ -113,6 +122,7 @@ export async function crearCotizacion(
   const cotizacion = await prisma.cotizacion.create({
     data: {
       clienteId,
+      prospectoNombre,
       servicioId,
       ordenCambioId,
       descripcion,
@@ -362,6 +372,9 @@ export async function convertirEnServicio(cotizacionId: number) {
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } });
   if (!cotizacion) return;
   if (cotizacion.status !== "Firmada" || cotizacion.servicioId) return;
+  // Un Servicio siempre necesita un cliente real — si sigue siendo
+  // prospecto, primero hay que convertirlo en cliente.
+  if (!cotizacion.clienteId) return;
 
   const userId = await currentUserId();
 

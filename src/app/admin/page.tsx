@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -348,7 +349,7 @@ export default async function AdminDashboardPage() {
                   href={`/admin/cotizaciones/${c.id}`}
                   className="truncate hover:underline"
                 >
-                  {c.cliente.nombre} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
+                  {nombreClienteCotizacion(c)} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
                 </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
@@ -425,7 +426,8 @@ export default async function AdminDashboardPage() {
             emptyText="No tienes tareas pendientes."
           >
             {tareasPendientes.map((t) => {
-              const proyecto = t.servicio?.descripcion ?? t.cotizacion?.cliente.nombre ?? null;
+              const proyecto =
+                t.servicio?.descripcion ?? (t.cotizacion ? nombreClienteCotizacion(t.cotizacion) : null);
               const vencida = t.fechaLimite && t.fechaLimite < new Date();
               const href = t.servicioId
                 ? `/admin/servicios/${t.servicioId}`

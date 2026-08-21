@@ -18,6 +18,7 @@ import {
   eliminarTarea,
 } from "@/app/admin/tareas/actions";
 import { PRIORIDAD_COLOR, PRIORIDAD_BAR } from "@/lib/status-colors";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import type { PrioridadTarea } from "@/generated/prisma/client";
 
 export type TareaCardData = {
@@ -31,7 +32,7 @@ export type TareaCardData = {
   cotizacionId: number | null;
   asignadoAId: number | null;
   servicio?: { descripcion: string } | null;
-  cotizacion?: { cliente: { nombre: string } } | null;
+  cotizacion?: { cliente: { nombre: string } | null; prospectoNombre?: string | null } | null;
   subtareas: SubtareaData[];
 };
 
@@ -46,7 +47,11 @@ function vinculoInfo(tarea: TareaCardData): { icono: string; label: string | nul
     return { icono: "💼", label: tarea.servicio.descripcion, valor: `servicio:${tarea.servicioId}` };
   }
   if (tarea.cotizacionId && tarea.cotizacion) {
-    return { icono: "📄", label: tarea.cotizacion.cliente.nombre, valor: `cotizacion:${tarea.cotizacionId}` };
+    return {
+      icono: "📄",
+      label: nombreClienteCotizacion(tarea.cotizacion),
+      valor: `cotizacion:${tarea.cotizacionId}`,
+    };
   }
   return { icono: "📌", label: null };
 }

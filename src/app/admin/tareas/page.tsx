@@ -6,6 +6,7 @@ import { TareasResumen } from "@/components/tareas/tareas-resumen";
 import { calcularResumenTareas } from "@/lib/tareas-resumen";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import type { Prisma } from "@/generated/prisma/client";
 
 export default async function TareasPage() {
@@ -40,7 +41,9 @@ export default async function TareasPage() {
       orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }],
       include: {
         servicio: { select: { descripcion: true } },
-        cotizacion: { select: { cliente: { select: { nombre: true } } } },
+        cotizacion: {
+          select: { cliente: { select: { nombre: true } }, prospectoNombre: true },
+        },
         subtareas: { orderBy: { creadoEn: "asc" } },
       },
     }),
@@ -54,7 +57,7 @@ export default async function TareasPage() {
     ...servicios.map((s) => ({ value: `servicio:${s.id}`, label: `Servicio: ${s.descripcion}` })),
     ...cotizaciones.map((c) => ({
       value: `cotizacion:${c.id}`,
-      label: `Negociación: ${c.cliente.nombre}`,
+      label: `Negociación: ${nombreClienteCotizacion(c)}`,
     })),
   ];
 

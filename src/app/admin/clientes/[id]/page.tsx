@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Mail, MessageCircle, CalendarDays } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
@@ -37,6 +37,7 @@ import {
   CONFIRMADO_COLOR,
   PENDIENTE_COLOR,
 } from "@/lib/status-colors";
+import { mailtoHref, whatsappHref, mensajeAgendarCita } from "@/lib/contacto";
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -178,31 +179,84 @@ export default async function ClienteDetallePage({
         <CardHeader>
           <CardTitle className="text-sm font-medium">Datos de contacto</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <p className="text-muted-foreground">País</p>
-            <p>{cliente.pais ?? "—"}</p>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-muted-foreground">País</p>
+              <p>{cliente.pais ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Teléfono</p>
+              <p>{cliente.telefono ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Email</p>
+              <p>{cliente.email ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Medio de captación</p>
+              <p>{cliente.medioCaptacion ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Código de referido</p>
+              <p>{cliente.codigoReferido ?? "—"}</p>
+            </div>
+            {cliente.notas && (
+              <div className="sm:col-span-2 lg:col-span-3">
+                <p className="text-muted-foreground">Notas</p>
+                <p className="whitespace-pre-wrap">{cliente.notas}</p>
+              </div>
+            )}
           </div>
-          <div>
-            <p className="text-muted-foreground">Teléfono</p>
-            <p>{cliente.telefono ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Email</p>
-            <p>{cliente.email ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Medio de captación</p>
-            <p>{cliente.medioCaptacion ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Código de referido</p>
-            <p>{cliente.codigoReferido ?? "—"}</p>
-          </div>
-          {cliente.notas && (
-            <div className="sm:col-span-2 lg:col-span-3">
-              <p className="text-muted-foreground">Notas</p>
-              <p className="whitespace-pre-wrap">{cliente.notas}</p>
+
+          {(cliente.email || cliente.telefono) && (
+            <div className="flex flex-wrap gap-2 border-t pt-4">
+              {cliente.email && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={mailtoHref(cliente.email)}>
+                    <Mail />
+                    Enviar correo
+                  </a>
+                </Button>
+              )}
+              {cliente.telefono && (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={whatsappHref(cliente.telefono)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle />
+                    WhatsApp
+                  </a>
+                </Button>
+              )}
+              {cliente.telefono && (
+                <Button size="sm" asChild>
+                  <a
+                    href={whatsappHref(cliente.telefono, mensajeAgendarCita(cliente.nombre))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <CalendarDays />
+                    Agendar cita (WhatsApp)
+                  </a>
+                </Button>
+              )}
+              {cliente.email && (
+                <Button size="sm" variant={cliente.telefono ? "outline" : "default"} asChild>
+                  <a
+                    href={mailtoHref(
+                      cliente.email,
+                      "Agenda una reunión conmigo",
+                      mensajeAgendarCita(cliente.nombre)
+                    )}
+                  >
+                    <CalendarDays />
+                    Agendar cita (Email)
+                  </a>
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { prisma } from "@/lib/prisma";
 import { CotizacionPdfDocument } from "@/components/cotizaciones/cotizacion-pdf-document";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 
 export async function GET(
   _request: Request,
@@ -45,8 +46,8 @@ export async function GET(
           }
         : null,
       cliente: {
-        nombre: cotizacion.cliente.nombre,
-        email: cotizacion.cliente.email,
+        nombre: nombreClienteCotizacion(cotizacion),
+        email: cotizacion.cliente?.email ?? null,
       },
     }) as ReactElement<DocumentProps>
   );

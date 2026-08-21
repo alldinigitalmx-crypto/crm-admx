@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ClienteRapidoDialog } from "@/components/clientes/cliente-rapido-dialog";
+import { crearClienteRapido } from "@/app/admin/clientes/actions";
 import type { ServicioFormState } from "@/app/admin/servicios/actions";
 
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"] as const;
@@ -58,6 +60,20 @@ export function ServicioForm({
   onCancel?: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(action, undefined);
+  const [clientesDisponibles, setClientesDisponibles] = useState(clientes);
+  const [clienteId, setClienteId] = useState<string>(
+    defaultValues ? String(defaultValues.clienteId) : ""
+  );
+  // Radix Select solo "descubre" la etiqueta de un value cuando ese
+  // SelectItem llegó a montarse al menos una vez — si el cliente nuevo se
+  // selecciona por código sin que el usuario haya abierto el desplegable,
+  // se queda mostrando el placeholder aunque el value ya cambió. Forzar un
+  // remount (cambiando key) justo en ese momento resuelve el desajuste.
+  const [selectKey, setSelectKey] = useState(0);
+  // Memorizado — si se recrea en cada render (p. ej. inline .bind()),
+  // useActionState de ClienteRapidoDialog pierde el estado justo después
+  // de crear el cliente, antes de que el auto-select alcance a aplicarse.
+  const crearClienteRapidoAction = useMemo(() => crearClienteRapido.bind(null, null), []);
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -80,19 +96,37 @@ export function ServicioForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="clienteId">Cliente *</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="clienteId">Cliente *</Label>
+            <ClienteRapidoDialog
+              trigger={
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  + Nuevo cliente
+                </button>
+              }
+              action={crearClienteRapidoAction}
+              onCreated={(cliente) => {
+                setClientesDisponibles((prev) => [...prev, cliente]);
+                setClienteId(String(cliente.id));
+                setSelectKey((k) => k + 1);
+              }}
+            />
+          </div>
           <Select
+            key={selectKey}
             name="clienteId"
             required
-            defaultValue={
-              defaultValues ? String(defaultValues.clienteId) : undefined
-            }
+            defaultValue={clienteId || undefined}
+            onValueChange={setClienteId}
           >
             <SelectTrigger id="clienteId" className="w-full">
               <SelectValue placeholder="Selecciona un cliente" />
             </SelectTrigger>
             <SelectContent>
-              {clientes.map((c) => (
+              {clientesDisponibles.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.nombre}
                 </SelectItem>

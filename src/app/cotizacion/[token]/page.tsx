@@ -12,6 +12,7 @@ import {
   firmarCotizacion,
   reportarPagoTransferencia,
 } from "@/app/admin/cotizaciones/actions";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
 
 const STATUS_LABEL: Record<string, string> = {
   Enviada: "Enviada",
@@ -66,7 +67,7 @@ export default async function CotizacionPublicaPage({
         <h1 className="text-2xl font-semibold">
           Cotización #{String(cotizacion.id).padStart(4, "0")}
         </h1>
-        <p className="text-sm text-muted-foreground">Para {cotizacion.cliente.nombre}</p>
+        <p className="text-sm text-muted-foreground">Para {nombreClienteCotizacion(cotizacion)}</p>
       </div>
 
       <Card>
@@ -123,7 +124,7 @@ export default async function CotizacionPublicaPage({
             <CardTitle className="text-sm font-medium">Firma de la cotización</CardTitle>
           </CardHeader>
           <CardContent>
-            <FirmaForm action={firmarAction} nombreDefault={cotizacion.cliente.nombre} />
+            <FirmaForm action={firmarAction} nombreDefault={nombreClienteCotizacion(cotizacion)} />
           </CardContent>
         </Card>
       )}

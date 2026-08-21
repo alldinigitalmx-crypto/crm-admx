@@ -174,6 +174,7 @@ export function CotizacionForm({
                   <SelectValue placeholder="Selecciona un cliente" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__prospecto__">+ Prospecto nuevo (sin registrar)</SelectItem>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.nombre}
@@ -181,6 +182,21 @@ export function CotizacionForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {clienteId === "__prospecto__" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="prospectoNombre">Nombre del prospecto *</Label>
+              <Input
+                id="prospectoNombre"
+                name="prospectoNombre"
+                required
+                placeholder="Nombre de quien está cotizando"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se guarda como prospecto — podrás darlo de alta como cliente después.
+              </p>
             </div>
           )}
 

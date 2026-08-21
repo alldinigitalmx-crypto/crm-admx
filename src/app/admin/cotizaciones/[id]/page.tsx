@@ -33,6 +33,8 @@ import {
   marcarCotizacionPerdida,
 } from "@/app/admin/cotizaciones/actions";
 import { COTIZACION_STATUS_COLOR, CONFIRMADO_COLOR, PENDIENTE_COLOR } from "@/lib/status-colors";
+import { nombreClienteCotizacion } from "@/lib/cotizacion";
+import { ConvertirProspectoButton } from "@/components/cotizaciones/convertir-prospecto-button";
 
 export default async function CotizacionDetallePage({
   params,
@@ -116,10 +118,16 @@ export default async function CotizacionDetallePage({
             ) : (
               descripcion && <>{descripcion} — </>
             )}
-            Cliente:{" "}
-            <Link href={`/admin/clientes/${cotizacion.cliente.id}`} className="hover:underline">
-              {cotizacion.cliente.nombre}
-            </Link>
+            {cotizacion.cliente ? (
+              <>
+                Cliente:{" "}
+                <Link href={`/admin/clientes/${cotizacion.cliente.id}`} className="hover:underline">
+                  {cotizacion.cliente.nombre}
+                </Link>
+              </>
+            ) : (
+              <>Prospecto: {nombreClienteCotizacion(cotizacion)} (sin registrar)</>
+            )}
             {cotizacion.ordenCambio && (
               <>
                 {" "}
@@ -151,11 +159,20 @@ export default async function CotizacionDetallePage({
               </form>
             </>
           )}
-          {permisos.puedeEditar && cotizacion.status === "Firmada" && !cotizacion.servicioId && (
-            <form action={boundConvertir}>
-              <Button type="submit">Convertir en servicio</Button>
-            </form>
+          {permisos.puedeEditar && !cotizacion.cliente && (
+            <ConvertirProspectoButton
+              cotizacionId={cotizacion.id}
+              defaultNombre={cotizacion.prospectoNombre ?? ""}
+            />
           )}
+          {permisos.puedeEditar &&
+            cotizacion.status === "Firmada" &&
+            !cotizacion.servicioId &&
+            cotizacion.cliente && (
+              <form action={boundConvertir}>
+                <Button type="submit">Convertir en servicio</Button>
+              </form>
+            )}
           {permisos.puedeEditar && cotizacion.status !== "Pagada" && (
             <CotizacionFormDialog
               trigger={
@@ -168,7 +185,7 @@ export default async function CotizacionDetallePage({
               description={descripcion}
               action={boundUpdate}
               montoSubtotal={Number(cotizacion.montoSubtotal)}
-              defaultValues={cotizacion}
+              defaultValues={{ ...cotizacion, clienteId: cotizacion.clienteId ?? undefined }}
               submitLabel="Guardar cambios"
             />
           )}

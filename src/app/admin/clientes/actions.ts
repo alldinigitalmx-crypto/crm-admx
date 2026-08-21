@@ -62,6 +62,53 @@ export async function createCliente(
   redirect(`/admin/clientes/${clienteId}`);
 }
 
+export type ClienteRapidoState =
+  | { error: string }
+  | { cliente: { id: number; nombre: string } }
+  | undefined;
+
+// Alta rápida de cliente sin salir de donde se está trabajando — desde el
+// formulario de Servicio (queda seleccionado de una vez) o desde una
+// cotización de prospecto (queda vinculada). A diferencia de createCliente,
+// no redirige: regresa el cliente creado para que el formulario que llamó
+// esta acción decida qué hacer con él.
+export async function crearClienteRapido(
+  vincularCotizacionId: number | null,
+  _prevState: ClienteRapidoState,
+  formData: FormData
+): Promise<ClienteRapidoState> {
+  if (!(await requiereNivel("Clientes", "Crear"))) {
+    return { error: "No tienes permiso para crear clientes." };
+  }
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "El nombre es obligatorio." };
+  const telefono = String(formData.get("telefono") ?? "").trim() || null;
+  const email = String(formData.get("email") ?? "").trim() || null;
+
+  let cliente;
+  try {
+    cliente = await prisma.cliente.create({ data: { nombre, telefono, email } });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { error: "Ese dato ya está en uso por otro cliente." };
+    }
+    throw e;
+  }
+
+  if (vincularCotizacionId) {
+    await prisma.cotizacion.update({
+      where: { id: vincularCotizacionId },
+      data: { clienteId: cliente.id },
+    });
+    revalidatePath(`/admin/cotizaciones/${vincularCotizacionId}`);
+    revalidatePath("/admin/cotizaciones");
+  }
+
+  revalidatePath("/admin/clientes");
+  return { cliente: { id: cliente.id, nombre: cliente.nombre } };
+}
+
 export async function updateCliente(
   id: number,
   _prevState: ClienteFormState,
