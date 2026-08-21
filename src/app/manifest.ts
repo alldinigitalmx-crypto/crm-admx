@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
 // Hace que "Agregar a pantalla de inicio" en Android use el logo real de la
-// marca (fondo azul marino + el mark dorado) en vez del ícono genérico que
-// Chrome arma solo cuando no hay manifest — que es justo lo que se veía en
-// la pantalla de carga antes de este archivo.
+// marca (fondo blanco + el mark dorado) en vez del ícono genérico que Chrome
+// arma solo cuando no hay manifest — que es justo lo que se veía en la
+// pantalla de carga antes de este archivo.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Admx Dev — Panel",
@@ -11,8 +11,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "CRM interno de Admx Dev",
     start_url: "/login",
     display: "standalone",
-    background_color: "#020617",
-    theme_color: "#020617",
+    background_color: "#ffffff",
+    theme_color: "#ffffff",
     icons: [
       {
         src: "/icon-192.png",

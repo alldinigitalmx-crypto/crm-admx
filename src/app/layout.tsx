@@ -20,9 +20,9 @@ export const metadata: Metadata = {
 };
 
 // Color de la barra del navegador y fondo de la splash de "Agregar a
-// pantalla de inicio" — mismo tono que el panel de marca del login.
+// pantalla de inicio" — mismo blanco que el ícono de la app.
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
