@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FirmaForm } from "@/components/cotizaciones/firma-form";
 import { PagoTransferenciaForm } from "@/components/cotizaciones/pago-transferencia-form";
+import { MetodosPagoElectronicos } from "@/components/cotizaciones/metodos-pago-electronicos";
 import {
   firmarCotizacion,
   reportarPagoTransferencia,
@@ -31,16 +32,26 @@ const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
 };
 
+const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | "error" }> = {
+  success: { texto: "¡Pago con PayPal confirmado! Gracias.", tono: "success" },
+  pending: { texto: "Tu pago con PayPal quedó pendiente de confirmación.", tono: "warning" },
+  cancelado: { texto: "Cancelaste el pago con PayPal. Puedes intentarlo de nuevo cuando quieras.", tono: "warning" },
+  error: { texto: "No pudimos completar el pago con PayPal. Intenta de nuevo en un momento.", tono: "error" },
+  no_configurado: { texto: "El pago con PayPal no está disponible por ahora.", tono: "error" },
+  sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
+};
+
 export default async function CotizacionPublicaPage({
   params,
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ mp?: string }>;
+  searchParams: Promise<{ mp?: string; pp?: string }>;
 }) {
   const { token } = await params;
-  const { mp } = await searchParams;
+  const { mp, pp } = await searchParams;
   const mensajeMp = mp ? MP_MENSAJE[mp] : undefined;
+  const mensajePp = pp ? PP_MENSAJE[pp] : undefined;
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
@@ -150,20 +161,21 @@ export default async function CotizacionPublicaPage({
         </Card>
       )}
 
-      {mensajeMp && (
+      {[mensajeMp, mensajePp].filter(Boolean).map((mensaje, i) => (
         <p
+          key={i}
           className={
             "rounded-lg border px-3 py-2 text-sm " +
-            (mensajeMp.tono === "success"
+            (mensaje!.tono === "success"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : mensajeMp.tono === "warning"
+              : mensaje!.tono === "warning"
                 ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
                 : "border-destructive/30 bg-destructive/10 text-destructive")
           }
         >
-          {mensajeMp.texto}
+          {mensaje!.texto}
         </p>
-      )}
+      ))}
 
       {cotizacion.status !== "Pagada" && cotizacion.status !== "Perdida" && (
         <Card>
@@ -173,30 +185,36 @@ export default async function CotizacionPublicaPage({
           <CardContent className="flex flex-col gap-4">
             {!cotizacion.servicioId ? (
               <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                Estamos formalizando este proyecto. Muy pronto podrás reportar tu pago aquí.
+                Estamos formalizando este proyecto. Muy pronto podrás pagar aquí.
               </p>
             ) : pagoPendiente ? (
               <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
                 Ya reportaste un pago por transferencia. Está pendiente de confirmación.
               </p>
             ) : (
-              <PagoTransferenciaForm action={pagoAction} />
-            )}
+              <>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Paga en línea al instante
+                </p>
+                <MetodosPagoElectronicos
+                  token={token}
+                  mercadoPagoDisponible
+                  paypalDisponible
+                />
 
-            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
-              {!cotizacion.servicioId || pagoPendiente ? (
-                <Button type="button" disabled variant="outline" className="flex-1">
-                  Pagar con Mercado Pago
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" className="flex-1" asChild>
-                  <a href={`/cotizacion/${token}/pagar-mercadopago`}>Pagar con Mercado Pago</a>
-                </Button>
-              )}
-              <Button type="button" disabled variant="outline" className="flex-1">
-                Pagar con PayPal (próximamente)
-              </Button>
-            </div>
+                <details className="group rounded-lg border border-input open:bg-muted/20">
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium text-muted-foreground marker:content-none">
+                    ¿Prefieres transferencia, Spin o Binance?
+                    <span className="text-xs text-muted-foreground transition group-open:rotate-180">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="border-t border-input px-3 pb-3 pt-3">
+                    <PagoTransferenciaForm action={pagoAction} />
+                  </div>
+                </details>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
