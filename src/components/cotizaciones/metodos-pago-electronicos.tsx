@@ -1,36 +1,17 @@
-// Botones de pago electrónico con el estilo de marca de cada pasarela
-// (colores y wordmark propios, no genéricos) para que se sientan como el
-// botón real de "Pagar con X" en vez de un botón outline cualquiera.
+// Botones de pago electrónico con el estilo de marca de cada pasarela —
+// íconos oficiales (descargados del propio CDN de cada marca, en
+// public/mercadopago-icon.svg y public/paypal-icon.png) para que se vean
+// como el botón real de "Pagar con X" y transmitan confianza, no un ícono
+// genérico inventado.
 
 function IconoMercadoPago() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="#fff" />
-      <path
-        d="M7 13c0 2.8 2.2 5 5 5s5-2.2 5-5"
-        stroke="#00b1ea"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="8.3" cy="10.5" r="1.1" fill="#00b1ea" />
-      <circle cx="15.7" cy="10.5" r="1.1" fill="#00b1ea" />
-    </svg>
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/mercadopago-icon.svg" alt="" className="size-5 shrink-0" aria-hidden="true" />;
 }
 
 function IconoPaypal() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
-      <path
-        d="M8 5h5.6c2.6 0 4.2 1.5 3.8 3.9-.5 3-2.6 4.5-5.6 4.5H9.6l-.9 5.6H5.5L8 5Z"
-        fill="#003087"
-      />
-      <path
-        d="M9.8 8.4h5.1c2.2 0 3.5 1.3 3.2 3.4-.4 2.6-2.3 3.9-4.8 3.9h-2.3l-.8 5.1H7.3l2.5-12.4Z"
-        fill="#009cde"
-      />
-    </svg>
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/paypal-icon.png" alt="" className="size-5 shrink-0" aria-hidden="true" />;
 }
 
 function BotonPago({
