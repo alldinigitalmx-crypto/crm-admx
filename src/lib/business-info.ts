@@ -9,6 +9,12 @@ export const businessInfo = {
     clabe: "012 180 01590878941 0",
     swift: "BCMRMXMMPYM",
   },
+  spin: {
+    cuenta: "728969000105509971",
+  },
+  mercadoPagoCuenta: {
+    cuenta: "722969070949613457",
+  },
   binance: {
     correo: "antoniohep56@gmail.com",
   },

@@ -10,5 +10,6 @@ export const METODO_LABEL: Record<string, string> = {
   WesternUnion: "Western Union",
   Binance: "Binance",
   Deposito: "Depósito",
+  Spin: "Spin by OXXO",
   Otro: "Otro",
 };

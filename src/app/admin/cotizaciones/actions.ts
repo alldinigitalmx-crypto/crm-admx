@@ -312,16 +312,21 @@ export async function reportarPagoTransferencia(
 
   const referencia = String(formData.get("referencia") ?? "").trim();
   const comprobanteDataUrl = String(formData.get("comprobante") ?? "");
+  const metodoRaw = String(formData.get("metodoPago") ?? "Transferencia");
+  const metodosValidos = ["Transferencia", "Spin", "Binance"];
+  const metodoPago = (
+    metodosValidos.includes(metodoRaw) ? metodoRaw : "Transferencia"
+  ) as "Transferencia" | "Spin" | "Binance";
 
   if (!comprobanteDataUrl.startsWith("data:")) {
-    return { error: "Sube tu comprobante de transferencia." };
+    return { error: "Sube tu comprobante de pago." };
   }
 
   const pago = await prisma.pago.create({
     data: {
       servicioId: cotizacion.servicioId,
       cotizacionId: cotizacion.id,
-      metodoPago: "Transferencia",
+      metodoPago,
       monto: cotizacion.montoTotal,
       confirmado: false,
       comprobante: referencia || null,

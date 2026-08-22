@@ -22,12 +22,25 @@ const STATUS_LABEL: Record<string, string> = {
   Perdida: "Perdida",
 };
 
+const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | "error" }> = {
+  success: { texto: "¡Pago recibido! En cuanto Mercado Pago lo confirme, actualizaremos el estatus.", tono: "success" },
+  pending: { texto: "Tu pago quedó pendiente de confirmación en Mercado Pago.", tono: "warning" },
+  failure: { texto: "El pago no se completó. Puedes intentarlo de nuevo.", tono: "error" },
+  error: { texto: "No pudimos iniciar el pago con Mercado Pago. Intenta de nuevo en un momento.", tono: "error" },
+  no_configurado: { texto: "El pago con Mercado Pago no está disponible por ahora.", tono: "error" },
+  sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
+};
+
 export default async function CotizacionPublicaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ mp?: string }>;
 }) {
   const { token } = await params;
+  const { mp } = await searchParams;
+  const mensajeMp = mp ? MP_MENSAJE[mp] : undefined;
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
@@ -137,6 +150,21 @@ export default async function CotizacionPublicaPage({
         </Card>
       )}
 
+      {mensajeMp && (
+        <p
+          className={
+            "rounded-lg border px-3 py-2 text-sm " +
+            (mensajeMp.tono === "success"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : mensajeMp.tono === "warning"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                : "border-destructive/30 bg-destructive/10 text-destructive")
+          }
+        >
+          {mensajeMp.texto}
+        </p>
+      )}
+
       {cotizacion.status !== "Pagada" && cotizacion.status !== "Perdida" && (
         <Card>
           <CardHeader>
@@ -156,9 +184,15 @@ export default async function CotizacionPublicaPage({
             )}
 
             <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
-              <Button type="button" disabled variant="outline" className="flex-1">
-                Pagar con Mercado Pago (próximamente)
-              </Button>
+              {!cotizacion.servicioId || pagoPendiente ? (
+                <Button type="button" disabled variant="outline" className="flex-1">
+                  Pagar con Mercado Pago
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" className="flex-1" asChild>
+                  <a href={`/cotizacion/${token}/pagar-mercadopago`}>Pagar con Mercado Pago</a>
+                </Button>
+              )}
               <Button type="button" disabled variant="outline" className="flex-1">
                 Pagar con PayPal (próximamente)
               </Button>

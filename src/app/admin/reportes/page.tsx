@@ -39,6 +39,7 @@ const METODO_COLOR_HEX: Record<string, string> = {
   "Western Union": "#f59e0b",
   Binance: "#f97316",
   Depósito: "#14b8a6",
+  "Spin by OXXO": "#dc2626",
   Otro: "#a1a1aa",
 };
 
@@ -59,6 +60,7 @@ const METODO_COLOR: Record<string, string> = {
   "Western Union": "bg-amber-500 dark:bg-amber-400",
   Binance: "bg-orange-500 dark:bg-orange-400",
   Depósito: "bg-teal-500 dark:bg-teal-400",
+  "Spin by OXXO": "bg-red-600 dark:bg-red-400",
   Otro: "bg-zinc-400 dark:bg-zinc-500",
 };
 const COLOR_OTROS = "bg-zinc-400 dark:bg-zinc-500";

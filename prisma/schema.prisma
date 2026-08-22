@@ -369,6 +369,7 @@ enum MetodoPago {
   WesternUnion
   Binance
   Deposito
+  Spin
   Otro
 }
 

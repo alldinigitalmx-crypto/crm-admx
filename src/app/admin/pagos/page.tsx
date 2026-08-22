@@ -44,6 +44,7 @@ const METODOS = [
   "WesternUnion",
   "Binance",
   "Deposito",
+  "Spin",
   "Otro",
 ];
 
