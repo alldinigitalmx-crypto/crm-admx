@@ -340,6 +340,7 @@ enum Etiqueta {
   VIP
   Premium
   Platinum
+  Prospecto
 }
 
 enum MedioCaptacion {

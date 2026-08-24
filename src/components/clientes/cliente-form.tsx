@@ -16,7 +16,7 @@ import {
 import type { Cliente } from "@/generated/prisma/client";
 import type { ClienteFormState } from "@/app/admin/clientes/actions";
 
-const ETIQUETAS = ["VIP", "Premium", "Platinum"] as const;
+const ETIQUETAS = ["VIP", "Premium", "Platinum", "Prospecto"] as const;
 
 const MEDIOS = [
   { value: "FacebookAds", label: "Facebook Ads" },

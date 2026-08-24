@@ -129,4 +129,5 @@ export const CLIENTE_ETIQUETA_COLOR: Record<string, string> = {
   VIP: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   Premium: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
   Platinum: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  Prospecto: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
 };
