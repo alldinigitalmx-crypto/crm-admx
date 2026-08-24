@@ -133,6 +133,9 @@ model Cotizacion {
   firmanteIp       String?
   fechaPago        DateTime?
   pagoConfirmado   Boolean          @default(false)
+  // Si se llena, el cliente paga primero este % del total (anticipo) y el
+  // resto (liquidación) al terminar, en vez de todo de una sola vez.
+  porcentajeAnticipo Int?
   creadoPorId      Int?
   creadoPor        Usuario?         @relation("CotizacionCreadoPor", fields: [creadoPorId], references: [id])
   editadoPorId     Int?

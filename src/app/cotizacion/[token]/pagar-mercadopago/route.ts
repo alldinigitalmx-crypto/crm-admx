@@ -7,6 +7,7 @@ import {
   mercadoPagoEsPrueba,
 } from "@/lib/mercadopago";
 import { esVisitanteDeMexico } from "@/lib/geo";
+import { montoAPagarAhora } from "@/lib/cotizacion";
 
 export async function GET(
   request: Request,
@@ -25,7 +26,7 @@ export async function GET(
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
-    include: { servicio: true, cliente: true },
+    include: { servicio: true, cliente: true, pagos: true },
   });
   if (!cotizacion) {
     return new Response("Cotización no encontrada", { status: 404 });
@@ -38,11 +39,12 @@ export async function GET(
   }
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;
+  const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
 
   try {
     const preferencia = await crearPreferenciaMercadoPago({
       titulo: descripcion,
-      monto: Number(cotizacion.montoTotal),
+      monto,
       externalReference: token,
       successUrl: `${origin}/cotizacion/${token}?mp=success`,
       failureUrl: `${origin}/cotizacion/${token}?mp=failure`,

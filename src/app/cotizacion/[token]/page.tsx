@@ -13,7 +13,12 @@ import {
   firmarCotizacion,
   reportarPagoTransferencia,
 } from "@/app/admin/cotizaciones/actions";
-import { nombreClienteCotizacion } from "@/lib/cotizacion";
+import {
+  nombreClienteCotizacion,
+  montoAPagarAhora,
+  montoPagadoCotizacion,
+  montoPendienteCotizacion,
+} from "@/lib/cotizacion";
 import { esVisitanteDeMexico } from "@/lib/geo";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -76,6 +81,11 @@ export default async function CotizacionPublicaPage({
     cotizacion.fechaVencimiento < new Date();
 
   const pagoPendiente = cotizacion.pagos.find((p) => !p.confirmado);
+  const montoPagado = montoPagadoCotizacion(cotizacion.pagos);
+  const montoPendiente = montoPendienteCotizacion(cotizacion, cotizacion.pagos);
+  const montoAhora = montoAPagarAhora(cotizacion, cotizacion.pagos);
+  const esSegundoPago = montoPagado > 0;
+  const esCobroPorPartes = Boolean(cotizacion.porcentajeAnticipo);
 
   const montoDescuento =
     cotizacion.descuentoTipo === "Porcentaje"
@@ -131,6 +141,24 @@ export default async function CotizacionPublicaPage({
             <span>Total</span>
             <span>{formatCurrency(cotizacion.montoTotal)}</span>
           </div>
+          {montoPagado > 0 && cotizacion.status !== "Pagada" && (
+            <>
+              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                <span>Pagado</span>
+                <span>{formatCurrency(montoPagado)}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Saldo pendiente</span>
+                <span>{formatCurrency(montoPendiente)}</span>
+              </div>
+            </>
+          )}
+          {esCobroPorPartes && montoPagado === 0 && cotizacion.status !== "Pagada" && (
+            <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              Este proyecto se cobra en dos partes: {cotizacion.porcentajeAnticipo}% de anticipo
+              ({formatCurrency(montoAhora)}) y el resto al terminar.
+            </p>
+          )}
           {cotizacion.fechaVencimiento && (
             <p className="text-xs text-muted-foreground">
               Vence: {formatDate(cotizacion.fechaVencimiento)}
@@ -197,7 +225,11 @@ export default async function CotizacionPublicaPage({
             ) : (
               <>
                 <p className="text-xs font-medium text-muted-foreground">
-                  Paga en línea al instante
+                  {esCobroPorPartes && !esSegundoPago
+                    ? `Paga tu anticipo (${cotizacion.porcentajeAnticipo}%) — ${formatCurrency(montoAhora)}`
+                    : esSegundoPago
+                      ? `Paga el saldo restante — ${formatCurrency(montoAhora)}`
+                      : "Paga en línea al instante"}
                 </p>
                 <MetodosPagoElectronicos
                   token={token}
@@ -214,7 +246,7 @@ export default async function CotizacionPublicaPage({
                     </span>
                   </summary>
                   <div className="border-t border-input px-3 pb-3 pt-3">
-                    <PagoTransferenciaForm action={pagoAction} />
+                    <PagoTransferenciaForm action={pagoAction} montoAPagar={montoAhora} />
                   </div>
                 </details>
               </>

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { capturarOrdenPaypal } from "@/lib/paypal";
 import { registrarEvento } from "@/lib/evento";
+import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
 
 // PayPal redirige aquí después de que el pagador aprueba el pago, con
 // ?token=<orderId>&PayerID=<...>. Capturamos la orden en el servidor (nunca
@@ -19,7 +20,10 @@ export async function GET(
 
   if (!orderId) return volver("?pp=error");
 
-  const cotizacion = await prisma.cotizacion.findUnique({ where: { token } });
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { token },
+    include: { pagos: true },
+  });
   if (!cotizacion) return new Response("Cotización no encontrada", { status: 404 });
   if (cotizacion.status === "Pagada") return volver("?pp=success");
   if (!cotizacion.servicioId) return volver("?pp=sin_servicio");
@@ -36,28 +40,37 @@ export async function GET(
     const referencia = `PP-${pago.id}`;
     const existente = await prisma.pago.findFirst({ where: { comprobante: referencia } });
     if (!existente) {
+      const montoPagado = Number(pago.amount.value);
+      const quedaSaldada = cotizacionQuedaSaldada(cotizacion, [
+        ...cotizacion.pagos,
+        { monto: montoPagado, confirmado: true },
+      ]);
+
       const nuevoPago = await prisma.$transaction(async (tx) => {
         const creado = await tx.pago.create({
           data: {
             servicioId: cotizacion.servicioId!,
             cotizacionId: cotizacion.id,
             metodoPago: "PayPal",
-            monto: Number(pago.amount.value),
+            monto: montoPagado,
             confirmado: true,
             confirmadoEn: new Date(),
             comprobante: referencia,
           },
         });
-        await tx.cotizacion.update({
-          where: { id: cotizacion.id },
-          data: { status: "Pagada", pagoConfirmado: true, fechaPago: new Date() },
-        });
+        if (quedaSaldada) {
+          await tx.cotizacion.update({
+            where: { id: cotizacion.id },
+            data: { status: "Pagada", pagoConfirmado: true, fechaPago: new Date() },
+          });
+        }
         return creado;
       });
 
       await registrarEvento("cotizacion.pago_paypal", "Cotizacion", cotizacion.id, {
         pagoId: nuevoPago.id,
         paypalOrderId: orderId,
+        quedaSaldada,
       });
     }
 

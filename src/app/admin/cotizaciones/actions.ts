@@ -10,6 +10,7 @@ import { currentUsuario } from "@/lib/current-usuario";
 import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import { montoTotalServicio } from "@/lib/servicio";
+import { cotizacionQuedaSaldada, montoAPagarAhora } from "@/lib/cotizacion";
 import type { Moneda, TipoDescuento } from "@/generated/prisma/client";
 
 export type CotizacionFormState = { error?: string } | undefined;
@@ -28,6 +29,14 @@ function calcularMontoTotal(
   if (!tipo || !valor) return subtotal;
   if (tipo === "Porcentaje") return subtotal - subtotal * (valor / 100);
   return Math.max(subtotal - valor, 0);
+}
+
+function parsePorcentajeAnticipo(formData: FormData): number | null {
+  const raw = String(formData.get("porcentajeAnticipo") ?? "").trim();
+  if (!raw) return null;
+  const valor = Math.round(Number(raw));
+  if (!Number.isFinite(valor) || valor < 1 || valor > 99) return null;
+  return valor;
 }
 
 function parseDescuento(formData: FormData) {
@@ -118,6 +127,7 @@ export async function crearCotizacion(
   }
 
   const montoTotal = calcularMontoTotal(montoSubtotal, tipo, valor);
+  const porcentajeAnticipo = parsePorcentajeAnticipo(formData);
 
   const cotizacion = await prisma.cotizacion.create({
     data: {
@@ -134,6 +144,7 @@ export async function crearCotizacion(
       descuentoMotivo: motivo,
       montoTotal,
       moneda,
+      porcentajeAnticipo,
       fechaVencimiento: fechaVencimientoRaw ? new Date(fechaVencimientoRaw) : null,
       creadoPorId: userId,
       editadoPorId: userId,
@@ -190,6 +201,7 @@ export async function actualizarCotizacion(
   }
 
   const montoTotal = calcularMontoTotal(montoSubtotal, tipo, valor);
+  const porcentajeAnticipo = parsePorcentajeAnticipo(formData);
 
   await prisma.cotizacion.update({
     where: { id },
@@ -201,6 +213,7 @@ export async function actualizarCotizacion(
       descuentoValor: valor,
       descuentoMotivo: motivo,
       montoTotal,
+      porcentajeAnticipo,
       fechaVencimiento: fechaVencimientoRaw ? new Date(fechaVencimientoRaw) : null,
       editadoPorId: userId,
     },
@@ -298,7 +311,10 @@ export async function reportarPagoTransferencia(
   _prevState: PublicActionState,
   formData: FormData
 ): Promise<PublicActionState> {
-  const cotizacion = await prisma.cotizacion.findUnique({ where: { token } });
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { token },
+    include: { pagos: true },
+  });
   if (!cotizacion) return { error: "Cotización no encontrada." };
   if (cotizacion.status === "Pagada") {
     return { error: "Esta cotización ya fue pagada." };
@@ -310,6 +326,7 @@ export async function reportarPagoTransferencia(
     };
   }
 
+  const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
   const referencia = String(formData.get("referencia") ?? "").trim();
   const comprobanteDataUrl = String(formData.get("comprobante") ?? "");
   const metodoRaw = String(formData.get("metodoPago") ?? "Transferencia");
@@ -327,7 +344,7 @@ export async function reportarPagoTransferencia(
       servicioId: cotizacion.servicioId,
       cotizacionId: cotizacion.id,
       metodoPago,
-      monto: cotizacion.montoTotal,
+      monto,
       confirmado: false,
       comprobante: referencia || null,
     },
@@ -473,24 +490,43 @@ export async function marcarCotizacionPerdida(id: number) {
 export async function confirmarPagoCotizacion(cotizacionId: number, pagoId: number) {
   if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
 
-  const cotizacion = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } });
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { id: cotizacionId },
+    include: { pagos: true },
+  });
   if (!cotizacion) return;
 
   const userId = await currentUserId();
+
+  // El pago que se está confirmando todavía cuenta como no-confirmado en
+  // cotizacion.pagos (se acaba de leer de la base), así que lo sumamos a
+  // mano para saber si con este pago ya queda saldada.
+  const pagoQueSeConfirma = cotizacion.pagos.find((p) => p.id === pagoId);
+  const pagosConEsteConfirmado = cotizacion.pagos.map((p) =>
+    p.id === pagoId ? { ...p, confirmado: true } : p
+  );
+  const quedaSaldada = pagoQueSeConfirma
+    ? cotizacionQuedaSaldada(cotizacion, pagosConEsteConfirmado)
+    : false;
 
   await prisma.$transaction([
     prisma.pago.update({
       where: { id: pagoId },
       data: { confirmado: true, confirmadoPorId: userId, confirmadoEn: new Date() },
     }),
-    prisma.cotizacion.update({
-      where: { id: cotizacionId },
-      data: { status: "Pagada", pagoConfirmado: true, fechaPago: new Date() },
-    }),
+    ...(quedaSaldada
+      ? [
+          prisma.cotizacion.update({
+            where: { id: cotizacionId },
+            data: { status: "Pagada" as const, pagoConfirmado: true, fechaPago: new Date() },
+          }),
+        ]
+      : []),
   ]);
 
   await registrarEvento("cotizacion.pago_confirmado", "Cotizacion", cotizacionId, {
     pagoId,
+    quedaSaldada,
   });
 
   revalidatePath(`/admin/cotizaciones/${cotizacionId}`);

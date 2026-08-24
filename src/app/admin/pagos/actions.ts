@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
+import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
 import type { Moneda, MetodoPago } from "@/generated/prisma/client";
 
 export type PagoFormState = { error?: string } | undefined;
@@ -220,12 +221,26 @@ export async function confirmarPago(id: number) {
 
   const userId = await currentUserId();
 
+  let quedaSaldada = false;
+  if (pago.cotizacionId) {
+    const cotizacion = await prisma.cotizacion.findUnique({
+      where: { id: pago.cotizacionId },
+      include: { pagos: true },
+    });
+    if (cotizacion) {
+      const pagosConEsteConfirmado = cotizacion.pagos.map((p) =>
+        p.id === id ? { ...p, confirmado: true } : p
+      );
+      quedaSaldada = cotizacionQuedaSaldada(cotizacion, pagosConEsteConfirmado);
+    }
+  }
+
   await prisma.$transaction([
     prisma.pago.update({
       where: { id },
       data: { confirmado: true, confirmadoPorId: userId, confirmadoEn: new Date() },
     }),
-    ...(pago.cotizacionId
+    ...(pago.cotizacionId && quedaSaldada
       ? [
           prisma.cotizacion.update({
             where: { id: pago.cotizacionId },
@@ -235,7 +250,7 @@ export async function confirmarPago(id: number) {
       : []),
   ]);
 
-  await registrarEvento("pago.confirmado", "Pago", id, {});
+  await registrarEvento("pago.confirmado", "Pago", id, { quedaSaldada });
 
   revalidatePath("/admin/pagos");
   revalidatePath(`/admin/servicios/${pago.servicioId}`);

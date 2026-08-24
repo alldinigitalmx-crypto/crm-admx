@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ type CotizacionDefaults = {
   descuentoValor: number | string | { toString(): string } | null;
   descuentoMotivo: string | null;
   fechaVencimiento: Date | null;
+  porcentajeAnticipo?: number | null;
 };
 
 type OrdenOption = { id: number; descripcion: string; monto: number; status: string };
@@ -78,6 +80,9 @@ export function CotizacionForm({
     servicios?.[0] ? String(servicios[0].id) : ""
   );
   const [ordenCambioId, setOrdenCambioId] = useState<string>("none");
+  const [requiereAnticipo, setRequiereAnticipo] = useState(
+    Boolean(defaultValues?.porcentajeAnticipo)
+  );
   const [clienteId, setClienteId] = useState<string>(
     defaultValues?.clienteId ? String(defaultValues.clienteId) : (clientes?.[0] ? String(clientes[0].id) : "")
   );
@@ -312,6 +317,36 @@ export function CotizacionForm({
                 <SelectItem value="COP">COP</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-input p-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="requiereAnticipo"
+            checked={requiereAnticipo}
+            onCheckedChange={(v) => setRequiereAnticipo(v === true)}
+          />
+          <Label htmlFor="requiereAnticipo" className="font-normal">
+            Cobrar en dos partes (anticipo + liquidación al terminar)
+          </Label>
+        </div>
+        {requiereAnticipo && (
+          <div className="flex flex-col gap-2 sm:w-48">
+            <Label htmlFor="porcentajeAnticipo">% de anticipo</Label>
+            <Input
+              id="porcentajeAnticipo"
+              name="porcentajeAnticipo"
+              type="number"
+              min="1"
+              max="99"
+              defaultValue={defaultValues?.porcentajeAnticipo ?? 50}
+            />
+            <p className="text-xs text-muted-foreground">
+              El cliente paga este % primero; el resto se le pide cuando la cotización
+              quede con el saldo pendiente (por ejemplo, al terminar el proyecto).
+            </p>
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { crearOrdenPaypal, paypalConfigurado } from "@/lib/paypal";
+import { montoAPagarAhora } from "@/lib/cotizacion";
 
 export async function GET(
   request: Request,
@@ -17,7 +18,7 @@ export async function GET(
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
-    include: { servicio: true },
+    include: { servicio: true, pagos: true },
   });
   if (!cotizacion) {
     return new Response("Cotización no encontrada", { status: 404 });
@@ -30,11 +31,12 @@ export async function GET(
   }
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;
+  const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
 
   try {
     const orden = await crearOrdenPaypal({
       titulo: descripcion,
-      monto: Number(cotizacion.montoTotal),
+      monto,
       externalReference: token,
       returnUrl: `${origin}/cotizacion/${token}/paypal-retorno`,
       cancelUrl: `${origin}/cotizacion/${token}?pp=cancelado`,

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { businessInfo } from "@/lib/business-info";
+import { formatCurrency } from "@/lib/format";
 import type { PublicActionState } from "@/app/admin/cotizaciones/actions";
 
 function CopyField({ label, value }: { label: string; value: string }) {
@@ -53,11 +54,13 @@ const METODOS = [
 
 export function PagoTransferenciaForm({
   action,
+  montoAPagar,
 }: {
   action: (
     prevState: PublicActionState,
     formData: FormData
   ) => Promise<PublicActionState>;
+  montoAPagar?: number;
 }) {
   const [state, formAction, isPending] = useActionState(action, undefined);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -83,6 +86,11 @@ export function PagoTransferenciaForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {montoAPagar !== undefined && (
+        <p className="text-sm">
+          Monto a transferir: <span className="font-semibold">{formatCurrency(montoAPagar)}</span>
+        </p>
+      )}
       <div className="flex flex-col gap-3 rounded-lg border border-input bg-muted/30 p-3">
         <div className="flex flex-col gap-2 border-b pb-3">
           <p className="text-xs font-medium text-muted-foreground">

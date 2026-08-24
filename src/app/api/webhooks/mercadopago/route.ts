@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obtenerPagoMercadoPago } from "@/lib/mercadopago";
 import { registrarEvento } from "@/lib/evento";
+import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
 
 // Mercado Pago notifica con distintos formatos según el origen del evento:
 // query params (?type=payment&data.id=123) o body JSON ({type, data:{id}}).
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
 
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { token: pago.external_reference },
+      include: { pagos: true },
     });
     if (!cotizacion || !cotizacion.servicioId) {
       return NextResponse.json({ ok: true });
@@ -50,6 +52,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    const quedaSaldada = cotizacionQuedaSaldada(cotizacion, [
+      ...cotizacion.pagos,
+      { monto: pago.transaction_amount, confirmado: true },
+    ]);
+
     const nuevoPago = await prisma.$transaction(async (tx) => {
       const creado = await tx.pago.create({
         data: {
@@ -62,16 +69,19 @@ export async function POST(request: Request) {
           comprobante: referencia,
         },
       });
-      await tx.cotizacion.update({
-        where: { id: cotizacion.id },
-        data: { status: "Pagada", pagoConfirmado: true, fechaPago: new Date() },
-      });
+      if (quedaSaldada) {
+        await tx.cotizacion.update({
+          where: { id: cotizacion.id },
+          data: { status: "Pagada", pagoConfirmado: true, fechaPago: new Date() },
+        });
+      }
       return creado;
     });
 
     await registrarEvento("cotizacion.pago_mercadopago", "Cotizacion", cotizacion.id, {
       pagoId: nuevoPago.id,
       mercadoPagoId: paymentId,
+      quedaSaldada,
     });
   } catch (e) {
     console.error("Error procesando webhook de Mercado Pago:", e);

@@ -33,7 +33,11 @@ import {
   marcarCotizacionPerdida,
 } from "@/app/admin/cotizaciones/actions";
 import { COTIZACION_STATUS_COLOR, CONFIRMADO_COLOR, PENDIENTE_COLOR } from "@/lib/status-colors";
-import { nombreClienteCotizacion } from "@/lib/cotizacion";
+import {
+  nombreClienteCotizacion,
+  montoPagadoCotizacion,
+  montoPendienteCotizacion,
+} from "@/lib/cotizacion";
 import { ConvertirProspectoButton } from "@/components/cotizaciones/convertir-prospecto-button";
 
 export default async function CotizacionDetallePage({
@@ -81,6 +85,8 @@ export default async function CotizacionDetallePage({
     cotizacion.descuentoTipo === "Porcentaje"
       ? Number(cotizacion.montoSubtotal) * (Number(cotizacion.descuentoValor ?? 0) / 100)
       : Number(cotizacion.descuentoValor ?? 0);
+  const montoPagado = montoPagadoCotizacion(cotizacion.pagos);
+  const montoPendiente = montoPendienteCotizacion(cotizacion, cotizacion.pagos);
 
   const boundUpdate = actualizarCotizacion.bind(null, cotizacion.id);
   const boundEliminar = eliminarCotizacion.bind(null, cotizacion.id);
@@ -235,6 +241,24 @@ export default async function CotizacionDetallePage({
             <span>Total</span>
             <span>{formatCurrency(cotizacion.montoTotal)}</span>
           </div>
+          {cotizacion.porcentajeAnticipo && (
+            <p className="text-xs text-muted-foreground">
+              Se cobra en dos partes: {cotizacion.porcentajeAnticipo}% de anticipo y el resto al
+              terminar.
+            </p>
+          )}
+          {cotizacion.status !== "Pagada" && montoPagado > 0 && (
+            <>
+              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                <span>Pagado</span>
+                <span>{formatCurrency(montoPagado)}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Saldo pendiente</span>
+                <span>{formatCurrency(montoPendiente)}</span>
+              </div>
+            </>
+          )}
           {montoSubtotalActual !== null && montoSubtotalActual !== Number(cotizacion.montoSubtotal) && (
             <p className="text-xs text-muted-foreground">
               El servicio cambió desde que se emitió esta cotización — subtotal actual del
