@@ -35,7 +35,7 @@ export type PagoDetalle = {
   servicio: { descripcion: string; cliente: { nombre: string } };
 };
 
-export type ComprobanteArchivo = { id: number; url: string; nombre: string };
+export type ComprobanteArchivo = { id: number; url: string; nombre: string; tipo: string };
 
 function ComprobanteImagenForm({
   action,
@@ -72,7 +72,7 @@ function ComprobanteImagenForm({
           {state.error}
         </p>
       )}
-      <Input type="file" accept="image/*" onChange={onFileChange} />
+      <Input type="file" accept="image/*,application/pdf" onChange={onFileChange} />
       {fileName && <p className="text-xs text-muted-foreground">{fileName}</p>}
       <input type="hidden" name="imagen" value={dataUrl ?? ""} />
       <Button type="submit" size="sm" disabled={isPending || !dataUrl} className="self-start">
@@ -157,14 +157,25 @@ export function PagoDetalleDialog({
           )}
 
           <div className="flex flex-col gap-2 border-t pt-3">
-            <Label>Comprobante (imagen)</Label>
+            <Label>Comprobante</Label>
             {comprobanteArchivo ? (
               <div className="flex flex-col gap-2">
-                <ZoomableImage
-                  src={comprobanteArchivo.url}
-                  alt="Comprobante de pago"
-                  className="max-h-72 w-full rounded-lg border border-input object-contain"
-                />
+                {comprobanteArchivo.tipo === "Imagen" ? (
+                  <ZoomableImage
+                    src={comprobanteArchivo.url}
+                    alt="Comprobante de pago"
+                    className="max-h-72 w-full rounded-lg border border-input object-contain"
+                  />
+                ) : (
+                  <a
+                    href={comprobanteArchivo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-input px-3 py-2 text-sm text-primary hover:underline"
+                  >
+                    Ver comprobante (PDF)
+                  </a>
+                )}
                 <form
                   action={eliminarComprobante.bind(null, comprobanteArchivo.id, servicioId)}
                 >
@@ -182,7 +193,7 @@ export function PagoDetalleDialog({
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Opcional — puedes subir una foto o captura del comprobante.
+                  Opcional — puedes subir una foto, captura o PDF del comprobante.
                 </p>
                 <ComprobanteImagenForm action={subirComprobante} />
               </>

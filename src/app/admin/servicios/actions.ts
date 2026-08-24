@@ -255,3 +255,56 @@ export async function eliminarEvidencia(archivoId: number, servicioId: number) {
   await prisma.archivo.delete({ where: { id: archivoId } });
   revalidatePath(`/admin/servicios/${servicioId}`);
 }
+
+export async function eliminarServicio(id: number) {
+  if (!(await requiereNivelServicio(id, "Editar"))) return;
+
+  const servicio = await prisma.servicio.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      pagos: { select: { id: true } },
+      ordenesCambio: { select: { id: true } },
+      tareas: { select: { id: true } },
+      cotizaciones: { select: { id: true } },
+    },
+  });
+  if (!servicio) return;
+
+  const pagoIds = servicio.pagos.map((p) => p.id);
+  const ordenCambioIds = servicio.ordenesCambio.map((o) => o.id);
+  const tareaIds = servicio.tareas.map((t) => t.id);
+  const cotizacionIds = servicio.cotizaciones.map((c) => c.id);
+
+  await prisma.$transaction([
+    prisma.subtarea.deleteMany({ where: { tareaId: { in: tareaIds } } }),
+    prisma.tarea.deleteMany({ where: { id: { in: tareaIds } } }),
+    prisma.archivo.deleteMany({
+      where: {
+        OR: [
+          { entidadTipo: "Servicio", entidadId: id },
+          { entidadTipo: "Pago", entidadId: { in: pagoIds } },
+        ],
+      },
+    }),
+    prisma.eventoSistema.deleteMany({
+      where: { entidadTipo: "Pago", entidadId: { in: pagoIds } },
+    }),
+    prisma.pago.deleteMany({ where: { id: { in: pagoIds } } }),
+    prisma.ordenCambio.deleteMany({ where: { id: { in: ordenCambioIds } } }),
+    // Las cotizaciones son documentos propios del cliente — se conservan,
+    // solo se desvinculan de este servicio (queda como si aún no se
+    // hubiera convertido en servicio).
+    prisma.cotizacion.updateMany({
+      where: { id: { in: cotizacionIds } },
+      data: { servicioId: null },
+    }),
+    prisma.servicio.delete({ where: { id } }),
+  ]);
+
+  revalidatePath("/admin/servicios");
+  revalidatePath("/admin/cotizaciones");
+  revalidatePath("/admin/pagos");
+  revalidatePath("/admin");
+  redirect("/admin/servicios");
+}

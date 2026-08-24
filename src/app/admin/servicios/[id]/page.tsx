@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
+import { DeleteServicioButton } from "@/components/servicios/delete-servicio-button";
 import { OrdenCambioFormDialog } from "@/components/servicios/orden-cambio-form-dialog";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
@@ -33,6 +34,7 @@ import {
   aprobarOrdenCambio,
   createOrdenCambio,
   eliminarEvidencia,
+  eliminarServicio,
   rechazarOrdenCambio,
   subirEvidencia,
   updateServicio,
@@ -109,7 +111,9 @@ export default async function ServicioDetallePage({
     }),
     prisma.archivo.findMany({
       where: { entidadTipo: "Pago", entidadId: { in: servicio.pagos.map((p) => p.id) } },
-      orderBy: { creadoEn: "desc" },
+      // Ascendente para que, si hubiera más de un archivo por pago, el Map
+      // se quede con el más reciente.
+      orderBy: { creadoEn: "asc" },
     }),
   ]);
   const comprobantePorPago = new Map(comprobantesPago.map((a) => [a.entidadId, a]));
@@ -186,6 +190,12 @@ export default async function ServicioDetallePage({
                 responsableId: servicio.responsableId,
               }}
               submitLabel="Guardar cambios"
+            />
+          )}
+          {permisos.puedeEditar && (
+            <DeleteServicioButton
+              descripcion={servicio.descripcion}
+              action={eliminarServicio.bind(null, servicio.id)}
             />
           )}
         </div>
@@ -468,6 +478,11 @@ export default async function ServicioDetallePage({
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
                           }}
+                          comprobanteExistente={
+                            comprobantePorPago.get(p.id)
+                              ? { nombre: comprobantePorPago.get(p.id)!.nombre }
+                              : null
+                          }
                           submitLabel="Guardar cambios"
                         />
                         <DeletePagoButton action={eliminarPago.bind(null, p.id)} />

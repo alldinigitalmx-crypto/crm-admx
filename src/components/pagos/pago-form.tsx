@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export function PagoForm({
   servicios,
   servicioFijo,
   defaultValues,
+  comprobanteExistente,
   submitLabel,
   onSuccess,
   onCancel,
@@ -47,6 +48,7 @@ export function PagoForm({
   servicios?: ServicioOption[];
   servicioFijo?: { id: number; label: string };
   defaultValues?: PagoDefaults;
+  comprobanteExistente?: { nombre: string } | null;
   submitLabel: string;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -57,6 +59,17 @@ export function PagoForm({
     return result;
   };
   const [state, formAction, isPending] = useActionState(wrappedAction, undefined);
+  const [archivoDataUrl, setArchivoDataUrl] = useState<string | null>(null);
+  const [archivoNombre, setArchivoNombre] = useState<string | null>(null);
+
+  function onArchivoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setArchivoNombre(file.name);
+    const reader = new FileReader();
+    reader.onload = () => setArchivoDataUrl(String(reader.result ?? ""));
+    reader.readAsDataURL(file);
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -192,14 +205,33 @@ export function PagoForm({
           </Select>
         </div>
 
-        <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label htmlFor="comprobante">Comprobante / referencia</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="comprobante">Referencia</Label>
           <Input
             id="comprobante"
             name="comprobante"
             defaultValue={defaultValues?.comprobante ?? ""}
-            placeholder="Opcional"
+            placeholder="Número de referencia o notas (opcional)"
           />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="comprobanteArchivo">Comprobante (imagen o PDF)</Label>
+          <Input
+            id="comprobanteArchivo"
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={onArchivoChange}
+          />
+          {archivoNombre ? (
+            <p className="text-xs text-muted-foreground">{archivoNombre}</p>
+          ) : comprobanteExistente ? (
+            <p className="text-xs text-muted-foreground">
+              Ya tiene un comprobante subido ({comprobanteExistente.nombre}). Selecciona otro
+              archivo para reemplazarlo.
+            </p>
+          ) : null}
+          <input type="hidden" name="comprobanteArchivo" value={archivoDataUrl ?? ""} />
         </div>
       </div>
 

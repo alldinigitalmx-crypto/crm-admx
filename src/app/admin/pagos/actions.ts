@@ -25,6 +25,7 @@ function parsePagoForm(formData: FormData) {
   const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
   const cuenta = String(formData.get("cuenta") ?? "").trim() || null;
   const comprobante = String(formData.get("comprobante") ?? "").trim() || null;
+  const comprobanteArchivo = String(formData.get("comprobanteArchivo") ?? "").trim() || null;
   const confirmado = formData.get("confirmado") === "on";
 
   return {
@@ -36,8 +37,22 @@ function parsePagoForm(formData: FormData) {
     moneda,
     cuenta,
     comprobante,
+    comprobanteArchivo,
     confirmado,
   };
+}
+
+async function guardarArchivoComprobante(pagoId: number, dataUrl: string, userId: number | null) {
+  await prisma.archivo.create({
+    data: {
+      entidadTipo: "Pago",
+      entidadId: pagoId,
+      nombre: `comprobante-pago-${pagoId}`,
+      url: dataUrl,
+      tipo: dataUrl.startsWith("data:application/pdf") ? "Documento" : "Imagen",
+      subidoPorId: userId,
+    },
+  });
 }
 
 function validatePagoForm(data: ReturnType<typeof parsePagoForm>) {
@@ -87,6 +102,10 @@ export async function crearPago(
     monto: data.montoRaw,
   });
 
+  if (data.comprobanteArchivo) {
+    await guardarArchivoComprobante(pago.id, data.comprobanteArchivo, userId);
+  }
+
   revalidatePath("/admin/pagos");
   revalidatePath(`/admin/servicios/${data.servicioId}`);
   revalidatePath("/admin");
@@ -129,6 +148,12 @@ export async function actualizarPago(
     },
   });
 
+  if (data.comprobanteArchivo) {
+    // Reemplaza el comprobante anterior (si había) en vez de acumular varios.
+    await prisma.archivo.deleteMany({ where: { entidadTipo: "Pago", entidadId: id } });
+    await guardarArchivoComprobante(id, data.comprobanteArchivo, userId);
+  }
+
   revalidatePath("/admin/pagos");
   revalidatePath(`/admin/servicios/${data.servicioId}`);
   if (pago.servicioId !== data.servicioId) revalidatePath(`/admin/servicios/${pago.servicioId}`);
@@ -162,8 +187,8 @@ export async function subirComprobantePago(
   }
 
   const dataUrl = String(formData.get("imagen") ?? "");
-  if (!dataUrl.startsWith("data:image")) {
-    return { error: "Selecciona una imagen." };
+  if (!dataUrl.startsWith("data:")) {
+    return { error: "Selecciona una imagen o PDF." };
   }
 
   const pago = await prisma.pago.findUnique({ where: { id: pagoId } });
@@ -171,16 +196,7 @@ export async function subirComprobantePago(
 
   const userId = await currentUserId();
 
-  await prisma.archivo.create({
-    data: {
-      entidadTipo: "Pago",
-      entidadId: pagoId,
-      nombre: `comprobante-pago-${pagoId}`,
-      url: dataUrl,
-      tipo: "Imagen",
-      subidoPorId: userId,
-    },
-  });
+  await guardarArchivoComprobante(pagoId, dataUrl, userId);
 
   revalidatePath("/admin/pagos");
   revalidatePath(`/admin/servicios/${pago.servicioId}`);

@@ -121,7 +121,10 @@ export default async function PagosPage({
 
   const comprobantes = await prisma.archivo.findMany({
     where: { entidadTipo: "Pago", entidadId: { in: pagos.map((p) => p.id) } },
-    orderBy: { creadoEn: "desc" },
+    // Ascendente para que, si por algún motivo hay más de un archivo para
+    // el mismo pago, el Map se quede con el más reciente (el último que
+    // se procesa sobreescribe a los anteriores).
+    orderBy: { creadoEn: "asc" },
   });
   const comprobantePorPago = new Map(comprobantes.map((a) => [a.entidadId, a]));
 
@@ -365,6 +368,11 @@ export default async function PagosPage({
                                 comprobante: p.comprobante,
                                 confirmado: p.confirmado,
                               }}
+                              comprobanteExistente={
+                                comprobantePorPago.get(p.id)
+                                  ? { nombre: comprobantePorPago.get(p.id)!.nombre }
+                                  : null
+                              }
                               submitLabel="Guardar cambios"
                             />
                           )}

@@ -33,6 +33,7 @@ export function PagoFormDialog({
   servicios,
   servicioFijo,
   defaultValues,
+  comprobanteExistente,
   submitLabel,
 }: {
   trigger: React.ReactNode;
@@ -42,6 +43,7 @@ export function PagoFormDialog({
   servicios?: ServicioOption[];
   servicioFijo?: { id: number; label: string };
   defaultValues?: PagoDefaults;
+  comprobanteExistente?: { nombre: string } | null;
   submitLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,6 +61,7 @@ export function PagoFormDialog({
           servicios={servicios}
           servicioFijo={servicioFijo}
           defaultValues={defaultValues}
+          comprobanteExistente={comprobanteExistente}
           submitLabel={submitLabel}
           onSuccess={() => setOpen(false)}
           onCancel={() => setOpen(false)}
