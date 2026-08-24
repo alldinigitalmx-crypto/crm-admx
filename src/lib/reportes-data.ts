@@ -7,7 +7,9 @@ import {
   construirRangoFecha,
   rangoEfectivo,
   agruparRecaudadoGastos,
+  granularidadPeriodo,
   topNConOtros,
+  type Granularidad,
   type PuntoPeriodo,
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
@@ -51,6 +53,7 @@ export type ReporteData = {
   serviciosNuevosCount: number;
   clientesNuevosCount: number;
   puntosPeriodo: PuntoPeriodo[];
+  granularidadPeriodo: Granularidad;
   statusItems: ReporteFila[];
   metodoItems: ReporteFila[];
   gastosItems: ReporteFila[];
@@ -188,6 +191,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     serviciosNuevosCount: serviciosNuevos.length,
     clientesNuevosCount,
     puntosPeriodo,
+    granularidadPeriodo: granularidadPeriodo(desdeEfectivo, hastaEfectivo),
     statusItems,
     metodoItems,
     gastosItems,

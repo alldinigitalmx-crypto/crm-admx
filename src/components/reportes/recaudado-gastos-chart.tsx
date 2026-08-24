@@ -1,15 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PuntoPeriodo } from "@/lib/reportes";
 import { formatCurrency } from "@/lib/format";
 
-const W = 760;
-const H = 260;
 const PAD_LEFT = 52;
 const PAD_RIGHT = 12;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 30;
+// Ancho:alto del área de dibujo — más bajo que un gráfico de escritorio
+// típico para que en pantallas angostas no quede ni aplastado ni cortado.
+const ASPECT = 2.4;
+const H_MIN = 200;
+const H_MAX = 300;
 
 function formatCorto(n: number) {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -20,16 +23,40 @@ function formatCorto(n: number) {
 export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  // Se mide el ancho real del contenedor (en vez de un viewBox fijo que
+  // luego el navegador escala) para que el trazo y el texto del SVG
+  // siempre midan 1:1 con los píxeles reales — en un celular angosto, un
+  // viewBox fijo de 760 quedaba "letterboxeado" y el texto se veía
+  // diminuto.
+  const [width, setWidth] = useState(760);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Mide de una vez con getBoundingClientRect (no espera al primer aviso
+    // async del ResizeObserver) para que el primer render en el cliente ya
+    // tenga el tamaño correcto en vez de arrancar con el default de 760.
+    const medir = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w) setWidth(Math.max(240, Math.round(w)));
+    };
+    medir();
+    const observer = new ResizeObserver(medir);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const hayActividad = datos.some((d) => d.recaudado > 0 || d.gastos > 0);
   if (datos.length === 0 || !hayActividad) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
         No hay movimientos en este rango de fechas.
       </div>
     );
   }
 
+  const W = width;
+  const H = Math.min(H_MAX, Math.max(H_MIN, Math.round(W / ASPECT)));
   const innerW = W - PAD_LEFT - PAD_RIGHT;
   const innerH = H - PAD_TOP - PAD_BOTTOM;
   const step = datos.length > 1 ? innerW / (datos.length - 1) : 0;
@@ -52,16 +79,30 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
   const ticksY = [0, 0.25, 0.5, 0.75, 1].map((f) => f * max);
 
-  // Muestra como máximo ~7 etiquetas en el eje X para que no se amontonen.
-  const labelStride = Math.max(1, Math.ceil(datos.length / 7));
+  // Muestra como máximo ~6 etiquetas en el eje X para que no se amontonen
+  // (en móvil, con menos ancho disponible, un poco menos que en escritorio).
+  const maxEtiquetas = W < 420 ? 5 : 7;
+  const labelStride = Math.max(1, Math.ceil(datos.length / maxEtiquetas));
 
-  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
+  function indiceEnX(clientX: number) {
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const fracX = (e.clientX - rect.left) / rect.width;
+    if (!rect) return null;
+    const fracX = (clientX - rect.left) / rect.width;
     const svgX = fracX * W;
     const idx = Math.round((svgX - PAD_LEFT) / (step || 1));
-    setHoverIndex(Math.min(datos.length - 1, Math.max(0, idx)));
+    return Math.min(datos.length - 1, Math.max(0, idx));
+  }
+
+  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
+    const idx = indiceEnX(e.clientX);
+    if (idx !== null) setHoverIndex(idx);
+  }
+
+  function handleTouch(e: React.TouchEvent<HTMLDivElement>) {
+    const touch = e.touches[0];
+    if (!touch) return;
+    const idx = indiceEnX(touch.clientX);
+    if (idx !== null) setHoverIndex(idx);
   }
 
   const hovered = hoverIndex !== null ? datos[hoverIndex] : null;
@@ -83,11 +124,14 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
       <div
         ref={containerRef}
-        className="relative w-full select-none"
+        className="relative w-full touch-pan-y select-none"
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverIndex(null)}
+        onTouchStart={handleTouch}
+        onTouchMove={handleTouch}
+        onTouchEnd={() => setHoverIndex(null)}
       >
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-64 w-full overflow-visible">
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ height: H }} className="w-full overflow-visible">
           {ticksY.map((t) => (
             <g key={t}>
               <line

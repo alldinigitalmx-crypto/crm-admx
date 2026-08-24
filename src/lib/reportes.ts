@@ -52,8 +52,18 @@ const MES_CORTO = [
   "dic",
 ];
 
-/** Agrupa pagos y gastos en periodos (día / semana / mes según el tamaño del
- * rango) para el gráfico de tendencia. Ambas series comparten los mismos
+export type Granularidad = "dia" | "mes";
+
+/** Un rango de un mes o menos se ve día por día; cualquier rango más largo
+ * (este año, un trimestre, "todo") se ve mes por mes, para poder comparar
+ * de un vistazo cómo se comportó cada mes anterior. */
+export function granularidadPeriodo(desde: Date, hasta: Date): Granularidad {
+  const diasTotales = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86400000));
+  return diasTotales <= 45 ? "dia" : "mes";
+}
+
+/** Agrupa pagos y gastos en periodos (día o mes, ver granularidadPeriodo)
+ * para el gráfico de tendencia. Ambas series comparten los mismos
  * periodos aunque una esté vacía en alguno. */
 export function agruparRecaudadoGastos(
   pagos: { fecha: Date; monto: number }[],
@@ -61,33 +71,22 @@ export function agruparRecaudadoGastos(
   desde: Date,
   hasta: Date
 ): PuntoPeriodo[] {
-  const diasTotales = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86400000));
-  const granularidad: "dia" | "semana" | "mes" =
-    diasTotales <= 45 ? "dia" : diasTotales <= 400 ? "semana" : "mes";
+  const granularidad = granularidadPeriodo(desde, hasta);
 
   function claveYLabel(fecha: Date): { key: string; label: string } {
     if (granularidad === "dia") {
       const key = `${fecha.getUTCFullYear()}-${pad2(fecha.getUTCMonth() + 1)}-${pad2(fecha.getUTCDate())}`;
       return { key, label: `${pad2(fecha.getUTCDate())} ${MES_CORTO[fecha.getUTCMonth()]}` };
     }
-    if (granularidad === "semana") {
-      // Semana ISO simplificada: se agrupa por el lunes de esa semana.
-      const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-      const dow = (d.getUTCDay() + 6) % 7; // 0 = lunes
-      d.setUTCDate(d.getUTCDate() - dow);
-      const key = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-      return { key, label: `${pad2(d.getUTCDate())} ${MES_CORTO[d.getUTCMonth()]}` };
-    }
     const key = `${fecha.getUTCFullYear()}-${pad2(fecha.getUTCMonth() + 1)}`;
     return { key, label: `${MES_CORTO[fecha.getUTCMonth()]} ${String(fecha.getUTCFullYear()).slice(2)}` };
   }
 
   // Genera la secuencia completa de periodos entre desde y hasta, para que
-  // los meses/semanas sin movimientos también aparezcan en el eje (en vez de
+  // los meses sin movimientos también aparezcan en el eje (en vez de
   // saltarse huecos, que distorsiona la lectura de la tendencia).
   const periodos = new Map<string, PuntoPeriodo>();
   const cursor = new Date(desde);
-  const pasoDias = granularidad === "dia" ? 1 : granularidad === "semana" ? 7 : 0;
   let guard = 0;
   while (cursor.getTime() <= hasta.getTime() && guard < 400) {
     const { key, label } = claveYLabel(cursor);
@@ -95,7 +94,7 @@ export function agruparRecaudadoGastos(
     if (granularidad === "mes") {
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     } else {
-      cursor.setUTCDate(cursor.getUTCDate() + pasoDias);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
     guard++;
   }

@@ -12,7 +12,7 @@ import {
 
 import { formatCurrency, formatDate } from "@/lib/format";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -97,13 +97,13 @@ function KpiCard({
         : "bg-primary/10 text-primary";
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 py-2">
-        <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
-          <Icon className="size-5" />
+      <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+        <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${toneClass}`}>
+          <Icon className="size-4 sm:size-5" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-xs text-muted-foreground">{title}</p>
-          <p className="truncate text-xl font-semibold">{value}</p>
+          <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
           {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
         </div>
       </CardContent>
@@ -130,6 +130,7 @@ export default async function ReportesPage({
     serviciosNuevosCount,
     clientesNuevosCount,
     puntosPeriodo,
+    granularidadPeriodo,
     statusItems: statusFilas,
     metodoItems: metodoFilas,
     gastosItems: gastosFilas,
@@ -247,7 +248,7 @@ export default async function ReportesPage({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagosCount} pagos confirmados`} />
         <KpiCard title="Gastos (empresa)" value={formatCurrency(totalGastos)} icon={TrendingDown} tone="bad" sub={`${gastosCount} movimientos`} />
         <KpiCard
@@ -265,6 +266,11 @@ export default async function ReportesPage({
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Recaudado vs. gastos</CardTitle>
+          <CardDescription className="text-xs">
+            {granularidadPeriodo === "mes"
+              ? "Un punto por mes — así se ve la tendencia de meses anteriores."
+              : "Un punto por día."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <RecaudadoGastosChart datos={puntosPeriodo} />
