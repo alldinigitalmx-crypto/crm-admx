@@ -1,5 +1,10 @@
 // Nombre a mostrar para una cotización que puede o no tener cliente
 // registrado — mientras es prospecto usa prospectoNombre.
+//
+// Este módulo es solo funciones puras (sin Prisma) a propósito: lo importan
+// componentes cliente (ej. tarea-card.tsx) y no debe arrastrar el driver de
+// Postgres al bundle del navegador. La lógica que sí toca la base de datos
+// (asegurarServicioParaCotizacion) vive en @/lib/cotizacion-servicio.
 export function nombreClienteCotizacion(c: {
   cliente?: { nombre: string } | null;
   prospectoNombre?: string | null;

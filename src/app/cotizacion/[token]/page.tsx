@@ -35,7 +35,7 @@ const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   failure: { texto: "El pago no se completó. Puedes intentarlo de nuevo.", tono: "error" },
   error: { texto: "No pudimos iniciar el pago con Mercado Pago. Intenta de nuevo en un momento.", tono: "error" },
   no_configurado: { texto: "El pago con Mercado Pago no está disponible por ahora.", tono: "error" },
-  sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
+  sin_cliente: { texto: "Contáctanos para completar tu registro antes de poder cobrarte.", tono: "warning" },
   pais: { texto: "Mercado Pago no está disponible en tu país. Usa PayPal u otro método.", tono: "warning" },
   moneda: { texto: "Mercado Pago no acepta cotizaciones en USD. Usa PayPal.", tono: "warning" },
 };
@@ -46,7 +46,7 @@ const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   cancelado: { texto: "Cancelaste el pago con PayPal. Puedes intentarlo de nuevo cuando quieras.", tono: "warning" },
   error: { texto: "No pudimos completar el pago con PayPal. Intenta de nuevo en un momento.", tono: "error" },
   no_configurado: { texto: "El pago con PayPal no está disponible por ahora.", tono: "error" },
-  sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
+  sin_cliente: { texto: "Contáctanos para completar tu registro antes de poder cobrarte.", tono: "warning" },
 };
 
 export default async function CotizacionPublicaPage({
@@ -217,7 +217,7 @@ export default async function CotizacionPublicaPage({
             <CardTitle className="text-sm font-medium">Pagar</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {!cotizacion.servicioId ? (
+            {!cotizacion.clienteId ? (
               <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 Estamos formalizando este proyecto. Muy pronto podrás pagar aquí.
               </p>

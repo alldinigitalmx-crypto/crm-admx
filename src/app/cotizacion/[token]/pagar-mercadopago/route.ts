@@ -8,6 +8,7 @@ import {
 } from "@/lib/mercadopago";
 import { esVisitanteDeMexico } from "@/lib/geo";
 import { montoAPagarAhora } from "@/lib/cotizacion";
+import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
 
 export async function GET(
   request: Request,
@@ -34,8 +35,9 @@ export async function GET(
   if (cotizacion.status === "Pagada") {
     return volver("");
   }
-  if (!cotizacion.servicioId) {
-    return volver("?mp=sin_servicio");
+  const servicioId = await asegurarServicioParaCotizacion(cotizacion.id);
+  if (!servicioId) {
+    return volver("?mp=sin_cliente");
   }
   if (cotizacion.moneda === "USD") {
     return volver("?mp=moneda");

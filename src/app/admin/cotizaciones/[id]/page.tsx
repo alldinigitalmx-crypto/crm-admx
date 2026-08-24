@@ -142,6 +142,12 @@ export default async function CotizacionDetallePage({
               </>
             )}
           </p>
+          {!cotizacion.servicioId && cotizacion.cliente && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              El cliente ya puede pagar aunque no la conviertas a mano — se formaliza sola como
+              servicio en cuanto llega el primer pago.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <CopyLinkButton path={`/cotizacion/${cotizacion.token}`} />

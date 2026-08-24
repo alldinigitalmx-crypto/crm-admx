@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { capturarOrdenPaypal } from "@/lib/paypal";
 import { registrarEvento } from "@/lib/evento";
 import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
+import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
 
 // PayPal redirige aquí después de que el pagador aprueba el pago, con
 // ?token=<orderId>&PayerID=<...>. Capturamos la orden en el servidor (nunca
@@ -26,7 +27,12 @@ export async function GET(
   });
   if (!cotizacion) return new Response("Cotización no encontrada", { status: 404 });
   if (cotizacion.status === "Pagada") return volver("?pp=success");
-  if (!cotizacion.servicioId) return volver("?pp=sin_servicio");
+
+  // En el flujo normal ya se aseguró el Servicio al iniciar el pago
+  // (pagar-paypal); esto es una red de seguridad para no perder una
+  // captura ya aprobada por PayPal si de algún modo llegara sin él.
+  const servicioId = await asegurarServicioParaCotizacion(cotizacion.id);
+  if (!servicioId) return volver("?pp=sin_cliente");
 
   try {
     const captura = await capturarOrdenPaypal(orderId);
@@ -49,7 +55,7 @@ export async function GET(
       const nuevoPago = await prisma.$transaction(async (tx) => {
         const creado = await tx.pago.create({
           data: {
-            servicioId: cotizacion.servicioId!,
+            servicioId,
             cotizacionId: cotizacion.id,
             metodoPago: "PayPal",
             monto: montoPagado,

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { obtenerPagoMercadoPago } from "@/lib/mercadopago";
 import { registrarEvento } from "@/lib/evento";
 import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
+import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
 
 // Mercado Pago notifica con distintos formatos según el origen del evento:
 // query params (?type=payment&data.id=123) o body JSON ({type, data:{id}}).
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       where: { token: pago.external_reference },
       include: { pagos: true },
     });
-    if (!cotizacion || !cotizacion.servicioId) {
+    if (!cotizacion) {
       return NextResponse.json({ ok: true });
     }
 
@@ -52,6 +53,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // Red de seguridad: en el flujo normal ya se creó el Servicio al
+    // iniciar el pago (pagar-mercadopago), pero por si este webhook llega
+    // para una cotización que aún no lo tiene, lo aseguramos aquí también
+    // para no perder un pago real ya aprobado por Mercado Pago.
+    const servicioId = await asegurarServicioParaCotizacion(cotizacion.id);
+    if (!servicioId) {
+      return NextResponse.json({ ok: true });
+    }
+
     const quedaSaldada = cotizacionQuedaSaldada(cotizacion, [
       ...cotizacion.pagos,
       { monto: pago.transaction_amount, confirmado: true },
@@ -60,7 +70,7 @@ export async function POST(request: Request) {
     const nuevoPago = await prisma.$transaction(async (tx) => {
       const creado = await tx.pago.create({
         data: {
-          servicioId: cotizacion.servicioId!,
+          servicioId,
           cotizacionId: cotizacion.id,
           metodoPago: "MercadoPago",
           monto: pago.transaction_amount,

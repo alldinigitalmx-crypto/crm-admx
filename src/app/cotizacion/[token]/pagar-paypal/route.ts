@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { crearOrdenPaypal, paypalConfigurado } from "@/lib/paypal";
 import { montoAPagarAhora } from "@/lib/cotizacion";
+import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
 
 export async function GET(
   request: Request,
@@ -26,8 +27,9 @@ export async function GET(
   if (cotizacion.status === "Pagada") {
     return volver("");
   }
-  if (!cotizacion.servicioId) {
-    return volver("?pp=sin_servicio");
+  const servicioId = await asegurarServicioParaCotizacion(cotizacion.id);
+  if (!servicioId) {
+    return volver("?pp=sin_cliente");
   }
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;

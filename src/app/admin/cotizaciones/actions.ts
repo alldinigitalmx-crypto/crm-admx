@@ -11,6 +11,7 @@ import { requiereNivel } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import { montoTotalServicio } from "@/lib/servicio";
 import { cotizacionQuedaSaldada, montoAPagarAhora } from "@/lib/cotizacion";
+import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
 import type { Moneda, TipoDescuento } from "@/generated/prisma/client";
 
 export type CotizacionFormState = { error?: string } | undefined;
@@ -319,10 +320,12 @@ export async function reportarPagoTransferencia(
   if (cotizacion.status === "Pagada") {
     return { error: "Esta cotización ya fue pagada." };
   }
-  if (!cotizacion.servicioId) {
+
+  const servicioId = await asegurarServicioParaCotizacion(cotizacion.id);
+  if (!servicioId) {
     return {
       error:
-        "Este proyecto todavía está en negociación. Espera a que se confirme como servicio antes de reportar el pago.",
+        "Este proyecto todavía está en negociación con un prospecto sin registrar. Contáctanos para poder recibir tu pago.",
     };
   }
 
@@ -341,7 +344,7 @@ export async function reportarPagoTransferencia(
 
   const pago = await prisma.pago.create({
     data: {
-      servicioId: cotizacion.servicioId,
+      servicioId,
       cotizacionId: cotizacion.id,
       metodoPago,
       monto,
@@ -366,6 +369,9 @@ export async function reportarPagoTransferencia(
 
   revalidatePath(`/cotizacion/${token}`);
   revalidatePath(`/admin/cotizaciones/${cotizacion.id}`);
+  revalidatePath(`/admin/servicios/${servicioId}`);
+  revalidatePath("/admin/servicios");
+  revalidatePath("/admin");
   return { success: true };
 }
 
@@ -388,6 +394,11 @@ export async function eliminarCotizacion(id: number) {
   redirect("/admin/cotizaciones");
 }
 
+// Conversión manual desde el admin — sigue disponible para quien prefiera
+// formalizar el proyecto antes de que el cliente pague. Ya no es requisito
+// para poder cobrar: eso lo cubre asegurarServicioParaCotizacion en el
+// momento del pago (ver reportarPagoTransferencia, pagar-mercadopago,
+// pagar-paypal, y las confirmaciones de pago).
 export async function convertirEnServicio(cotizacionId: number) {
   if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
 
@@ -399,34 +410,13 @@ export async function convertirEnServicio(cotizacionId: number) {
   if (!cotizacion.clienteId) return;
 
   const userId = await currentUserId();
-
-  const servicio = await prisma.servicio.create({
-    data: {
-      clienteId: cotizacion.clienteId,
-      descripcion: cotizacion.descripcion ?? `Cotización #${cotizacion.id}`,
-      detalles: cotizacion.detalles,
-      montoInicial: cotizacion.montoTotal,
-      moneda: cotizacion.moneda,
-      fechaInicio: new Date(),
-      status: "Aprobado",
-      creadoPorId: userId,
-      editadoPorId: userId,
-    },
-  });
-
-  await prisma.cotizacion.update({
-    where: { id: cotizacionId },
-    data: { servicioId: servicio.id },
-  });
-
-  await registrarEvento("cotizacion.convertida_en_servicio", "Cotizacion", cotizacionId, {
-    servicioId: servicio.id,
-  });
+  const servicioId = await asegurarServicioParaCotizacion(cotizacionId, userId);
+  if (!servicioId) return;
 
   revalidatePath(`/admin/cotizaciones/${cotizacionId}`);
   revalidatePath("/admin/cotizaciones");
   revalidatePath("/admin");
-  redirect(`/admin/servicios/${servicio.id}`);
+  redirect(`/admin/servicios/${servicioId}`);
 }
 
 export async function marcarCotizacionGanada(id: number) {
