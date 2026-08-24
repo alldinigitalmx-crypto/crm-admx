@@ -14,6 +14,7 @@ import {
   reportarPagoTransferencia,
 } from "@/app/admin/cotizaciones/actions";
 import { nombreClienteCotizacion } from "@/lib/cotizacion";
+import { esVisitanteDeMexico } from "@/lib/geo";
 
 const STATUS_LABEL: Record<string, string> = {
   Enviada: "Enviada",
@@ -30,6 +31,7 @@ const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   error: { texto: "No pudimos iniciar el pago con Mercado Pago. Intenta de nuevo en un momento.", tono: "error" },
   no_configurado: { texto: "El pago con Mercado Pago no está disponible por ahora.", tono: "error" },
   sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
+  pais: { texto: "Mercado Pago no está disponible en tu país. Usa PayPal u otro método.", tono: "warning" },
 };
 
 const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | "error" }> = {
@@ -52,6 +54,7 @@ export default async function CotizacionPublicaPage({
   const { mp, pp } = await searchParams;
   const mensajeMp = mp ? MP_MENSAJE[mp] : undefined;
   const mensajePp = pp ? PP_MENSAJE[pp] : undefined;
+  const esMexico = await esVisitanteDeMexico();
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { token },
@@ -198,7 +201,8 @@ export default async function CotizacionPublicaPage({
                 </p>
                 <MetodosPagoElectronicos
                   token={token}
-                  mercadoPagoDisponible
+                  mercadoPagoDisponible={esMexico}
+                  mercadoPagoNoDisponibleTexto="No disponible en tu país"
                   paypalDisponible
                 />
 

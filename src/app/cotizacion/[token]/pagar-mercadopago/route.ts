@@ -6,6 +6,7 @@ import {
   mercadoPagoConfigurado,
   mercadoPagoEsPrueba,
 } from "@/lib/mercadopago";
+import { esVisitanteDeMexico } from "@/lib/geo";
 
 export async function GET(
   request: Request,
@@ -17,6 +18,9 @@ export async function GET(
 
   if (!mercadoPagoConfigurado()) {
     return volver("?mp=no_configurado");
+  }
+  if (!(await esVisitanteDeMexico())) {
+    return volver("?mp=pais");
   }
 
   const cotizacion = await prisma.cotizacion.findUnique({

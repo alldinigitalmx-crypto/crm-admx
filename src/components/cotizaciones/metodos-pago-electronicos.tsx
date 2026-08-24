@@ -18,12 +18,14 @@ function BotonPago({
   href,
   disponible,
   label,
+  labelNoDisponible,
   style,
   icono,
 }: {
   href: string;
   disponible: boolean;
   label: string;
+  labelNoDisponible?: string;
   style: React.CSSProperties;
   icono: React.ReactNode;
 }) {
@@ -34,7 +36,7 @@ function BotonPago({
         aria-disabled
       >
         {icono}
-        {label}
+        {labelNoDisponible ?? label}
       </div>
     );
   }
@@ -54,10 +56,12 @@ function BotonPago({
 export function MetodosPagoElectronicos({
   token,
   mercadoPagoDisponible,
+  mercadoPagoNoDisponibleTexto,
   paypalDisponible,
 }: {
   token: string;
   mercadoPagoDisponible: boolean;
+  mercadoPagoNoDisponibleTexto?: string;
   paypalDisponible: boolean;
 }) {
   return (
@@ -66,6 +70,7 @@ export function MetodosPagoElectronicos({
         href={`/cotizacion/${token}/pagar-mercadopago`}
         disponible={mercadoPagoDisponible}
         label="Mercado Pago"
+        labelNoDisponible={mercadoPagoNoDisponibleTexto}
         style={{ backgroundColor: "#00b1ea", color: "#ffffff" }}
         icono={<IconoMercadoPago />}
       />
