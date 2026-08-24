@@ -55,12 +55,14 @@ const METODOS = [
 export function PagoTransferenciaForm({
   action,
   montoAPagar,
+  moneda,
 }: {
   action: (
     prevState: PublicActionState,
     formData: FormData
   ) => Promise<PublicActionState>;
   montoAPagar?: number;
+  moneda?: string;
 }) {
   const [state, formAction, isPending] = useActionState(action, undefined);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -88,7 +90,8 @@ export function PagoTransferenciaForm({
     <div className="flex flex-col gap-4">
       {montoAPagar !== undefined && (
         <p className="text-sm">
-          Monto a transferir: <span className="font-semibold">{formatCurrency(montoAPagar)}</span>
+          Monto a transferir:{" "}
+          <span className="font-semibold">{formatCurrency(montoAPagar, moneda)}</span>
         </p>
       )}
       <div className="flex flex-col gap-3 rounded-lg border border-input bg-muted/30 p-3">

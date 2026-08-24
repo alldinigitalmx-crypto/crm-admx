@@ -52,6 +52,7 @@ type OrdenPaypal = {
 export async function crearOrdenPaypal(params: {
   titulo: string;
   monto: number;
+  moneda?: "MXN" | "USD";
   externalReference: string;
   returnUrl: string;
   cancelUrl: string;
@@ -71,7 +72,7 @@ export async function crearOrdenPaypal(params: {
           reference_id: params.externalReference,
           description: params.titulo.slice(0, 127),
           amount: {
-            currency_code: "MXN",
+            currency_code: params.moneda ?? "MXN",
             value: params.monto.toFixed(2),
           },
         },

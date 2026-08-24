@@ -32,11 +32,13 @@ export async function GET(
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;
   const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
+  const moneda = cotizacion.moneda === "USD" ? "USD" : "MXN";
 
   try {
     const orden = await crearOrdenPaypal({
       titulo: descripcion,
       monto,
+      moneda,
       externalReference: token,
       returnUrl: `${origin}/cotizacion/${token}/paypal-retorno`,
       cancelUrl: `${origin}/cotizacion/${token}?pp=cancelado`,

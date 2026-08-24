@@ -226,7 +226,7 @@ export default async function CotizacionDetallePage({
         <CardContent className="flex flex-col gap-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal (al emitir)</span>
-            <span>{formatCurrency(cotizacion.montoSubtotal)}</span>
+            <span>{formatCurrency(cotizacion.montoSubtotal, cotizacion.moneda)}</span>
           </div>
           {cotizacion.descuentoTipo && (
             <div className="flex justify-between">
@@ -234,12 +234,12 @@ export default async function CotizacionDetallePage({
                 Descuento
                 {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
               </span>
-              <span>-{formatCurrency(montoDescuento)}</span>
+              <span>-{formatCurrency(montoDescuento, cotizacion.moneda)}</span>
             </div>
           )}
           <div className="flex justify-between border-t pt-2 text-base font-semibold">
             <span>Total</span>
-            <span>{formatCurrency(cotizacion.montoTotal)}</span>
+            <span>{formatCurrency(cotizacion.montoTotal, cotizacion.moneda)}</span>
           </div>
           {cotizacion.porcentajeAnticipo && (
             <p className="text-xs text-muted-foreground">
@@ -247,15 +247,20 @@ export default async function CotizacionDetallePage({
               terminar.
             </p>
           )}
+          {cotizacion.moneda === "USD" && (
+            <p className="text-xs text-muted-foreground">
+              Cotización en USD — el cliente solo puede pagar en línea con PayPal.
+            </p>
+          )}
           {cotizacion.status !== "Pagada" && montoPagado > 0 && (
             <>
               <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                 <span>Pagado</span>
-                <span>{formatCurrency(montoPagado)}</span>
+                <span>{formatCurrency(montoPagado, cotizacion.moneda)}</span>
               </div>
               <div className="flex justify-between font-medium">
                 <span>Saldo pendiente</span>
-                <span>{formatCurrency(montoPendiente)}</span>
+                <span>{formatCurrency(montoPendiente, cotizacion.moneda)}</span>
               </div>
             </>
           )}

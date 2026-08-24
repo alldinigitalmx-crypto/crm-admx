@@ -361,7 +361,7 @@ export default async function ServicioDetallePage({
                     </TableCell>
                     <TableCell>{formatDate(c.fechaEmision)}</TableCell>
                     <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(c.montoTotal, c.moneda)}</TableCell>
                     <TableCell>
                       <Link
                         href={`/admin/cotizaciones/${c.id}`}

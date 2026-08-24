@@ -252,7 +252,7 @@ export default async function CotizacionesPage({
                       </TableCell>
                       <TableCell className="truncate">{formatDate(c.fechaEmision)}</TableCell>
                       <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(c.montoTotal)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(c.montoTotal, c.moneda)}</TableCell>
                       <TableCell>
                         <Link
                           href={`/admin/cotizaciones/${c.id}`}
@@ -279,7 +279,7 @@ export default async function CotizacionesPage({
                       avatarClassName={STATUS_COLOR[c.status]}
                       title={c.servicio?.descripcion ?? c.descripcion ?? "Sin servicio"}
                       subtitle={nombreClienteCotizacion(c)}
-                      meta={`${formatDate(c.fechaEmision)} · ${formatCurrency(c.montoTotal)}`}
+                      meta={`${formatDate(c.fechaEmision)} · ${formatCurrency(c.montoTotal, c.moneda)}`}
                       badge={
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[c.status]}`}

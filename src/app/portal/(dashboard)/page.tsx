@@ -120,7 +120,7 @@ export default async function PortalPage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatCurrency(c.montoTotal)}
+                      {formatCurrency(c.montoTotal, c.moneda)}
                       {c.fechaVencimiento ? ` — vence ${formatDate(c.fechaVencimiento)}` : ""}
                     </p>
                   </div>

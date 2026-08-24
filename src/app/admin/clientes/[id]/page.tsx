@@ -354,7 +354,7 @@ export default async function ClienteDetallePage({
                     <TableCell>{formatDate(c.fechaEmision)}</TableCell>
                     <TableCell>{formatDate(c.fechaVencimiento)}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(c.montoTotal)}
+                      {formatCurrency(c.montoTotal, c.moneda)}
                     </TableCell>
                   </TableRow>
                 ))}

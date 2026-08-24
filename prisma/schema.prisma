@@ -466,6 +466,7 @@ enum TipoEntrega {
 enum Moneda {
   MXN
   COP
+  USD
 }
 
 enum CategoriaProducto {

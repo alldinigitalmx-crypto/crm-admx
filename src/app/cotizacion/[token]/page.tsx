@@ -37,6 +37,7 @@ const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   no_configurado: { texto: "El pago con Mercado Pago no está disponible por ahora.", tono: "error" },
   sin_servicio: { texto: "Estamos formalizando este proyecto antes de poder cobrar.", tono: "warning" },
   pais: { texto: "Mercado Pago no está disponible en tu país. Usa PayPal u otro método.", tono: "warning" },
+  moneda: { texto: "Mercado Pago no acepta cotizaciones en USD. Usa PayPal.", tono: "warning" },
 };
 
 const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | "error" }> = {
@@ -86,6 +87,8 @@ export default async function CotizacionPublicaPage({
   const montoAhora = montoAPagarAhora(cotizacion, cotizacion.pagos);
   const esSegundoPago = montoPagado > 0;
   const esCobroPorPartes = Boolean(cotizacion.porcentajeAnticipo);
+  const moneda = cotizacion.moneda ?? undefined;
+  const esUSD = cotizacion.moneda === "USD";
 
   const montoDescuento =
     cotizacion.descuentoTipo === "Porcentaje"
@@ -126,7 +129,7 @@ export default async function CotizacionPublicaPage({
           {detalles && <p className="text-muted-foreground">{detalles}</p>}
           <div className="flex justify-between border-t pt-3">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatCurrency(cotizacion.montoSubtotal)}</span>
+            <span>{formatCurrency(cotizacion.montoSubtotal, moneda)}</span>
           </div>
           {cotizacion.descuentoTipo && (
             <div className="flex justify-between">
@@ -134,29 +137,29 @@ export default async function CotizacionPublicaPage({
                 Descuento
                 {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
               </span>
-              <span>-{formatCurrency(montoDescuento)}</span>
+              <span>-{formatCurrency(montoDescuento, moneda)}</span>
             </div>
           )}
           <div className="flex justify-between border-t pt-3 text-base font-semibold">
             <span>Total</span>
-            <span>{formatCurrency(cotizacion.montoTotal)}</span>
+            <span>{formatCurrency(cotizacion.montoTotal, moneda)}</span>
           </div>
           {montoPagado > 0 && cotizacion.status !== "Pagada" && (
             <>
               <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                 <span>Pagado</span>
-                <span>{formatCurrency(montoPagado)}</span>
+                <span>{formatCurrency(montoPagado, moneda)}</span>
               </div>
               <div className="flex justify-between font-medium">
                 <span>Saldo pendiente</span>
-                <span>{formatCurrency(montoPendiente)}</span>
+                <span>{formatCurrency(montoPendiente, moneda)}</span>
               </div>
             </>
           )}
           {esCobroPorPartes && montoPagado === 0 && cotizacion.status !== "Pagada" && (
             <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
               Este proyecto se cobra en dos partes: {cotizacion.porcentajeAnticipo}% de anticipo
-              ({formatCurrency(montoAhora)}) y el resto al terminar.
+              ({formatCurrency(montoAhora, moneda)}) y el resto al terminar.
             </p>
           )}
           {cotizacion.fechaVencimiento && (
@@ -226,15 +229,15 @@ export default async function CotizacionPublicaPage({
               <>
                 <p className="text-xs font-medium text-muted-foreground">
                   {esCobroPorPartes && !esSegundoPago
-                    ? `Paga tu anticipo (${cotizacion.porcentajeAnticipo}%) — ${formatCurrency(montoAhora)}`
+                    ? `Paga tu anticipo (${cotizacion.porcentajeAnticipo}%) — ${formatCurrency(montoAhora, moneda)}`
                     : esSegundoPago
-                      ? `Paga el saldo restante — ${formatCurrency(montoAhora)}`
+                      ? `Paga el saldo restante — ${formatCurrency(montoAhora, moneda)}`
                       : "Paga en línea al instante"}
                 </p>
                 <MetodosPagoElectronicos
                   token={token}
-                  mercadoPagoDisponible={esMexico}
-                  mercadoPagoNoDisponibleTexto="No disponible en tu país"
+                  mercadoPagoDisponible={esMexico && !esUSD}
+                  mercadoPagoNoDisponibleTexto={esUSD ? "No disponible en USD" : "No disponible en tu país"}
                   paypalDisponible
                 />
 
@@ -246,7 +249,7 @@ export default async function CotizacionPublicaPage({
                     </span>
                   </summary>
                   <div className="border-t border-input px-3 pb-3 pt-3">
-                    <PagoTransferenciaForm action={pagoAction} montoAPagar={montoAhora} />
+                    <PagoTransferenciaForm action={pagoAction} montoAPagar={montoAhora} moneda={moneda} />
                   </div>
                 </details>
               </>

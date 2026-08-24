@@ -80,6 +80,7 @@ export function CotizacionForm({
     servicios?.[0] ? String(servicios[0].id) : ""
   );
   const [ordenCambioId, setOrdenCambioId] = useState<string>("none");
+  const [moneda, setMoneda] = useState<string>("MXN");
   const [requiereAnticipo, setRequiereAnticipo] = useState(
     Boolean(defaultValues?.porcentajeAnticipo)
   );
@@ -308,15 +309,21 @@ export function CotizacionForm({
         {!defaultValues && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="moneda">Moneda</Label>
-            <Select name="moneda" defaultValue="MXN">
+            <Select name="moneda" value={moneda} onValueChange={setMoneda}>
               <SelectTrigger id="moneda" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="MXN">MXN</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
                 <SelectItem value="COP">COP</SelectItem>
               </SelectContent>
             </Select>
+            {moneda === "USD" && (
+              <p className="text-xs text-muted-foreground">
+                En USD el cliente solo podrá pagar con PayPal — Mercado Pago no acepta dólares.
+              </p>
+            )}
           </div>
         )}
       </div>

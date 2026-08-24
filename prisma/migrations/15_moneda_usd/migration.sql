@@ -1,0 +1,1 @@
+ALTER TYPE "Moneda" ADD VALUE 'USD';

@@ -37,6 +37,9 @@ export async function GET(
   if (!cotizacion.servicioId) {
     return volver("?mp=sin_servicio");
   }
+  if (cotizacion.moneda === "USD") {
+    return volver("?mp=moneda");
+  }
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;
   const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
