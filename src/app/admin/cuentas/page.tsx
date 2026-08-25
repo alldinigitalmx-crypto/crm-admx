@@ -44,12 +44,31 @@ export default async function CuentasPage() {
     retirosPorCuentaLista.set(r.cuentaId, lista);
   }
 
+  // Un retiro es plata que sale de una cuenta (banco/billetera) para
+  // convertirse en efectivo — así que además de restarle a la cuenta de
+  // origen, se le suma a Efectivo. Si el origen ya era Efectivo (retirar
+  // de la caja chica misma) no cuenta dos veces: solo resta ahí, no se
+  // vuelve a sumar a sí mismo.
+  const cuentaPorId = new Map(cuentas.map((c) => [c.id, c]));
+  const retirosHaciaEfectivo = retiros
+    .filter((r) => cuentaPorId.get(r.cuentaId)?.tipo !== "Efectivo")
+    .reduce((acc, r) => acc + Number(r.monto), 0);
+
   const cuentasConSaldo = cuentas.map((c) => {
     const pagos = pagosMap.get(c.id) ?? 0;
     const gastos = gastosMap.get(c.id) ?? 0;
     const retirosMonto = retirosMap.get(c.id) ?? 0;
-    const saldo = Number(c.saldoInicial) + pagos - gastos - retirosMonto;
-    return { ...c, pagos, gastos, retirosMonto, saldo, retirosLista: retirosPorCuentaLista.get(c.id) ?? [] };
+    const ingresosPorRetiros = c.tipo === "Efectivo" ? retirosHaciaEfectivo : 0;
+    const saldo = Number(c.saldoInicial) + pagos - gastos - retirosMonto + ingresosPorRetiros;
+    return {
+      ...c,
+      pagos,
+      gastos,
+      retirosMonto,
+      ingresosPorRetiros,
+      saldo,
+      retirosLista: retirosPorCuentaLista.get(c.id) ?? [],
+    };
   });
 
   const totalDisponible = cuentasConSaldo.reduce((acc, c) => acc + (c.activa ? c.saldo : 0), 0);
@@ -116,7 +135,7 @@ export default async function CuentasPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                <div className={`grid gap-2 text-xs text-muted-foreground ${c.ingresosPorRetiros > 0 ? "grid-cols-2" : "grid-cols-3"}`}>
                   <div>
                     <p className="text-emerald-600 dark:text-emerald-400">+{formatCurrency(c.pagos)}</p>
                     <p>Pagos</p>
@@ -129,6 +148,14 @@ export default async function CuentasPage() {
                     <p className="text-destructive">-{formatCurrency(c.retirosMonto)}</p>
                     <p>Retiros</p>
                   </div>
+                  {c.ingresosPorRetiros > 0 && (
+                    <div>
+                      <p className="text-emerald-600 dark:text-emerald-400">
+                        +{formatCurrency(c.ingresosPorRetiros)}
+                      </p>
+                      <p>Retiros recibidos</p>
+                    </div>
+                  )}
                 </div>
 
                 {c.retirosLista.length > 0 && (
