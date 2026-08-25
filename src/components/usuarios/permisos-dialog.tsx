@@ -22,7 +22,7 @@ import {
 import { guardarPermisos } from "@/app/admin/usuarios/actions";
 import { MODULOS, MODULO_LABEL } from "@/lib/modulo-sistema";
 
-const MODULOS_CON_ALCANCE = ["Clientes", "Servicios", "Quejas", "Tareas"];
+const MODULOS_CON_ALCANCE = ["Clientes", "Servicios", "Cotizaciones", "Pagos", "Quejas", "Tareas"];
 
 export function PermisosDialog({
   trigger,

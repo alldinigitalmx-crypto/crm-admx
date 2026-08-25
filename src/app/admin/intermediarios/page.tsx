@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
+import { currentUsuario } from "@/lib/current-usuario";
+import { permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -21,6 +24,10 @@ import {
 } from "@/app/admin/intermediarios/actions";
 
 export default async function IntermediariosPage() {
+  const usuario = await currentUsuario();
+  const permisos = await permisosModulo(usuario, "Intermediarios");
+  if (!permisos.puedeVer) redirect("/admin");
+
   const intermediarios = await prisma.intermediario.findMany({ orderBy: { nombre: "asc" } });
 
   return (
@@ -33,17 +40,19 @@ export default async function IntermediariosPage() {
             {intermediarios.length === 1 ? "" : "s"}
           </p>
         </div>
-        <IntermediarioFormDialog
-          trigger={
-            <Button>
-              <Plus />
-              Nuevo intermediario
-            </Button>
-          }
-          title="Nuevo intermediario"
-          action={crearIntermediario}
-          submitLabel="Crear intermediario"
-        />
+        {permisos.puedeCrear && (
+          <IntermediarioFormDialog
+            trigger={
+              <Button>
+                <Plus />
+                Nuevo intermediario
+              </Button>
+            }
+            title="Nuevo intermediario"
+            action={crearIntermediario}
+            submitLabel="Crear intermediario"
+          />
+        )}
       </div>
 
       <Card>
@@ -65,7 +74,7 @@ export default async function IntermediariosPage() {
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Correo</TableHead>
                     <TableHead>Notas</TableHead>
-                    <TableHead className="w-20" />
+                    {permisos.puedeEditar && <TableHead className="w-20" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -82,8 +91,48 @@ export default async function IntermediariosPage() {
                       <TableCell>{i.telefono ?? "—"}</TableCell>
                       <TableCell>{i.email ?? "—"}</TableCell>
                       <TableCell className="max-w-64 truncate">{i.notas ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
+                      {permisos.puedeEditar && (
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <IntermediarioFormDialog
+                              trigger={
+                                <Button size="icon" variant="ghost" className="size-7">
+                                  <Pencil className="size-4" />
+                                </Button>
+                              }
+                              title="Editar intermediario"
+                              action={actualizarIntermediario.bind(null, i.id)}
+                              defaultValues={{
+                                nombre: i.nombre,
+                                telefono: i.telefono,
+                                email: i.email,
+                                notas: i.notas,
+                              }}
+                              submitLabel="Guardar cambios"
+                            />
+                            <DeleteIntermediarioButton
+                              action={eliminarIntermediario.bind(null, i.id)}
+                            />
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Móvil: tarjetas tipo app */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {intermediarios.map((i) => (
+                  <MobileRecordCard
+                    key={i.id}
+                    avatarLabel={i.nombre.trim().charAt(0).toUpperCase() || "?"}
+                    title={i.nombre}
+                    subtitle={i.telefono ?? i.email ?? undefined}
+                    meta={i.telefono && i.email ? i.email : (i.notas ?? undefined)}
+                    actions={
+                      permisos.puedeEditar ? (
+                        <>
                           <IntermediarioFormDialog
                             trigger={
                               <Button size="icon" variant="ghost" className="size-7">
@@ -103,44 +152,8 @@ export default async function IntermediariosPage() {
                           <DeleteIntermediarioButton
                             action={eliminarIntermediario.bind(null, i.id)}
                           />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {/* Móvil: tarjetas tipo app */}
-              <div className="flex flex-col gap-2 md:hidden">
-                {intermediarios.map((i) => (
-                  <MobileRecordCard
-                    key={i.id}
-                    avatarLabel={i.nombre.trim().charAt(0).toUpperCase() || "?"}
-                    title={i.nombre}
-                    subtitle={i.telefono ?? i.email ?? undefined}
-                    meta={i.telefono && i.email ? i.email : (i.notas ?? undefined)}
-                    actions={
-                      <>
-                        <IntermediarioFormDialog
-                          trigger={
-                            <Button size="icon" variant="ghost" className="size-7">
-                              <Pencil className="size-4" />
-                            </Button>
-                          }
-                          title="Editar intermediario"
-                          action={actualizarIntermediario.bind(null, i.id)}
-                          defaultValues={{
-                            nombre: i.nombre,
-                            telefono: i.telefono,
-                            email: i.email,
-                            notas: i.notas,
-                          }}
-                          submitLabel="Guardar cambios"
-                        />
-                        <DeleteIntermediarioButton
-                          action={eliminarIntermediario.bind(null, i.id)}
-                        />
-                      </>
+                        </>
+                      ) : undefined
                     }
                   />
                 ))}

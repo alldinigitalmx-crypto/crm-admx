@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
+import { requiereNivel } from "@/lib/alcance";
 
 export type IntermediarioFormState = { error?: string } | undefined;
 
@@ -24,6 +25,10 @@ export async function crearIntermediario(
   _prevState: IntermediarioFormState,
   formData: FormData
 ): Promise<IntermediarioFormState> {
+  if (!(await requiereNivel("Intermediarios", "Crear"))) {
+    return { error: "No tienes permiso para crear en este módulo." };
+  }
+
   const data = parseIntermediarioForm(formData);
   const error = validateIntermediarioForm(data);
   if (error) return { error };
@@ -39,6 +44,10 @@ export async function actualizarIntermediario(
   _prevState: IntermediarioFormState,
   formData: FormData
 ): Promise<IntermediarioFormState> {
+  if (!(await requiereNivel("Intermediarios", "Editar"))) {
+    return { error: "No tienes permiso para editar en este módulo." };
+  }
+
   const data = parseIntermediarioForm(formData);
   const error = validateIntermediarioForm(data);
   if (error) return { error };
@@ -50,6 +59,8 @@ export async function actualizarIntermediario(
 }
 
 export async function eliminarIntermediario(id: number) {
+  if (!(await requiereNivel("Intermediarios", "Editar"))) return;
+
   const serviciosAsociados = await prisma.servicio.count({ where: { intermediarioId: id } });
   if (serviciosAsociados > 0) return;
 

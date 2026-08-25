@@ -47,7 +47,16 @@ const GRUPO_LABEL: Record<Grupo, string> = {
 
 const navPrincipal = [
   { title: "Panel", href: "/admin", icon: LayoutDashboard, modulo: null, grupo: "general" },
-  { title: "Reportes", href: "/admin/reportes", icon: BarChart3, modulo: null, grupo: "general" },
+  {
+    title: "Reportes",
+    href: "/admin/reportes",
+    icon: BarChart3,
+    modulo: null,
+    grupo: "general",
+    // Financieros de todo el negocio — exclusivos del dueño, nunca
+    // otorgables a un usuario interno (ver alcance.ts: requiereAdmin).
+    soloAdmin: true,
+  },
   { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes", grupo: "operacion" },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios", grupo: "operacion" },
   { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones", grupo: "operacion" },
@@ -56,8 +65,22 @@ const navPrincipal = [
   { title: "Quejas / Help Desk", href: "/admin/quejas", icon: LifeBuoy, modulo: "Quejas", grupo: "operacion" },
   { title: "Productos", href: "/admin/productos", icon: Package, modulo: "Productos", grupo: "negocio" },
   { title: "Ventas", href: "/admin/ventas", icon: ShoppingBag, modulo: "Ventas", grupo: "negocio" },
-  { title: "Intermediarios", href: "/admin/intermediarios", icon: Handshake, modulo: null, grupo: "negocio" },
-  { title: "Gastos", href: "/admin/gastos", icon: Wallet, modulo: null, grupo: "negocio" },
+  {
+    title: "Intermediarios",
+    href: "/admin/intermediarios",
+    icon: Handshake,
+    modulo: "Intermediarios",
+    grupo: "negocio",
+  },
+  {
+    title: "Gastos",
+    href: "/admin/gastos",
+    icon: Wallet,
+    modulo: null,
+    grupo: "negocio",
+    // Igual que Reportes: solo el dueño, nunca otorgable.
+    soloAdmin: true,
+  },
   {
     title: "Usuarios y Accesos",
     href: "/admin/usuarios",

@@ -44,12 +44,22 @@ export default async function CotizacionesPage({
   const permisos = await permisosModulo(usuario, "Cotizaciones");
   if (!permisos.puedeVer) redirect("/admin");
 
+  const verTodo = permisos.verTodo;
+
   const [clientes, serviciosParaCotizar] = await Promise.all([
+    // El picker de cliente para una negociación nueva no se restringe a
+    // "propios": un vendedor con alcance Propio también debe poder
+    // arrancar una cotización con un cliente que todavía no es suyo
+    // (nadie es "responsable" de un cliente antes de tener un servicio
+    // con él). El filtro de abajo sí es sobre lo que ya existe.
     prisma.cliente.findMany({
       select: { id: true, nombre: true },
       orderBy: { nombre: "asc" },
     }),
+    // Vincular una cotización a un servicio existente sí es una acción
+    // sobre algo que ya tiene dueño — ese servicio debe ser suyo.
     prisma.servicio.findMany({
+      where: !verTodo && usuario ? { responsableId: usuario.id } : {},
       include: { cliente: true, ordenesCambio: true },
       orderBy: { creadoEn: "desc" },
     }),
@@ -71,6 +81,12 @@ export default async function CotizacionesPage({
   const where: Prisma.CotizacionWhereInput = {};
   if (clienteId) where.clienteId = Number(clienteId);
   if (status) where.status = status as StatusCotizacion;
+  // Alcance "Propio": la cotización es suya si la creó ella misma
+  // (negociación suelta) o si cuelga de un servicio del que es
+  // responsable — igual criterio que requiereNivelCotizacion().
+  if (!verTodo && usuario) {
+    where.OR = [{ creadoPorId: usuario.id }, { servicio: { responsableId: usuario.id } }];
+  }
 
   const hasFiltros = Boolean(clienteId || status);
 

@@ -2,10 +2,15 @@ import { createElement } from "react";
 import type { ReactElement } from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 
+import { requiereAdmin } from "@/lib/alcance";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { ReportesPdfDocument } from "@/components/reportes/reportes-pdf-document";
 
 export async function GET(request: Request) {
+  if (!(await requiereAdmin())) {
+    return new Response("No autorizado", { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;

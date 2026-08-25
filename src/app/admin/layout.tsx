@@ -16,6 +16,7 @@ const MODULOS_SIDEBAR: ModuloSistema[] = [
   "Ventas",
   "Quejas",
   "Tareas",
+  "Intermediarios",
 ];
 
 export default async function AdminLayout({

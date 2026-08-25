@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Wallet,
   TrendingUp,
@@ -10,6 +11,7 @@ import {
   FileDown,
 } from "lucide-react";
 
+import { requiereAdmin } from "@/lib/alcance";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,6 +118,8 @@ export default async function ReportesPage({
 }: {
   searchParams: Promise<{ desde?: string; hasta?: string }>;
 }) {
+  if (!(await requiereAdmin())) redirect("/admin");
+
   const { desde, hasta } = await searchParams;
   const datos = await obtenerDatosReportes(desde, hasta);
   const {

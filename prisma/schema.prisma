@@ -440,6 +440,7 @@ enum ModuloSistema {
   Usuarios
   Portal
   Tareas
+  Intermediarios
 }
 
 enum StatusTicketAcceso {

@@ -28,6 +28,7 @@ export async function GET(request: Request) {
       ...(hasta ? { lte: new Date(hasta) } : {}),
     };
   }
+  if (!permisos.verTodo && usuario) where.servicio = { responsableId: usuario.id };
 
   const pagos = await prisma.pago.findMany({
     where,

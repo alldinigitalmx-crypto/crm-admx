@@ -12,8 +12,11 @@ import type {
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { currentUsuario } from "@/lib/current-usuario";
-import { esAdmin } from "@/lib/alcance";
+// Gestionar usuarios, permisos y tickets de acceso es exclusivo de Admin —
+// requiereAdmin() revisa el rol fresco en base de datos (no el del JWT) en
+// cada acción, nunca solo en la página, porque estas funciones son
+// invocables directamente sin pasar por la UI.
+import { requiereAdmin } from "@/lib/alcance";
 import { MODULOS } from "@/lib/modulo-sistema";
 
 export type UsuarioFormState = { error?: string } | undefined;
@@ -22,15 +25,6 @@ async function currentUsuarioId() {
   const session = await auth();
   const id = session?.user?.id;
   return id ? Number(id) : null;
-}
-
-// Gestionar usuarios, permisos y tickets de acceso es exclusivo de Admin —
-// se revisa el rol fresco en base de datos (no el del JWT) en cada acción,
-// nunca solo en la página, porque estas funciones son invocables
-// directamente sin pasar por la UI.
-async function requiereAdmin() {
-  const usuario = await currentUsuario();
-  return esAdmin(usuario);
 }
 
 function parseUsuarioForm(formData: FormData) {

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, Pencil } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
+import { requiereAdmin } from "@/lib/alcance";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { GASTO_AMBITO_COLOR as AMBITO_COLOR, GASTO_AMBITO_ICON } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +31,8 @@ export default async function GastosPage({
 }: {
   searchParams: Promise<{ ambito?: string; categoria?: string; desde?: string; hasta?: string }>;
 }) {
+  if (!(await requiereAdmin())) redirect("/admin");
+
   const { ambito, categoria, desde, hasta } = await searchParams;
 
   const categoriasExistentes = await prisma.gasto.findMany({

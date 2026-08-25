@@ -1,9 +1,14 @@
+import { requiereAdmin } from "@/lib/alcance";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { buildMultiSheetExcelResponse } from "@/lib/excel";
 
 // Un solo Excel con dos pestañas (Ingresos / Gastos) para el mismo rango
 // de fechas — antes eran dos descargas sueltas.
 export async function GET(request: Request) {
+  if (!(await requiereAdmin())) {
+    return new Response("No autorizado", { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;

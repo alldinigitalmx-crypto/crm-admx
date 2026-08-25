@@ -7,7 +7,11 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { requiereNivel } from "@/lib/alcance";
+import {
+  requiereNivel,
+  requiereNivelCotizacion,
+  requiereNivelCotizacionNuevaParaServicio,
+} from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import { montoTotalServicio } from "@/lib/servicio";
 import { cotizacionQuedaSaldada, montoAPagarAhora } from "@/lib/cotizacion";
@@ -88,6 +92,9 @@ export async function crearCotizacion(
       include: { ordenesCambio: true },
     });
     if (!servicio) return { error: "El servicio ya no existe." };
+    if (!(await requiereNivelCotizacionNuevaParaServicio(servicioId))) {
+      return { error: "No tienes permiso para cotizar sobre ese servicio." };
+    }
 
     const ordenCambioIdRaw = String(formData.get("ordenCambioId") ?? "");
     ordenCambioId = ordenCambioIdRaw && ordenCambioIdRaw !== "none" ? Number(ordenCambioIdRaw) : null;
@@ -169,8 +176,8 @@ export async function actualizarCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelCotizacion(id, "Editar"))) {
+    return { error: "No tienes permiso para editar esta cotización." };
   }
 
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id } });
@@ -376,7 +383,7 @@ export async function reportarPagoTransferencia(
 }
 
 export async function eliminarCotizacion(id: number) {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
+  if (!(await requiereNivelCotizacion(id, "Editar"))) return;
 
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id } });
   if (!cotizacion || cotizacion.status === "Pagada") return;
@@ -400,7 +407,7 @@ export async function eliminarCotizacion(id: number) {
 // momento del pago (ver reportarPagoTransferencia, pagar-mercadopago,
 // pagar-paypal, y las confirmaciones de pago).
 export async function convertirEnServicio(cotizacionId: number) {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
+  if (!(await requiereNivelCotizacion(cotizacionId, "Editar"))) return;
 
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } });
   if (!cotizacion) return;
@@ -420,7 +427,7 @@ export async function convertirEnServicio(cotizacionId: number) {
 }
 
 export async function marcarCotizacionGanada(id: number) {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
+  if (!(await requiereNivelCotizacion(id, "Editar"))) return;
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { id },
@@ -464,7 +471,7 @@ export async function marcarCotizacionGanada(id: number) {
 }
 
 export async function marcarCotizacionPerdida(id: number) {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
+  if (!(await requiereNivelCotizacion(id, "Editar"))) return;
 
   const cotizacion = await prisma.cotizacion.findUnique({ where: { id } });
   if (!cotizacion || cotizacion.status !== "Enviada") return;
@@ -478,7 +485,7 @@ export async function marcarCotizacionPerdida(id: number) {
 }
 
 export async function confirmarPagoCotizacion(cotizacionId: number, pagoId: number) {
-  if (!(await requiereNivel("Cotizaciones", "Editar"))) return;
+  if (!(await requiereNivelCotizacion(cotizacionId, "Editar"))) return;
 
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { id: cotizacionId },

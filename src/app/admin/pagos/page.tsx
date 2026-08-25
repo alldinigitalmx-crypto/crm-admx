@@ -70,7 +70,10 @@ export default async function PagosPage({
   const permisos = await permisosModulo(usuario, "Pagos");
   if (!permisos.puedeVer) redirect("/admin");
 
+  const verTodo = permisos.verTodo;
+
   const servicios = await prisma.servicio.findMany({
+    where: !verTodo && usuario ? { responsableId: usuario.id } : {},
     include: { cliente: true },
     orderBy: { creadoEn: "desc" },
   });
@@ -91,6 +94,9 @@ export default async function PagosPage({
       ...(hasta ? { lte: new Date(hasta) } : {}),
     };
   }
+  // Alcance "Propio": solo pagos de servicios de los que es responsable —
+  // mismo criterio que ya usan Servicios/Clientes/Quejas.
+  if (!verTodo && usuario) where.servicio = { responsableId: usuario.id };
 
   const hasFiltros = Boolean(servicioId || metodoPago || confirmado || desde || hasta);
 

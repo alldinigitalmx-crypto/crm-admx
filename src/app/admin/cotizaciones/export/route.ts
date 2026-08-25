@@ -19,6 +19,9 @@ export async function GET(request: Request) {
   const where: Prisma.CotizacionWhereInput = {};
   if (clienteId) where.clienteId = Number(clienteId);
   if (status) where.status = status as StatusCotizacion;
+  if (!permisos.verTodo && usuario) {
+    where.OR = [{ creadoPorId: usuario.id }, { servicio: { responsableId: usuario.id } }];
+  }
 
   const cotizaciones = await prisma.cotizacion.findMany({
     where,

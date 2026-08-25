@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { requiereAdmin } from "@/lib/alcance";
 import type { AmbitoGasto, MetodoPago } from "@/generated/prisma/client";
 
 export type GastoFormState = { error?: string } | undefined;
@@ -41,6 +42,10 @@ export async function crearGasto(
   _prevState: GastoFormState,
   formData: FormData
 ): Promise<GastoFormState> {
+  if (!(await requiereAdmin())) {
+    return { error: "No tienes permiso para registrar gastos." };
+  }
+
   const data = parseGastoForm(formData);
   const error = validateGastoForm(data);
   if (error) return { error };
@@ -70,6 +75,10 @@ export async function actualizarGasto(
   _prevState: GastoFormState,
   formData: FormData
 ): Promise<GastoFormState> {
+  if (!(await requiereAdmin())) {
+    return { error: "No tienes permiso para editar gastos." };
+  }
+
   const data = parseGastoForm(formData);
   const error = validateGastoForm(data);
   if (error) return { error };
@@ -93,6 +102,8 @@ export async function actualizarGasto(
 }
 
 export async function eliminarGasto(id: number) {
+  if (!(await requiereAdmin())) return;
+
   await prisma.gasto.delete({ where: { id } });
   revalidatePath("/admin/gastos");
 }

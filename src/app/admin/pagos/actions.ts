@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { requiereNivel } from "@/lib/alcance";
+import { requiereNivelPago, requiereNivelPagoNuevo } from "@/lib/alcance";
 import { registrarEvento } from "@/lib/evento";
 import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
 import type { Moneda, MetodoPago } from "@/generated/prisma/client";
@@ -72,13 +72,16 @@ export async function crearPago(
   _prevState: PagoFormState,
   formData: FormData
 ): Promise<PagoFormState> {
-  if (!(await requiereNivel("Pagos", "Crear"))) {
-    return { error: "No tienes permiso para crear en este módulo." };
-  }
-
   const data = parsePagoForm(formData);
   const error = validatePagoForm(data);
   if (error) return { error };
+
+  // Se valida contra el servicio ya parseado: con alcance "Propio" solo
+  // se puede registrar un pago sobre un servicio del que se es
+  // responsable, no sobre cualquiera con solo conocer su id.
+  if (!(await requiereNivelPagoNuevo(data.servicioId!))) {
+    return { error: "No tienes permiso para registrar un pago en ese servicio." };
+  }
 
   const userId = await currentUserId();
 
@@ -118,8 +121,8 @@ export async function actualizarPago(
   _prevState: PagoFormState,
   formData: FormData
 ): Promise<PagoFormState> {
-  if (!(await requiereNivel("Pagos", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelPago(id, "Editar"))) {
+    return { error: "No tienes permiso para editar este pago." };
   }
 
   const pago = await prisma.pago.findUnique({ where: { id } });
@@ -128,6 +131,13 @@ export async function actualizarPago(
   const data = parsePagoForm(formData);
   const error = validatePagoForm(data);
   if (error) return { error };
+
+  // Si además está moviendo el pago a otro servicio, ese destino también
+  // debe ser suyo — si no, con alcance "Propio" podría "regalarse" un
+  // pago de un servicio ajeno con solo cambiar el select del formulario.
+  if (data.servicioId !== pago.servicioId && !(await requiereNivelPagoNuevo(data.servicioId!))) {
+    return { error: "No tienes permiso para mover el pago a ese servicio." };
+  }
 
   const userId = await currentUserId();
   const seConfirmaAhora = data.confirmado && !pago.confirmado;
@@ -163,7 +173,7 @@ export async function actualizarPago(
 }
 
 export async function eliminarPago(id: number) {
-  if (!(await requiereNivel("Pagos", "Editar"))) return;
+  if (!(await requiereNivelPago(id, "Editar"))) return;
 
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago) return;
@@ -183,8 +193,8 @@ export async function subirComprobantePago(
   _prevState: ComprobanteFormState,
   formData: FormData
 ): Promise<ComprobanteFormState> {
-  if (!(await requiereNivel("Pagos", "Editar"))) {
-    return { error: "No tienes permiso para editar en este módulo." };
+  if (!(await requiereNivelPago(pagoId, "Editar"))) {
+    return { error: "No tienes permiso para editar este pago." };
   }
 
   const dataUrl = String(formData.get("imagen") ?? "");
@@ -205,7 +215,7 @@ export async function subirComprobantePago(
 }
 
 export async function eliminarComprobantePago(archivoId: number, servicioId: number) {
-  if (!(await requiereNivel("Pagos", "Editar"))) return;
+  if (!(await requiereNivelPagoNuevo(servicioId, "Editar"))) return;
 
   await prisma.archivo.delete({ where: { id: archivoId } });
 
@@ -214,7 +224,7 @@ export async function eliminarComprobantePago(archivoId: number, servicioId: num
 }
 
 export async function confirmarPago(id: number) {
-  if (!(await requiereNivel("Pagos", "Editar"))) return;
+  if (!(await requiereNivelPago(id, "Editar"))) return;
 
   const pago = await prisma.pago.findUnique({ where: { id } });
   if (!pago || pago.confirmado) return;

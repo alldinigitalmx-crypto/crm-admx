@@ -66,6 +66,17 @@ export default async function CotizacionDetallePage({
     : null;
 
   if (!cotizacion) notFound();
+  // Con alcance "Propio", entrar directo por la URL a una cotización que
+  // no es suya (ni la creó, ni cuelga de un servicio suyo) no debe
+  // funcionar aunque la liste ya la filtre — mismo criterio que
+  // requiereNivelCotizacion() y que ya usa el detalle de Servicio.
+  if (
+    !permisos.verTodo &&
+    cotizacion.creadoPorId !== usuarioSesion?.id &&
+    cotizacion.servicio?.responsableId !== usuarioSesion?.id
+  ) {
+    notFound();
+  }
 
   const [archivos, usuarios] = await Promise.all([
     prisma.archivo.findMany({

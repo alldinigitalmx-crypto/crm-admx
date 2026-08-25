@@ -52,6 +52,17 @@ export async function requiereNivel(
   return minimo === "Crear" ? permisos.puedeCrear : permisos.puedeEditar;
 }
 
+// Para módulos que son exclusivos del dueño del negocio y nunca deben
+// poder otorgarse a un usuario interno normal (Reportes, Gastos) — a
+// diferencia de requiereNivel(), esto no consulta ModuloPermiso en
+// absoluto: ni siquiera un Admin podría "graduar" a alguien más aquí
+// desde Usuarios y Accesos, porque esos módulos no forman parte de
+// ModuloSistema.
+export async function requiereAdmin(): Promise<boolean> {
+  const usuario = await currentUsuario();
+  return esAdmin(usuario);
+}
+
 // --- Chequeos de alcance por registro -------------------------------------
 // requiereNivel() solo verifica nivel (Ver/Crear/Editar) — un usuario con
 // alcance "Propio" que apenas tiene permiso de Editar en el módulo podía
@@ -67,11 +78,17 @@ async function usuarioYPermisos(modulo: ModuloSistema) {
   return { usuario, permisos };
 }
 
-export async function requiereNivelServicio(
+// Criterio compartido por varios módulos: "¿el usuario tiene nivel Y (el
+// servicio en cuestión es suyo, o de plano ve todo)?" — lo usan tanto
+// acciones sobre un Servicio existente como acciones de otros módulos
+// (Pagos, Cotizaciones) que cuelgan de un servicio y deben respetar el
+// mismo dueño.
+async function puedeOperarServicioEnModulo(
+  modulo: ModuloSistema,
   servicioId: number,
   minimo: "Crear" | "Editar"
 ): Promise<boolean> {
-  const { usuario, permisos } = await usuarioYPermisos("Servicios");
+  const { usuario, permisos } = await usuarioYPermisos(modulo);
   const tieneNivel = minimo === "Crear" ? permisos.puedeCrear : permisos.puedeEditar;
   if (!tieneNivel) return false;
   if (permisos.verTodo) return true;
@@ -82,6 +99,71 @@ export async function requiereNivelServicio(
     select: { responsableId: true },
   });
   return !!servicio && servicio.responsableId === usuario.id;
+}
+
+export async function requiereNivelServicio(
+  servicioId: number,
+  minimo: "Crear" | "Editar"
+): Promise<boolean> {
+  return puedeOperarServicioEnModulo("Servicios", servicioId, minimo);
+}
+
+// Un Pago siempre cuelga de un Servicio (servicioId es obligatorio) — el
+// alcance "Propio" en Pagos se hereda del responsable de ese servicio,
+// igual que ya pasa con Quejas.
+export async function requiereNivelPago(
+  pagoId: number,
+  minimo: "Crear" | "Editar"
+): Promise<boolean> {
+  const { usuario, permisos } = await usuarioYPermisos("Pagos");
+  const tieneNivel = minimo === "Crear" ? permisos.puedeCrear : permisos.puedeEditar;
+  if (!tieneNivel) return false;
+  if (permisos.verTodo) return true;
+  if (!usuario) return false;
+
+  const pago = await prisma.pago.findUnique({
+    where: { id: pagoId },
+    select: { servicio: { select: { responsableId: true } } },
+  });
+  return !!pago && pago.servicio.responsableId === usuario.id;
+}
+
+// Para crearPago (o mover un pago a otro servicio, o borrar un
+// comprobante del que solo se conoce el servicio): todavía no hay un
+// pagoId que consultar, pero ya se sabe a qué servicio corresponde —
+// mismo criterio, verificado contra ese servicio directamente.
+export async function requiereNivelPagoNuevo(
+  servicioId: number,
+  minimo: "Crear" | "Editar" = "Crear"
+): Promise<boolean> {
+  return puedeOperarServicioEnModulo("Pagos", servicioId, minimo);
+}
+
+// Una Cotización es "propia" si el usuario la creó (negociación suelta,
+// sin servicio todavía) o si ya está colgada de un servicio del que es
+// responsable.
+export async function requiereNivelCotizacion(
+  cotizacionId: number,
+  minimo: "Crear" | "Editar"
+): Promise<boolean> {
+  const { usuario, permisos } = await usuarioYPermisos("Cotizaciones");
+  const tieneNivel = minimo === "Crear" ? permisos.puedeCrear : permisos.puedeEditar;
+  if (!tieneNivel) return false;
+  if (permisos.verTodo) return true;
+  if (!usuario) return false;
+
+  const cotizacion = await prisma.cotizacion.findUnique({
+    where: { id: cotizacionId },
+    select: { creadoPorId: true, servicio: { select: { responsableId: true } } },
+  });
+  if (!cotizacion) return false;
+  return cotizacion.creadoPorId === usuario.id || cotizacion.servicio?.responsableId === usuario.id;
+}
+
+// Para crearCotizacion cuando se vincula a un servicio existente: ese
+// servicio ya tiene dueño, así que debe ser el usuario actual.
+export async function requiereNivelCotizacionNuevaParaServicio(servicioId: number): Promise<boolean> {
+  return puedeOperarServicioEnModulo("Cotizaciones", servicioId, "Crear");
 }
 
 export async function requiereNivelQueja(
