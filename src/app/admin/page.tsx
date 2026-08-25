@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Users,
   Briefcase,
@@ -18,6 +19,9 @@ import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
+import { currentUsuario } from "@/lib/current-usuario";
+import { esAdmin, permisosModulo } from "@/lib/alcance";
+import type { Usuario } from "@/generated/prisma/client";
 
 const currency = new Intl.NumberFormat("es-MX", {
   style: "currency",
@@ -97,7 +101,53 @@ function PendienteCard({
   );
 }
 
+// Tarjeta compacta reutilizada por ambos paneles cuando no queda ningún
+// pendiente por mostrar en esa vista.
+function TodoAlDiaCard({ texto }: { texto: string }) {
+  return (
+    <Card className="mb-4">
+      <CardContent className="flex items-center gap-3 py-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+          <CheckCircle2 className="size-5" />
+        </div>
+        <div>
+          <p className="font-medium">¡Todo al día!</p>
+          <p className="text-sm text-muted-foreground">{texto}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SinPendientesCard({ items }: { items: { key: string; title: string }[] }) {
+  return (
+    <Card className="mt-4">
+      <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <CheckCircle2 className="size-3.5 text-success" />
+          Sin pendientes:
+        </span>
+        {items.map((p) => (
+          <span key={p.key}>{p.title}</span>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function AdminDashboardPage() {
+  const usuario = await currentUsuario();
+  if (!usuario) redirect("/login");
+
+  // El panel del dueño (Admin) es un resumen financiero de todo el
+  // negocio; el de un usuario interno normal es solo lo que le toca a
+  // él — nunca ingresos, embudo de venta ni ventas por origen de la
+  // empresa completa.
+  if (!esAdmin(usuario)) return <PanelUsuario usuario={usuario} />;
+  return <PanelAdmin />;
+}
+
+async function PanelAdmin() {
   const inicioDeMes = new Date();
   inicioDeMes.setDate(1);
   inicioDeMes.setHours(0, 0, 0, 0);
@@ -362,19 +412,7 @@ export default async function AdminDashboardPage() {
           Cosas que requieren tu atención
         </p>
 
-        {!hayPendientesActivos && (
-          <Card className="mb-4">
-            <CardContent className="flex items-center gap-3 py-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
-                <CheckCircle2 className="size-5" />
-              </div>
-              <div>
-                <p className="font-medium">¡Todo al día!</p>
-                <p className="text-sm text-muted-foreground">No tienes pendientes en ningún módulo.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {!hayPendientesActivos && <TodoAlDiaCard texto="No tienes pendientes en ningún módulo." />}
 
         <div className="grid gap-4 lg:grid-cols-2">
           {cotizacionesPendientes.length > 0 && (
@@ -524,24 +562,341 @@ export default async function AdminDashboardPage() {
           )}
         </div>
 
-        {hayPendientesActivos && pendientesVacios.length > 0 && (
-          <Card className="mt-4">
-            <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <CheckCircle2 className="size-3.5 text-success" />
-                Sin pendientes:
-              </span>
-              {pendientesVacios.map((p) => (
-                <span key={p.key}>{p.title}</span>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {hayPendientesActivos && pendientesVacios.length > 0 && <SinPendientesCard items={pendientesVacios} />}
       </div>
 
       <p className="text-xs text-muted-foreground">
         Todos los módulos de Fase 1 están disponibles.
       </p>
+    </div>
+  );
+}
+
+// Panel de un usuario interno normal (no Admin): nada de ingresos,
+// embudo de venta ni ventas por origen de la empresa — solo lo que a
+// él le toca, y solo de los módulos que de verdad tiene otorgados.
+// Cada consulta usa el mismo criterio de "propio" que ya usa la lista
+// real de ese módulo (responsableId del servicio, asignadoAId, o quién
+// creó el registro), así que si más adelante se le da alcance "Todo" en
+// algún módulo, este panel automáticamente le muestra todo ahí también.
+async function PanelUsuario({ usuario }: { usuario: Usuario }) {
+  const [permisosClientes, permisosServicios, permisosCotizaciones, permisosPagos, permisosQuejas, permisosTareas] =
+    await Promise.all([
+      permisosModulo(usuario, "Clientes"),
+      permisosModulo(usuario, "Servicios"),
+      permisosModulo(usuario, "Cotizaciones"),
+      permisosModulo(usuario, "Pagos"),
+      permisosModulo(usuario, "Quejas"),
+      permisosModulo(usuario, "Tareas"),
+    ]);
+
+  const cotizacionPropiaWhere = permisosCotizaciones.verTodo
+    ? {}
+    : { OR: [{ creadoPorId: usuario.id }, { servicio: { responsableId: usuario.id } }] };
+  const quejaPropiaWhere = permisosQuejas.verTodo
+    ? {}
+    : { OR: [{ asignadoAId: usuario.id }, { servicio: { responsableId: usuario.id } }] };
+
+  const [
+    misClientesCount,
+    misServiciosActivosCount,
+    misCotizacionesPendientesCount,
+    misTareasPendientesCount,
+    serviciosPorStatus,
+    cotizacionesPendientes,
+    pagosPorConfirmar,
+    quejasNuevas,
+    tareasPendientes,
+    ordenesCambioPendientes,
+  ] = await Promise.all([
+    permisosClientes.puedeVer
+      ? prisma.cliente.count({
+          where: permisosClientes.verTodo ? {} : { servicios: { some: { responsableId: usuario.id } } },
+        })
+      : Promise.resolve(0),
+    permisosServicios.puedeVer
+      ? prisma.servicio.count({
+          where: {
+            status: { in: ["Aprobado", "EnProceso"] },
+            ...(permisosServicios.verTodo ? {} : { responsableId: usuario.id }),
+          },
+        })
+      : Promise.resolve(0),
+    permisosCotizaciones.puedeVer
+      ? prisma.cotizacion.count({ where: { status: "Enviada", ...cotizacionPropiaWhere } })
+      : Promise.resolve(0),
+    permisosTareas.puedeVer
+      ? prisma.tarea.count({
+          where: { completada: false, ...(permisosTareas.verTodo ? {} : { asignadoAId: usuario.id }) },
+        })
+      : Promise.resolve(0),
+    permisosServicios.puedeVer
+      ? prisma.servicio.groupBy({
+          by: ["status"],
+          _count: true,
+          where: permisosServicios.verTodo ? {} : { responsableId: usuario.id },
+        })
+      : Promise.resolve([]),
+    permisosCotizaciones.puedeVer
+      ? prisma.cotizacion.findMany({
+          where: { status: "Enviada", ...cotizacionPropiaWhere },
+          orderBy: { fechaVencimiento: "asc" },
+          take: 10,
+          include: { cliente: true, servicio: true },
+        })
+      : Promise.resolve([]),
+    permisosPagos.puedeVer
+      ? prisma.pago.findMany({
+          where: {
+            confirmado: false,
+            ...(permisosPagos.verTodo ? {} : { servicio: { responsableId: usuario.id } }),
+          },
+          orderBy: { fecha: "asc" },
+          take: 10,
+          include: { servicio: { include: { cliente: true } } },
+        })
+      : Promise.resolve([]),
+    permisosQuejas.puedeVer
+      ? prisma.queja.findMany({
+          where: { status: "Nueva", ...quejaPropiaWhere },
+          orderBy: { creadoEn: "asc" },
+          take: 10,
+          include: { cliente: true },
+        })
+      : Promise.resolve([]),
+    permisosTareas.puedeVer
+      ? prisma.tarea.findMany({
+          where: { completada: false, ...(permisosTareas.verTodo ? {} : { asignadoAId: usuario.id }) },
+          orderBy: [{ fechaLimite: "asc" }, { creadoEn: "desc" }],
+          take: 10,
+          include: { servicio: true, cotizacion: { include: { cliente: true } } },
+        })
+      : Promise.resolve([]),
+    permisosServicios.puedeVer
+      ? prisma.ordenCambio.findMany({
+          where: {
+            status: "Pendiente",
+            ...(permisosServicios.verTodo ? {} : { servicio: { responsableId: usuario.id } }),
+          },
+          orderBy: { creadoEn: "asc" },
+          take: 10,
+          include: { servicio: { include: { cliente: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const kpis: { title: string; value: string; icon: React.ComponentType<{ className?: string }> }[] = [];
+  if (permisosClientes.puedeVer) kpis.push({ title: "Mis clientes", value: String(misClientesCount), icon: Users });
+  if (permisosServicios.puedeVer)
+    kpis.push({ title: "Mis servicios activos", value: String(misServiciosActivosCount), icon: Briefcase });
+  if (permisosCotizaciones.puedeVer)
+    kpis.push({
+      title: "Mis cotizaciones pendientes",
+      value: String(misCotizacionesPendientesCount),
+      icon: FileText,
+    });
+  if (permisosTareas.puedeVer)
+    kpis.push({ title: "Mis tareas pendientes", value: String(misTareasPendientesCount), icon: ListTodo });
+
+  const pendientesResumen: { key: string; title: string; count: number }[] = [];
+  if (permisosCotizaciones.puedeVer)
+    pendientesResumen.push({
+      key: "cotizaciones",
+      title: "Cotizaciones por firmar/pagar",
+      count: cotizacionesPendientes.length,
+    });
+  if (permisosPagos.puedeVer)
+    pendientesResumen.push({ key: "pagos", title: "Pagos por confirmar", count: pagosPorConfirmar.length });
+  if (permisosQuejas.puedeVer)
+    pendientesResumen.push({ key: "quejas", title: "Quejas nuevas", count: quejasNuevas.length });
+  if (permisosTareas.puedeVer)
+    pendientesResumen.push({ key: "tareas", title: "Tareas pendientes", count: tareasPendientes.length });
+  if (permisosServicios.puedeVer)
+    pendientesResumen.push({
+      key: "ordenes",
+      title: "Órdenes de cambio por aprobar",
+      count: ordenesCambioPendientes.length,
+    });
+
+  const pendientesVacios = pendientesResumen.filter((p) => p.count === 0);
+  const hayPendientesActivos = pendientesResumen.some((p) => p.count > 0);
+  const tieneAlgunModulo = pendientesResumen.length > 0;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Panel</h1>
+        <p className="text-sm text-muted-foreground">Resumen de lo que te corresponde</p>
+      </div>
+
+      {kpis.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {kpis.map((k) => (
+            <KpiCard key={k.title} title={k.title} value={k.value} icon={k.icon} />
+          ))}
+        </div>
+      )}
+
+      {permisosServicios.puedeVer && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Mis servicios por status</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {serviciosPorStatus.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aún no tienes servicios asignados.</p>
+            ) : (
+              serviciosPorStatus.map((s) => (
+                <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
+                  <Badge className={SERVICIO_STATUS_COLOR[s.status] ?? ""}>
+                    {s.status}: {s._count}
+                  </Badge>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tieneAlgunModulo && (
+        <div>
+          <h2 className="text-lg font-semibold">Mis pendientes</h2>
+          <p className="mb-3 text-sm text-muted-foreground">Cosas que requieren tu atención</p>
+
+          {!hayPendientesActivos && <TodoAlDiaCard texto="No tienes pendientes en lo que te toca." />}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {permisosCotizaciones.puedeVer && cotizacionesPendientes.length > 0 && (
+              <PendienteCard
+                title="Cotizaciones por firmar/pagar"
+                icon={FileText}
+                count={cotizacionesPendientes.length}
+                emptyText="No hay cotizaciones pendientes."
+              >
+                {cotizacionesPendientes.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between text-sm">
+                    <Link href={`/admin/cotizaciones/${c.id}`} className="truncate hover:underline">
+                      {nombreClienteCotizacion(c)} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
+                    </Link>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
+                    </span>
+                  </li>
+                ))}
+              </PendienteCard>
+            )}
+
+            {permisosPagos.puedeVer && pagosPorConfirmar.length > 0 && (
+              <PendienteCard
+                title="Pagos por confirmar"
+                icon={Landmark}
+                count={pagosPorConfirmar.length}
+                emptyText="No hay pagos pendientes de confirmar."
+              >
+                {pagosPorConfirmar.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between text-sm">
+                    <Link
+                      href={
+                        p.cotizacionId
+                          ? `/admin/cotizaciones/${p.cotizacionId}`
+                          : `/admin/servicios/${p.servicio.id}`
+                      }
+                      className="truncate hover:underline"
+                    >
+                      {p.servicio.cliente.nombre} — {p.servicio.descripcion}
+                    </Link>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {currency.format(Number(p.monto))}
+                    </span>
+                  </li>
+                ))}
+              </PendienteCard>
+            )}
+
+            {permisosQuejas.puedeVer && quejasNuevas.length > 0 && (
+              <PendienteCard
+                title="Quejas nuevas"
+                icon={LifeBuoy}
+                count={quejasNuevas.length}
+                emptyText="No hay quejas nuevas."
+              >
+                {quejasNuevas.map((q) => (
+                  <li key={q.id} className="flex items-center justify-between text-sm">
+                    <Link href="/admin/quejas" className="truncate hover:underline">
+                      {q.cliente.nombre} — {q.categoria}
+                    </Link>
+                    <span className="shrink-0 text-xs text-muted-foreground">{fecha.format(q.creadoEn)}</span>
+                  </li>
+                ))}
+              </PendienteCard>
+            )}
+
+            {permisosTareas.puedeVer && tareasPendientes.length > 0 && (
+              <PendienteCard
+                title="Tareas pendientes"
+                icon={ListTodo}
+                count={tareasPendientes.length}
+                emptyText="No tienes tareas pendientes."
+              >
+                {tareasPendientes.map((t) => {
+                  const proyecto =
+                    t.servicio?.descripcion ?? (t.cotizacion ? nombreClienteCotizacion(t.cotizacion) : null);
+                  const vencida = t.fechaLimite && t.fechaLimite < new Date();
+                  const href = t.servicioId
+                    ? `/admin/servicios/${t.servicioId}`
+                    : t.cotizacionId
+                      ? `/admin/cotizaciones/${t.cotizacionId}`
+                      : "/admin/tareas";
+                  return (
+                    <li key={t.id} className="flex items-center justify-between text-sm">
+                      <Link href={href} className="truncate hover:underline">
+                        {t.titulo}
+                        {proyecto ? ` — ${proyecto}` : ""}
+                      </Link>
+                      <span
+                        className={`shrink-0 text-xs ${vencida ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {t.fechaLimite ? fecha.format(t.fechaLimite) : t.prioridad}
+                      </span>
+                    </li>
+                  );
+                })}
+              </PendienteCard>
+            )}
+
+            {permisosServicios.puedeVer && ordenesCambioPendientes.length > 0 && (
+              <PendienteCard
+                title="Órdenes de cambio por aprobar"
+                icon={Briefcase}
+                count={ordenesCambioPendientes.length}
+                emptyText="No hay órdenes de cambio pendientes."
+              >
+                {ordenesCambioPendientes.map((o) => (
+                  <li key={o.id} className="flex items-center justify-between text-sm">
+                    <Link href={`/admin/servicios/${o.servicio.id}`} className="truncate hover:underline">
+                      {o.servicio.cliente.nombre} — {o.descripcion}
+                    </Link>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {currency.format(Number(o.monto))}
+                    </span>
+                  </li>
+                ))}
+              </PendienteCard>
+            )}
+          </div>
+
+          {hayPendientesActivos && pendientesVacios.length > 0 && <SinPendientesCard items={pendientesVacios} />}
+        </div>
+      )}
+
+      {kpis.length === 0 && !tieneAlgunModulo && (
+        <Card>
+          <CardContent className="py-6 text-center text-sm text-muted-foreground">
+            Todavía no tienes acceso a ningún módulo. Pídele a un administrador que te lo asigne desde Usuarios y
+            Accesos.
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
