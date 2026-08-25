@@ -10,16 +10,28 @@ import {
   KeyRound,
   ListTodo,
   ShoppingBag,
+  CheckCircle2,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { nombreClienteCotizacion } from "@/lib/cotizacion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
 
 const currency = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
+});
+
+// Para los totales "de un vistazo" (KPIs, embudo, ventas por origen) los
+// centavos no aportan nada y sí le quitan espacio a la tarjeta en móvil —
+// las cantidades exactas de pagos/órdenes individuales siguen usando
+// `currency` completo.
+const currencyCorta = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+  maximumFractionDigits: 0,
 });
 
 const fecha = new Intl.DateTimeFormat("es-MX", {
@@ -39,13 +51,13 @@ function KpiCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 py-2">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="size-5" />
+      <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
+          <Icon className="size-4 sm:size-5" />
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">{title}</p>
-          <p className="text-xl font-semibold">{value}</p>
+        <div className="min-w-0">
+          <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{title}</p>
+          <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -183,6 +195,20 @@ export default async function AdminDashboardPage() {
   const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
   const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
 
+  // En móvil, seis tarjetas repitiendo "no hay nada pendiente" es puro
+  // scroll sin información — las vacías se colapsan en una sola tarjeta
+  // compacta y solo las que sí tienen algo se ven en detalle.
+  const pendientesResumen = [
+    { key: "cotizaciones", title: "Cotizaciones por firmar/pagar", count: cotizacionesPendientes.length },
+    { key: "pagos", title: "Pagos por confirmar", count: pagosPorConfirmar.length },
+    { key: "quejas", title: "Quejas nuevas", count: quejasNuevas.length },
+    { key: "tickets", title: "Tickets de acceso", count: ticketsPendientes.length },
+    { key: "tareas", title: "Tareas pendientes", count: tareasPendientes.length },
+    { key: "ordenes", title: "Órdenes de cambio por aprobar", count: ordenesCambioPendientes.length },
+  ];
+  const pendientesVacios = pendientesResumen.filter((p) => p.count === 0);
+  const hayPendientesActivos = pendientesResumen.some((p) => p.count > 0);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -192,7 +218,7 @@ export default async function AdminDashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard title="Clientes" value={String(totalClientes)} icon={Users} />
         <KpiCard
           title="Servicios activos"
@@ -201,7 +227,7 @@ export default async function AdminDashboardPage() {
         />
         <KpiCard
           title="Ingresos del mes"
-          value={currency.format(Number(ingresosMes._sum.monto ?? 0))}
+          value={currencyCorta.format(Number(ingresosMes._sum.monto ?? 0))}
           icon={CreditCard}
         />
         <KpiCard
@@ -225,7 +251,7 @@ export default async function AdminDashboardPage() {
           ) : (
             serviciosPorStatus.map((s) => (
               <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
-                <Badge variant="outline">
+                <Badge className={SERVICIO_STATUS_COLOR[s.status] ?? ""}>
                   {s.status}: {s._count}
                 </Badge>
               </Link>
@@ -239,14 +265,14 @@ export default async function AdminDashboardPage() {
         <p className="mb-3 text-sm text-muted-foreground">
           De la negociación al servicio confirmado
         </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <Link href="/admin/cotizaciones?status=Enviada">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
-                <p className="text-xs text-muted-foreground">En negociación</p>
-                <p className="text-xl font-semibold">{enNegociacion._count}</p>
-                <p className="text-xs text-muted-foreground">
-                  {currency.format(Number(enNegociacion._sum.montoTotal ?? 0))}
+                <p className="truncate text-xs text-muted-foreground">En negociación</p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{enNegociacion._count}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {currencyCorta.format(Number(enNegociacion._sum.montoTotal ?? 0))}
                 </p>
               </CardContent>
             </Card>
@@ -254,30 +280,30 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/cotizaciones?status=Firmada">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
-                <p className="text-xs text-muted-foreground">Ganadas por formalizar</p>
-                <p className="text-xl font-semibold">{ganadasPorFormalizar._count}</p>
-                <p className="text-xs text-muted-foreground">
-                  {currency.format(Number(ganadasPorFormalizar._sum.montoTotal ?? 0))}
+                <p className="truncate text-xs text-muted-foreground">Ganadas por formalizar</p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{ganadasPorFormalizar._count}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {currencyCorta.format(Number(ganadasPorFormalizar._sum.montoTotal ?? 0))}
                 </p>
               </CardContent>
             </Card>
           </Link>
           <Card>
             <CardContent className="py-2">
-              <p className="text-xs text-muted-foreground">Convertidas a servicio</p>
-              <p className="text-xl font-semibold">{convertidasAServicio._count}</p>
-              <p className="text-xs text-muted-foreground">
-                {currency.format(Number(convertidasAServicio._sum.montoTotal ?? 0))}
+              <p className="truncate text-xs text-muted-foreground">Convertidas a servicio</p>
+              <p className="truncate text-lg font-semibold sm:text-xl">{convertidasAServicio._count}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {currencyCorta.format(Number(convertidasAServicio._sum.montoTotal ?? 0))}
               </p>
             </CardContent>
           </Card>
           <Link href="/admin/cotizaciones?status=Perdida">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
-                <p className="text-xs text-muted-foreground">Perdidas</p>
-                <p className="text-xl font-semibold">{perdidas._count}</p>
-                <p className="text-xs text-muted-foreground">
-                  {currency.format(Number(perdidas._sum.montoTotal ?? 0))}
+                <p className="truncate text-xs text-muted-foreground">Perdidas</p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{perdidas._count}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {currencyCorta.format(Number(perdidas._sum.montoTotal ?? 0))}
                 </p>
               </CardContent>
             </Card>
@@ -288,19 +314,19 @@ export default async function AdminDashboardPage() {
       <div>
         <h2 className="text-lg font-semibold">Ventas por origen</h2>
         <p className="mb-3 text-sm text-muted-foreground">Mes actual</p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <Link href="/admin/ventas?origen=TiendaOnline">
             <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-4 py-2">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <ShoppingBag className="size-5" />
+              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
+                  <ShoppingBag className="size-4 sm:size-5" />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Tienda Online</p>
-                  <p className="text-xl font-semibold">
-                    {currency.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Tienda Online</p>
+                  <p className="truncate text-lg font-semibold sm:text-xl">
+                    {currencyCorta.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {ventasTiendaOnline?._count ?? 0} venta
                     {(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"}
                   </p>
@@ -310,16 +336,16 @@ export default async function AdminDashboardPage() {
           </Link>
           <Link href="/admin/ventas?origen=Manual">
             <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-4 py-2">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <ShoppingBag className="size-5" />
+              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
+                  <ShoppingBag className="size-4 sm:size-5" />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Manual (otros medios)</p>
-                  <p className="text-xl font-semibold">
-                    {currency.format(Number(ventasManual?._sum.total ?? 0))}
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Manual (otros medios)</p>
+                  <p className="truncate text-lg font-semibold sm:text-xl">
+                    {currencyCorta.format(Number(ventasManual?._sum.total ?? 0))}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {ventasManual?._count ?? 0} venta
                     {(ventasManual?._count ?? 0) === 1 ? "" : "s"}
                   </p>
@@ -336,7 +362,22 @@ export default async function AdminDashboardPage() {
           Cosas que requieren tu atención
         </p>
 
+        {!hayPendientesActivos && (
+          <Card className="mb-4">
+            <CardContent className="flex items-center gap-3 py-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                <CheckCircle2 className="size-5" />
+              </div>
+              <div>
+                <p className="font-medium">¡Todo al día!</p>
+                <p className="text-sm text-muted-foreground">No tienes pendientes en ningún módulo.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-2">
+          {cotizacionesPendientes.length > 0 && (
           <PendienteCard
             title="Cotizaciones por firmar/pagar"
             icon={FileText}
@@ -357,7 +398,9 @@ export default async function AdminDashboardPage() {
               </li>
             ))}
           </PendienteCard>
+          )}
 
+          {pagosPorConfirmar.length > 0 && (
           <PendienteCard
             title="Pagos por confirmar"
             icon={Landmark}
@@ -382,7 +425,9 @@ export default async function AdminDashboardPage() {
               </li>
             ))}
           </PendienteCard>
+          )}
 
+          {quejasNuevas.length > 0 && (
           <PendienteCard
             title="Quejas nuevas"
             icon={LifeBuoy}
@@ -400,7 +445,9 @@ export default async function AdminDashboardPage() {
               </li>
             ))}
           </PendienteCard>
+          )}
 
+          {ticketsPendientes.length > 0 && (
           <PendienteCard
             title="Tickets de acceso"
             icon={KeyRound}
@@ -418,7 +465,9 @@ export default async function AdminDashboardPage() {
               </li>
             ))}
           </PendienteCard>
+          )}
 
+          {tareasPendientes.length > 0 && (
           <PendienteCard
             title="Tareas pendientes"
             icon={ListTodo}
@@ -449,7 +498,9 @@ export default async function AdminDashboardPage() {
               );
             })}
           </PendienteCard>
+          )}
 
+          {ordenesCambioPendientes.length > 0 && (
           <PendienteCard
             title="Órdenes de cambio por aprobar"
             icon={Briefcase}
@@ -470,7 +521,22 @@ export default async function AdminDashboardPage() {
               </li>
             ))}
           </PendienteCard>
+          )}
         </div>
+
+        {hayPendientesActivos && pendientesVacios.length > 0 && (
+          <Card className="mt-4">
+            <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <CheckCircle2 className="size-3.5 text-success" />
+                Sin pendientes:
+              </span>
+              {pendientesVacios.map((p) => (
+                <span key={p.key}>{p.title}</span>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">
