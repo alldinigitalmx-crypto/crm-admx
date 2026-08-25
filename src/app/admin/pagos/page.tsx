@@ -5,7 +5,7 @@ import { Plus, Pencil, Download, CheckCircle2, Clock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
-import { permisosModulo } from "@/lib/alcance";
+import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -71,6 +71,13 @@ export default async function PagosPage({
   if (!permisos.puedeVer) redirect("/admin");
 
   const verTodo = permisos.verTodo;
+  // Cuentas es exclusivo del dueño — un usuario interno normal ni ve el
+  // selector para elegirla ni el nombre de la cuenta en pagos ya
+  // registrados (ver PagoForm/PagoDetalleDialog).
+  const esAdminUsuario = esAdmin(usuario);
+  const cuentasDisponibles = esAdminUsuario
+    ? await prisma.cuenta.findMany({ where: { activa: true }, orderBy: { alias: "asc" } })
+    : [];
 
   const servicios = await prisma.servicio.findMany({
     where: !verTodo && usuario ? { responsableId: usuario.id } : {},
@@ -111,7 +118,7 @@ export default async function PagosPage({
     prisma.pago.aggregate({ where, _sum: { monto: true, comision: true }, _count: true }),
     prisma.pago.findMany({
       where,
-      include: { servicio: { include: { cliente: true } } },
+      include: { servicio: { include: { cliente: true } }, cuenta: true },
       orderBy: { fecha: "desc" },
       skip: paginationSkip(page),
       take: PAGE_SIZE,
@@ -179,6 +186,7 @@ export default async function PagosPage({
                 description="Registra un pago recibido para un servicio."
                 action={crearPago}
                 servicios={servicioOpciones}
+                cuentas={esAdminUsuario ? cuentasDisponibles : undefined}
                 submitLabel="Registrar pago"
               />
             ) : (
@@ -276,7 +284,9 @@ export default async function PagosPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagos.map((p) => (
+                  {pagos.map((p) => {
+                  const cuentaNombre = esAdminUsuario ? (p.cuenta?.alias ?? p.cuentaTexto) : null;
+                  return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
                         <Link
@@ -311,8 +321,8 @@ export default async function PagosPage({
                       <TableCell className="truncate" title={p.metodoPago}>
                         {p.metodoPago}
                       </TableCell>
-                      <TableCell className="truncate" title={p.cuenta ?? undefined}>
-                        {p.cuenta ?? "—"}
+                      <TableCell className="truncate" title={cuentaNombre ?? undefined}>
+                        {cuentaNombre ?? "—"}
                       </TableCell>
                       <TableCell>
                         <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
@@ -340,7 +350,7 @@ export default async function PagosPage({
                               monto: Number(p.monto),
                               comision: p.comision ? Number(p.comision) : null,
                               moneda: p.moneda,
-                              cuenta: p.cuenta,
+                              cuentaNombre,
                               comprobante: p.comprobante,
                               confirmado: p.confirmado,
                               servicio: {
@@ -363,6 +373,7 @@ export default async function PagosPage({
                               title="Editar pago"
                               action={actualizarPago.bind(null, p.id)}
                               servicios={servicioOpciones}
+                              cuentas={esAdminUsuario ? cuentasDisponibles : undefined}
                               defaultValues={{
                                 servicioId: p.servicioId,
                                 fecha: p.fecha,
@@ -370,7 +381,7 @@ export default async function PagosPage({
                                 monto: Number(p.monto),
                                 comision: p.comision ? Number(p.comision) : null,
                                 moneda: p.moneda,
-                                cuenta: p.cuenta,
+                                cuentaId: p.cuentaId,
                                 comprobante: p.comprobante,
                                 confirmado: p.confirmado,
                               }}
@@ -388,13 +399,15 @@ export default async function PagosPage({
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );})}
                 </TableBody>
               </Table>
 
               {/* Móvil: tarjetas tipo app */}
               <div className="flex flex-col gap-2 md:hidden">
-                {pagos.map((p) => (
+                {pagos.map((p) => {
+                const cuentaNombre = esAdminUsuario ? (p.cuenta?.alias ?? p.cuentaTexto) : null;
+                return (
                   <MobileRecordCard
                     key={p.id}
                     avatarLabel={p.confirmado ? <CheckCircle2 className="size-5" /> : <Clock className="size-5" />}
@@ -428,7 +441,7 @@ export default async function PagosPage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
-                            cuenta: p.cuenta,
+                            cuentaNombre,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
                             servicio: {
@@ -451,6 +464,7 @@ export default async function PagosPage({
                             title="Editar pago"
                             action={actualizarPago.bind(null, p.id)}
                             servicios={servicioOpciones}
+                            cuentas={esAdminUsuario ? cuentasDisponibles : undefined}
                             defaultValues={{
                               servicioId: p.servicioId,
                               fecha: p.fecha,
@@ -458,7 +472,7 @@ export default async function PagosPage({
                               monto: Number(p.monto),
                               comision: p.comision ? Number(p.comision) : null,
                               moneda: p.moneda,
-                              cuenta: p.cuenta,
+                              cuentaId: p.cuentaId,
                               comprobante: p.comprobante,
                               confirmado: p.confirmado,
                             }}
@@ -471,7 +485,7 @@ export default async function PagosPage({
                       </>
                     }
                   />
-                ))}
+                );})}
               </div>
 
               <div className="mt-4">

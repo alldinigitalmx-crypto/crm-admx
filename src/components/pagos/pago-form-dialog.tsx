@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PagoForm, type ServicioOption } from "@/components/pagos/pago-form";
+import { PagoForm, type ServicioOption, type CuentaOption } from "@/components/pagos/pago-form";
 import type { PagoFormState } from "@/app/admin/pagos/actions";
 
 type PagoDefaults = {
@@ -20,7 +20,7 @@ type PagoDefaults = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
-  cuenta: string | null;
+  cuentaId: number | null;
   comprobante: string | null;
   confirmado: boolean;
 };
@@ -32,6 +32,7 @@ export function PagoFormDialog({
   action,
   servicios,
   servicioFijo,
+  cuentas,
   defaultValues,
   comprobanteExistente,
   submitLabel,
@@ -42,6 +43,7 @@ export function PagoFormDialog({
   action: (prevState: PagoFormState, formData: FormData) => Promise<PagoFormState>;
   servicios?: ServicioOption[];
   servicioFijo?: { id: number; label: string };
+  cuentas?: CuentaOption[];
   defaultValues?: PagoDefaults;
   comprobanteExistente?: { nombre: string } | null;
   submitLabel: string;
@@ -60,6 +62,7 @@ export function PagoFormDialog({
           action={action}
           servicios={servicios}
           servicioFijo={servicioFijo}
+          cuentas={cuentas}
           defaultValues={defaultValues}
           comprobanteExistente={comprobanteExistente}
           submitLabel={submitLabel}

@@ -24,10 +24,12 @@ type PagoDefaults = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
-  cuenta: string | null;
+  cuentaId: number | null;
   comprobante: string | null;
   confirmado: boolean;
 };
+
+export type CuentaOption = { id: number; alias: string };
 
 function toDateInputValue(d: Date | null | undefined) {
   if (!d) return "";
@@ -38,6 +40,7 @@ export function PagoForm({
   action,
   servicios,
   servicioFijo,
+  cuentas,
   defaultValues,
   comprobanteExistente,
   submitLabel,
@@ -47,6 +50,10 @@ export function PagoForm({
   action: (prevState: PagoFormState, formData: FormData) => Promise<PagoFormState>;
   servicios?: ServicioOption[];
   servicioFijo?: { id: number; label: string };
+  // Solo se pasa para un Admin — Cuentas es información exclusiva del
+  // dueño (igual que Reportes/Gastos), un usuario interno normal no debe
+  // ver ni elegir a qué cuenta bancaria entró un pago.
+  cuentas?: CuentaOption[];
   defaultValues?: PagoDefaults;
   comprobanteExistente?: { nombre: string } | null;
   submitLabel: string;
@@ -175,22 +182,24 @@ export function PagoForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cuenta">Cuenta</Label>
-          <Input
-            id="cuenta"
-            name="cuenta"
-            list="cuentas-pago"
-            defaultValue={defaultValues?.cuenta ?? ""}
-            placeholder="Ej. BBVA, Binance, PayPal..."
-          />
-          <datalist id="cuentas-pago">
-            <option value="BBVA" />
-            <option value="Binance" />
-            <option value="PayPal" />
-            <option value="Efectivo" />
-          </datalist>
-        </div>
+        {cuentas && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="cuentaId">Cuenta</Label>
+            <Select name="cuentaId" defaultValue={defaultValues?.cuentaId ? String(defaultValues.cuentaId) : "none"}>
+              <SelectTrigger id="cuentaId" className="w-full">
+                <SelectValue placeholder="Sin cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin cuenta</SelectItem>
+                {cuentas.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.alias}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="moneda">Moneda</Label>

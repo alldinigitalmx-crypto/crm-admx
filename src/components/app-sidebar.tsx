@@ -16,6 +16,7 @@ import {
   Code2,
   ListTodo,
   Wallet,
+  PiggyBank,
   BarChart3,
   LogOut,
 } from "lucide-react";
@@ -79,6 +80,15 @@ const navPrincipal = [
     modulo: null,
     grupo: "negocio",
     // Igual que Reportes: solo el dueño, nunca otorgable.
+    soloAdmin: true,
+  },
+  {
+    title: "Cuentas",
+    href: "/admin/cuentas",
+    icon: PiggyBank,
+    modulo: null,
+    grupo: "negocio",
+    // Igual que Gastos: saldos reales del dueño, solo Admin.
     soloAdmin: true,
   },
   {

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { montoTotalServicio, comisionIntermediario } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
-import { permisosModulo } from "@/lib/alcance";
+import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,7 +83,7 @@ export default async function ServicioDetallePage({
           cliente: true,
           intermediario: true,
           ordenesCambio: { orderBy: { creadoEn: "desc" } },
-          pagos: { orderBy: { fecha: "desc" } },
+          pagos: { orderBy: { fecha: "desc" }, include: { cuenta: true } },
           cotizaciones: { orderBy: { fechaEmision: "desc" } },
           tareas: { orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }] },
         },
@@ -97,7 +97,10 @@ export default async function ServicioDetallePage({
   if (!permisos.puedeVer) redirect("/admin");
   if (!permisos.verTodo && servicio.responsableId !== usuarioActual?.id) notFound();
 
-  const [clientes, intermediarios, usuarios, evidencias, comprobantesPago] = await Promise.all([
+  // Cuentas es exclusivo del dueño — ver la nota en admin/pagos/page.tsx.
+  const esAdminUsuario = esAdmin(usuarioActual);
+
+  const [clientes, intermediarios, usuarios, evidencias, comprobantesPago, cuentasDisponibles] = await Promise.all([
     prisma.cliente.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.intermediario.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.usuario.findMany({
@@ -115,6 +118,7 @@ export default async function ServicioDetallePage({
       // se quede con el más reciente.
       orderBy: { creadoEn: "asc" },
     }),
+    esAdminUsuario ? prisma.cuenta.findMany({ where: { activa: true }, orderBy: { alias: "asc" } }) : Promise.resolve([]),
   ]);
   const comprobantePorPago = new Map(comprobantesPago.map((a) => [a.entidadId, a]));
 
@@ -392,6 +396,7 @@ export default async function ServicioDetallePage({
             description={servicio.descripcion}
             action={crearPago}
             servicioFijo={{ id: servicio.id, label: servicio.descripcion }}
+            cuentas={esAdminUsuario ? cuentasDisponibles : undefined}
             submitLabel="Registrar pago"
           />
         </CardHeader>
@@ -414,11 +419,13 @@ export default async function ServicioDetallePage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {servicio.pagos.map((p) => (
+                {servicio.pagos.map((p) => {
+                const cuentaNombre = esAdminUsuario ? (p.cuenta?.alias ?? p.cuentaTexto) : null;
+                return (
                   <TableRow key={p.id}>
                     <TableCell>{formatDate(p.fecha)}</TableCell>
                     <TableCell>{p.metodoPago}</TableCell>
-                    <TableCell>{p.cuenta ?? "—"}</TableCell>
+                    <TableCell>{cuentaNombre ?? "—"}</TableCell>
                     <TableCell>
                       <Badge className={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}>
                         {p.confirmado ? "Confirmado" : "Pendiente"}
@@ -445,7 +452,7 @@ export default async function ServicioDetallePage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
-                            cuenta: p.cuenta,
+                            cuentaNombre,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
                             servicio: {
@@ -467,6 +474,7 @@ export default async function ServicioDetallePage({
                           title="Editar pago"
                           action={actualizarPago.bind(null, p.id)}
                           servicioFijo={{ id: servicio.id, label: servicio.descripcion }}
+                          cuentas={esAdminUsuario ? cuentasDisponibles : undefined}
                           defaultValues={{
                             servicioId: p.servicioId,
                             fecha: p.fecha,
@@ -474,7 +482,7 @@ export default async function ServicioDetallePage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
-                            cuenta: p.cuenta,
+                            cuentaId: p.cuentaId,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
                           }}
@@ -489,7 +497,7 @@ export default async function ServicioDetallePage({
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                );})}
               </TableBody>
             </Table>
           )}

@@ -29,7 +29,9 @@ export type PagoDetalle = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
-  cuenta: string | null;
+  // Ya resuelto por quien arma este objeto: p.cuenta?.alias ?? p.cuentaTexto
+  // (el que llame decide si el visitante puede ver esto — no todos deben).
+  cuentaNombre: string | null;
   comprobante: string | null;
   confirmado: boolean;
   servicio: { descripcion: string; cliente: { nombre: string } };
@@ -127,7 +129,7 @@ export function PagoDetalleDialog({
             </div>
             <div>
               <p className="text-muted-foreground">Cuenta</p>
-              <p>{pago.cuenta ?? "—"}</p>
+              <p>{pago.cuentaNombre ?? "—"}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Moneda</p>

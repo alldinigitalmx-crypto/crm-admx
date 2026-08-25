@@ -10,39 +10,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { GastoForm, type CuentaOption } from "@/components/gastos/gasto-form";
-import type { GastoFormState } from "@/app/admin/gastos/actions";
+import { CuentaForm } from "@/components/cuentas/cuenta-form";
+import type { CuentaFormState } from "@/app/admin/cuentas/actions";
 
-type GastoDefaults = {
-  descripcion: string;
-  categoria: string;
-  ambito: string;
-  monto: number | string | { toString(): string };
-  metodoPago: string | null;
-  fecha: Date;
-  cuentaId: number | null;
-  comprobante: string | null;
+type CuentaDefaults = {
+  alias: string;
+  tipo: string;
+  banco: string | null;
+  numeroCuenta: string | null;
+  clabe: string | null;
+  swift: string | null;
+  saldoInicial: number | string | { toString(): string };
+  activa: boolean;
   notas: string | null;
 };
 
-export function GastoFormDialog({
+export function CuentaFormDialog({
   trigger,
   title,
   description,
   action,
-  cuentas,
   defaultValues,
   submitLabel,
 }: {
   trigger: React.ReactNode;
   title: string;
   description?: string;
-  action: (
-    prevState: GastoFormState,
-    formData: FormData
-  ) => Promise<GastoFormState>;
-  cuentas?: CuentaOption[];
-  defaultValues?: GastoDefaults;
+  action: (prevState: CuentaFormState, formData: FormData) => Promise<CuentaFormState>;
+  defaultValues?: CuentaDefaults;
   submitLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -55,9 +50,8 @@ export function GastoFormDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <GastoForm
+        <CuentaForm
           action={action}
-          cuentas={cuentas}
           defaultValues={defaultValues}
           submitLabel={submitLabel}
           onSuccess={() => setOpen(false)}

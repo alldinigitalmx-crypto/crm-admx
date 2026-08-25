@@ -331,7 +331,7 @@ async function main() {
         metodoPago: mapMetodoPago(String(metodoRaw)),
         monto: num(montoRaw),
         comision: comisionRaw ?? null,
-        cuenta: str(cuenta),
+        cuentaTexto: str(cuenta),
         confirmado: true,
       },
     });

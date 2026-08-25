@@ -23,10 +23,12 @@ function parseGastoForm(formData: FormData) {
   const metodoPagoRaw = String(formData.get("metodoPago") ?? "");
   const metodoPago = metodoPagoRaw && metodoPagoRaw !== "none" ? (metodoPagoRaw as MetodoPago) : null;
   const fechaRaw = String(formData.get("fecha") ?? "");
+  const cuentaIdRaw = String(formData.get("cuentaId") ?? "");
+  const cuentaId = cuentaIdRaw && cuentaIdRaw !== "none" ? Number(cuentaIdRaw) : null;
   const comprobante = String(formData.get("comprobante") ?? "").trim() || null;
   const notas = String(formData.get("notas") ?? "").trim() || null;
 
-  return { descripcion, categoria, ambito, montoRaw, metodoPago, fechaRaw, comprobante, notas };
+  return { descripcion, categoria, ambito, montoRaw, metodoPago, fechaRaw, cuentaId, comprobante, notas };
 }
 
 function validateGastoForm(data: ReturnType<typeof parseGastoForm>) {
@@ -60,6 +62,7 @@ export async function crearGasto(
       monto: data.montoRaw,
       metodoPago: data.metodoPago,
       fecha: data.fechaRaw ? new Date(data.fechaRaw) : new Date(),
+      cuentaId: data.cuentaId,
       comprobante: data.comprobante,
       notas: data.notas,
       creadoPorId: userId,
@@ -92,6 +95,7 @@ export async function actualizarGasto(
       monto: data.montoRaw,
       metodoPago: data.metodoPago,
       fecha: data.fechaRaw ? new Date(data.fechaRaw) : new Date(),
+      cuentaId: data.cuentaId,
       comprobante: data.comprobante,
       notas: data.notas,
     },

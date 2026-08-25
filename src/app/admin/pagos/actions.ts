@@ -24,7 +24,13 @@ function parsePagoForm(formData: FormData) {
   const comisionRaw = String(formData.get("comision") ?? "");
   const monedaRaw = String(formData.get("moneda") ?? "");
   const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
-  const cuenta = String(formData.get("cuenta") ?? "").trim() || null;
+  // El select de Cuenta solo se manda al formulario para un Admin — si el
+  // campo ni siquiera vino (usuario interno normal) no se debe tocar el
+  // cuentaId que ya tuviera el pago, a diferencia de que sí venga vacío
+  // ("Sin cuenta" elegido a propósito).
+  const cuentaIdRaw = formData.get("cuentaId");
+  const cuentaIdProvisto = cuentaIdRaw !== null;
+  const cuentaId = cuentaIdRaw && cuentaIdRaw !== "none" ? Number(cuentaIdRaw) : null;
   const comprobante = String(formData.get("comprobante") ?? "").trim() || null;
   const comprobanteArchivo = String(formData.get("comprobanteArchivo") ?? "").trim() || null;
   const confirmado = formData.get("confirmado") === "on";
@@ -36,7 +42,8 @@ function parsePagoForm(formData: FormData) {
     montoRaw,
     comisionRaw,
     moneda,
-    cuenta,
+    cuentaId,
+    cuentaIdProvisto,
     comprobante,
     comprobanteArchivo,
     confirmado,
@@ -93,7 +100,7 @@ export async function crearPago(
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
       moneda: data.moneda,
-      cuenta: data.cuenta,
+      cuentaId: data.cuentaId,
       comprobante: data.comprobante,
       confirmado: data.confirmado,
       confirmadoPorId: data.confirmado ? userId : null,
@@ -151,7 +158,7 @@ export async function actualizarPago(
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
       moneda: data.moneda,
-      cuenta: data.cuenta,
+      ...(data.cuentaIdProvisto ? { cuentaId: data.cuentaId } : {}),
       comprobante: data.comprobante,
       confirmado: data.confirmado,
       confirmadoPorId: seConfirmaAhora ? userId : pago.confirmadoPorId,

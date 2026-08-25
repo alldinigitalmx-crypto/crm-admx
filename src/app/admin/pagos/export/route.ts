@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
-import { permisosModulo } from "@/lib/alcance";
+import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { buildExcelResponse } from "@/lib/excel";
 import type { MetodoPago, Prisma } from "@/generated/prisma/client";
 
@@ -30,9 +30,10 @@ export async function GET(request: Request) {
   }
   if (!permisos.verTodo && usuario) where.servicio = { responsableId: usuario.id };
 
+  const esAdminUsuario = esAdmin(usuario);
   const pagos = await prisma.pago.findMany({
     where,
-    include: { servicio: { include: { cliente: true } } },
+    include: { servicio: { include: { cliente: true } }, cuenta: true },
     orderBy: { fecha: "desc" },
   });
 
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
       cliente: p.servicio.cliente.nombre,
       fecha: p.fecha,
       metodoPago: p.metodoPago,
-      cuenta: p.cuenta ?? "",
+      cuenta: esAdminUsuario ? (p.cuenta?.alias ?? p.cuentaTexto ?? "") : "",
       status: p.confirmado ? "Confirmado" : "Pendiente",
       comision: p.comision ? Number(p.comision) : 0,
       monto: Number(p.monto),

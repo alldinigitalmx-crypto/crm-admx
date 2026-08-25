@@ -53,7 +53,10 @@ export default async function GastosPage({
 
   const hasFiltros = Boolean(ambito || categoria || desde || hasta);
 
-  const gastos = await prisma.gasto.findMany({ where, orderBy: { fecha: "desc" } });
+  const [gastos, cuentasDisponibles] = await Promise.all([
+    prisma.gasto.findMany({ where, include: { cuenta: true }, orderBy: { fecha: "desc" } }),
+    prisma.cuenta.findMany({ where: { activa: true }, orderBy: { alias: "asc" } }),
+  ]);
   const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
 
   return (
@@ -77,6 +80,7 @@ export default async function GastosPage({
           }
           title="Nuevo gasto"
           action={crearGasto}
+          cuentas={cuentasDisponibles}
           submitLabel="Registrar gasto"
         />
       </div>
@@ -149,6 +153,7 @@ export default async function GastosPage({
                     <TableHead>Descripción</TableHead>
                     <TableHead>Categoría</TableHead>
                     <TableHead>Ámbito</TableHead>
+                    <TableHead>Cuenta</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead className="w-20" />
@@ -173,6 +178,7 @@ export default async function GastosPage({
                       <TableCell>
                         <Badge className={AMBITO_COLOR[g.ambito]}>{g.ambito}</Badge>
                       </TableCell>
+                      <TableCell className="truncate">{g.cuenta?.alias ?? "—"}</TableCell>
                       <TableCell>{formatDate(g.fecha)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(g.monto)}</TableCell>
                       <TableCell>
@@ -185,6 +191,7 @@ export default async function GastosPage({
                             }
                             title="Editar gasto"
                             action={actualizarGasto.bind(null, g.id)}
+                            cuentas={cuentasDisponibles}
                             defaultValues={g}
                             submitLabel="Guardar cambios"
                           />
@@ -225,6 +232,7 @@ export default async function GastosPage({
                             }
                             title="Editar gasto"
                             action={actualizarGasto.bind(null, g.id)}
+                            cuentas={cuentasDisponibles}
                             defaultValues={g}
                             submitLabel="Guardar cambios"
                           />

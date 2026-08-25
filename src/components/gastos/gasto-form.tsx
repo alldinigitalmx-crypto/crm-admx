@@ -22,9 +22,12 @@ type GastoDefaults = {
   monto: number | string | { toString(): string };
   metodoPago: string | null;
   fecha: Date;
+  cuentaId: number | null;
   comprobante: string | null;
   notas: string | null;
 };
+
+export type CuentaOption = { id: number; alias: string };
 
 function toDateInputValue(d: Date | null | undefined) {
   if (!d) return "";
@@ -33,6 +36,7 @@ function toDateInputValue(d: Date | null | undefined) {
 
 export function GastoForm({
   action,
+  cuentas,
   defaultValues,
   submitLabel,
   onSuccess,
@@ -42,6 +46,7 @@ export function GastoForm({
     prevState: GastoFormState,
     formData: FormData
   ) => Promise<GastoFormState>;
+  cuentas?: CuentaOption[];
   defaultValues?: GastoDefaults;
   submitLabel: string;
   onSuccess?: () => void;
@@ -153,6 +158,25 @@ export function GastoForm({
             </SelectContent>
           </Select>
         </div>
+
+        {cuentas && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="cuentaId">Cuenta de donde salió</Label>
+            <Select name="cuentaId" defaultValue={defaultValues?.cuentaId ? String(defaultValues.cuentaId) : "none"}>
+              <SelectTrigger id="cuentaId" className="w-full">
+                <SelectValue placeholder="Sin cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin cuenta</SelectItem>
+                {cuentas.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.alias}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="comprobante">Comprobante / referencia</Label>

@@ -109,6 +109,12 @@ export const GASTO_AMBITO_ICON: IconMap = {
   Personal: User,
 };
 
+export const TIPO_CUENTA_COLOR: Record<string, string> = {
+  Banco: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  Efectivo: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  Billetera: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+};
+
 export const USUARIO_ROL_COLOR: Record<string, string> = {
   Admin: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
   Interno: "bg-primary/10 text-primary",
