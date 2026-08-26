@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ReloadButton } from "@/components/reload-button";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -35,6 +36,7 @@ export function AdminTopbar({
       </div>
 
       <div className="flex items-center gap-2">
+        <ReloadButton />
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

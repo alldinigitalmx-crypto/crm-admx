@@ -3,6 +3,7 @@
 import { LogOut, Code2 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ReloadButton } from "@/components/reload-button";
 import { Button } from "@/components/ui/button";
 
 export function PortalTopbar({
@@ -25,6 +26,7 @@ export function PortalTopbar({
         {userName && (
           <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
         )}
+        <ReloadButton />
         <ThemeToggle />
         <form action={onSignOut}>
           <Button type="submit" variant="ghost" size="icon" title="Cerrar sesión">
