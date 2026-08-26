@@ -74,6 +74,21 @@ const styles = StyleSheet.create({
   totalBar: { width: 3, backgroundColor: ACCENT, marginRight: 10 },
   totalText: { fontSize: 14, fontWeight: 700, paddingVertical: 4 },
 
+  pagoRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 6 },
+  paidBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#ffffff",
+    backgroundColor: "#15803d",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 3,
+  },
+  cuentaBox: { alignItems: "flex-end" },
+  cuentaLine: { fontSize: 9, color: "#374151", marginTop: 2 },
+  cuentaLineLabel: { fontWeight: 700, color: INK },
+  cuentaPendiente: { fontSize: 9, color: "#b45309", marginTop: 2, fontWeight: 700 },
+
   paymentsRow: { flexDirection: "row", marginTop: 26 },
   paymentCol: {
     flex: 1,
@@ -98,8 +113,13 @@ const styles = StyleSheet.create({
   footer: { marginTop: 32, textAlign: "center", fontSize: 10, color: MUTED },
 });
 
-const currency = (n: number) =>
-  `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Mismo criterio que formatCurrency() (src/lib/format.ts): MXN no lleva
+// sufijo, USD/COP sí, para no confundirlo con pesos ya que los tres usan
+// el símbolo "$".
+const currency = (n: number, moneda?: string | null) => {
+  const monto = `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return moneda && moneda !== "MXN" ? `${monto} ${moneda}` : monto;
+};
 
 const fechaFormatter = new Intl.DateTimeFormat("es-MX", {
   day: "2-digit",
@@ -121,8 +141,15 @@ export type CotizacionPdfProps = {
     descuentoValor: number | null;
     descuentoMotivo: string | null;
     montoTotal: number;
+    moneda: string | null;
     fechaEmision: Date;
     fechaVencimiento: Date | null;
+  };
+  pago: {
+    pagada: boolean;
+    montoPagado: number;
+    montoPendiente: number;
+    fechaPago: Date | null;
   };
   servicio: {
     descripcion: string;
@@ -134,7 +161,7 @@ export type CotizacionPdfProps = {
   cliente: { nombre: string; email: string | null };
 };
 
-export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: CotizacionPdfProps) {
+export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: CotizacionPdfProps) {
   const montoDescuento =
     cotizacion.descuentoTipo === "Porcentaje"
       ? cotizacion.montoSubtotal * ((cotizacion.descuentoValor ?? 0) / 100)
@@ -216,10 +243,10 @@ export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: Cotizac
           <Text style={[styles.colQty, styles.cellText]}>1</Text>
           <Text style={[styles.colUnit, styles.cellText]}>Servicio</Text>
           <Text style={[styles.colPrice, styles.cellText]}>
-            {currency(cotizacion.montoSubtotal)}
+            {currency(cotizacion.montoSubtotal, cotizacion.moneda)}
           </Text>
           <Text style={[styles.colSubtotal, styles.cellText]}>
-            {currency(cotizacion.montoSubtotal)}
+            {currency(cotizacion.montoSubtotal, cotizacion.moneda)}
           </Text>
         </View>
 
@@ -235,14 +262,34 @@ export function CotizacionPdfDocument({ cotizacion, servicio, cliente }: Cotizac
             <Text style={[styles.colUnit, styles.cellText]}>—</Text>
             <Text style={[styles.colPrice, styles.cellText]}>—</Text>
             <Text style={[styles.colSubtotal, styles.cellText]}>
-              -{currency(montoDescuento)}
+              -{currency(montoDescuento, cotizacion.moneda)}
             </Text>
           </View>
         )}
 
         <View style={styles.totalRow}>
           <View style={styles.totalBar} />
-          <Text style={styles.totalText}>Total: {currency(cotizacion.montoTotal)}</Text>
+          <Text style={styles.totalText}>
+            Total: {currency(cotizacion.montoTotal, cotizacion.moneda)}
+          </Text>
+        </View>
+
+        <View style={styles.pagoRow}>
+          {pago.pagada ? (
+            <Text style={styles.paidBadge}>
+              ✓ PAGADO{pago.fechaPago ? ` — ${fechaCorta(pago.fechaPago)}` : ""}
+            </Text>
+          ) : pago.montoPagado > 0 ? (
+            <View style={styles.cuentaBox}>
+              <Text style={styles.cuentaLine}>
+                <Text style={styles.cuentaLineLabel}>A cuenta: </Text>
+                {currency(pago.montoPagado, cotizacion.moneda)}
+              </Text>
+              <Text style={styles.cuentaPendiente}>
+                Saldo pendiente: {currency(pago.montoPendiente, cotizacion.moneda)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.paymentsRow}>
