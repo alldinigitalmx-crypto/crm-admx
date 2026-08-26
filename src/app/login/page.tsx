@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { signIn } from "@/auth";
+import { auth, signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,15 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; restablecido?: string }>;
 }) {
   const { error, restablecido } = await searchParams;
+
+  // Si el ícono de "agregar a pantalla de inicio" (start_url en el
+  // manifest) abre directo aquí, y la sesión sigue viva (con "Mantener
+  // sesión iniciada" puede durar hasta 90 días), no tiene sentido
+  // mostrar el formulario de nuevo — se manda directo al panel.
+  const session = await auth();
+  if (session?.user && (session.user as { role?: string }).role === "admin") {
+    redirect("/admin");
+  }
 
   async function login(formData: FormData) {
     "use server";

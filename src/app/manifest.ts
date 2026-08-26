@@ -20,7 +20,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Admx Dev — Panel",
     short_name: "Admx Dev",
     description: "CRM interno de Admx Dev",
-    start_url: "/login",
+    // Antes apuntaba a "/login": el ícono de pantalla de inicio siempre
+    // abría el formulario de login sin fijarse si la sesión seguía viva.
+    // Ahora abre "/admin" directo -- si hay sesión válida entra al panel,
+    // y si no, el proxy (src/proxy.ts) rebota a /login solo.
+    start_url: "/admin",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",

@@ -1,4 +1,4 @@
-import { signIn } from "@/auth";
+import { auth, signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,14 @@ export default async function PortalLoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+
+  // Mismo caso que /login: si el ícono de la app en el celular abre
+  // directo aquí y la sesión del cliente sigue viva, no tiene caso
+  // pedirle que inicie sesión de nuevo.
+  const session = await auth();
+  if (session?.user && (session.user as { role?: string }).role === "cliente") {
+    redirect("/portal");
+  }
 
   async function login(formData: FormData) {
     "use server";
