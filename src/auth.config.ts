@@ -22,6 +22,7 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.remember = (user as { remember?: boolean }).remember ?? false;
       }
       return token;
     },

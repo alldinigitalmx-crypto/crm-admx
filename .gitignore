@@ -44,3 +44,6 @@ next-env.d.ts
 
 # artefactos de importaciones puntuales (mapeos locales, no aplican en otras máquinas)
 scripts/_appsheet-import-checkpoint.json
+
+.vercel
+.env*

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThemedLogo } from "@/components/themed-logo";
 import { Code2, Mail, Lock, Briefcase, FileText, CreditCard } from "lucide-react";
@@ -22,6 +23,7 @@ export default async function LoginPage({
       await signIn("admin-login", {
         email: formData.get("email"),
         password: formData.get("password"),
+        remember: formData.get("remember") === "on" ? "true" : "false",
         redirectTo: "/admin",
       });
     } catch (err) {
@@ -155,6 +157,13 @@ export default async function LoginPage({
                     className="pl-9"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox id="remember" name="remember" defaultChecked />
+                <Label htmlFor="remember" className="font-normal text-muted-foreground">
+                  Mantener sesión iniciada en este dispositivo
+                </Label>
               </div>
 
               <Button type="submit" className="mt-2 w-full">
