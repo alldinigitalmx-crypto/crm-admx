@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { ThemedLogo } from "@/components/themed-logo";
+import { QuejaFormPublica } from "@/components/quejas/queja-form-publica";
+import { crearQuejaPublica } from "@/app/servicio/actions";
 
 const STATUS_LABEL: Record<string, string> = {
   Cotizado: "Cotizado",
@@ -251,6 +253,15 @@ export default async function ServicioPublicoPage({
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Quejas y sugerencias</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <QuejaFormPublica action={crearQuejaPublica.bind(null, token)} />
           </CardContent>
         </Card>
 

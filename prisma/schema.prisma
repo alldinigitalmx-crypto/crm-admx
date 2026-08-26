@@ -476,6 +476,7 @@ enum CategoriaQueja {
   Falla
   Cobro
   Atencion
+  Sugerencia
   Otro
 }
 

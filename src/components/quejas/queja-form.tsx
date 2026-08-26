@@ -17,7 +17,7 @@ import type { QuejaFormState } from "@/app/admin/quejas/actions";
 type ServicioOption = { id: number; descripcion: string };
 export type ClienteOption = { id: number; nombre: string; servicios: ServicioOption[] };
 
-const CATEGORIAS = ["Falla", "Cobro", "Atencion", "Otro"];
+const CATEGORIAS = ["Falla", "Cobro", "Atencion", "Sugerencia", "Otro"];
 
 export function QuejaForm({
   action,
