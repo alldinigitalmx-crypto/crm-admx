@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { requiereNivel, requiereNivelServicio } from "@/lib/alcance";
@@ -199,6 +200,11 @@ export async function rechazarOrdenCambio(ordenId: number, servicioId: number) {
 
 export type EvidenciaFormState = { error?: string } | undefined;
 
+// "imagen" y "video-archivo" llegan ya subidos a Vercel Blob desde el
+// navegador (evidencia-form.tsx) -- aquí solo se registra la URL que
+// regresó el upload. "video-liga" es la ruta vieja para pegar un link de
+// Loom/Drive/YouTube, que sigue viva porque no todo cliente quiere
+// descargar el archivo real.
 export async function subirEvidencia(
   servicioId: number,
   _prevState: EvidenciaFormState,
@@ -213,7 +219,7 @@ export async function subirEvidencia(
 
   const userId = await currentUserId();
 
-  if (tipoInput === "video") {
+  if (tipoInput === "video-liga") {
     const url = String(formData.get("videoUrl") ?? "").trim();
     if (!url.startsWith("http")) {
       return { error: "Pega una liga válida (Loom, Drive, YouTube, etc.)." };
@@ -229,17 +235,24 @@ export async function subirEvidencia(
       },
     });
   } else {
-    const dataUrl = String(formData.get("imagen") ?? "");
-    if (!dataUrl.startsWith("data:image")) {
-      return { error: "Selecciona una imagen." };
+    const url = String(formData.get("archivoUrl") ?? "").trim();
+    const tamanioRaw = formData.get("tamanioBytes");
+    const tamanioBytes = tamanioRaw ? Number(tamanioRaw) : null;
+
+    if (!url.startsWith("https://")) {
+      return {
+        error: tipoInput === "video-archivo" ? "Sube un archivo de video." : "Selecciona una imagen.",
+      };
     }
+
     await prisma.archivo.create({
       data: {
         entidadTipo: "Servicio",
         entidadId: servicioId,
-        nombre: titulo || "Evidencia",
-        url: dataUrl,
-        tipo: "Imagen",
+        nombre: titulo || (tipoInput === "video-archivo" ? "Video" : "Evidencia"),
+        url,
+        tipo: tipoInput === "video-archivo" ? "Video" : "Imagen",
+        tamanioBytes: tamanioBytes && Number.isFinite(tamanioBytes) ? tamanioBytes : null,
         subidoPorId: userId,
       },
     });
@@ -251,6 +264,19 @@ export async function subirEvidencia(
 
 export async function eliminarEvidencia(archivoId: number, servicioId: number) {
   if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
+
+  const archivo = await prisma.archivo.findUnique({ where: { id: archivoId } });
+
+  // Solo intenta borrar del blob si de verdad vive ahí -- las ligas
+  // externas (Loom/Drive/YouTube) y los dataURL viejos no son blobs
+  // nuestros y no hay nada que borrar en Vercel.
+  if (archivo?.url.includes(".public.blob.vercel-storage.com")) {
+    try {
+      await del(archivo.url);
+    } catch {
+      // Si ya no existe en el store, no bloquea el borrado del registro.
+    }
+  }
 
   await prisma.archivo.delete({ where: { id: archivoId } });
   revalidatePath(`/admin/servicios/${servicioId}`);

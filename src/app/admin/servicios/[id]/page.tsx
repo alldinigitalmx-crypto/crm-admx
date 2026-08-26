@@ -511,7 +511,7 @@ export default async function ServicioDetallePage({
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <EvidenciaForm action={boundSubirEvidencia} />
+          <EvidenciaForm servicioId={servicio.id} action={boundSubirEvidencia} />
 
           {evidencias.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -526,6 +526,13 @@ export default async function ServicioDetallePage({
                       src={ev.url}
                       alt={ev.nombre}
                       className="h-32 w-full rounded-md object-cover"
+                    />
+                  ) : ev.url.includes(".public.blob.vercel-storage.com") ? (
+                    <video
+                      src={ev.url}
+                      controls
+                      preload="metadata"
+                      className="h-32 w-full rounded-md bg-black object-contain"
                     />
                   ) : (
                     <a
