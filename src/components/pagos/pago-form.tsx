@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,41 @@ export function PagoForm({
   const [moneda, setMoneda] = useState(
     defaultValues?.moneda && defaultValues.moneda !== "MXN" ? defaultValues.moneda : "USD"
   );
+  const montoRef = useRef<HTMLInputElement>(null);
+  const montoMXNRef = useRef<HTMLInputElement>(null);
+  const [cargandoTipoCambio, setCargandoTipoCambio] = useState(false);
+  const [tipoCambioInfo, setTipoCambioInfo] = useState<{ rate: number; fecha: string | null } | null>(
+    null
+  );
+  const [tipoCambioError, setTipoCambioError] = useState<string | null>(null);
+
+  // PayPal sí convierte solo a pesos cuando el cobro es en dólares, pero
+  // ese tipo de cambio (con el margen que le aplica PayPal) solo lo sabe
+  // PayPal -- este botón nada más sugiere un punto de partida con el tipo
+  // de cambio del día (Frankfurter/BCE), que el usuario puede ajustar si
+  // PayPal le mostró otro número.
+  async function usarTipoCambioDeHoy() {
+    const montoActual = Number(montoRef.current?.value ?? "");
+    if (!montoActual || montoActual <= 0) {
+      setTipoCambioError("Captura primero el monto en dólares.");
+      return;
+    }
+    setCargandoTipoCambio(true);
+    setTipoCambioError(null);
+    try {
+      const res = await fetch(`/api/tipo-cambio?from=USD&monto=${montoActual}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "No se pudo obtener el tipo de cambio.");
+      if (montoMXNRef.current) montoMXNRef.current.value = Number(data.mxn).toFixed(2);
+      setTipoCambioInfo({ rate: data.rate, fecha: data.fecha });
+    } catch (err) {
+      setTipoCambioError(
+        err instanceof Error ? err.message : "No se pudo obtener el tipo de cambio."
+      );
+    } finally {
+      setCargandoTipoCambio(false);
+    }
+  }
 
   function onArchivoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -169,6 +205,7 @@ export function PagoForm({
           <Input
             id="monto"
             name="monto"
+            ref={montoRef}
             type="number"
             step="0.01"
             min="0.01"
@@ -240,23 +277,60 @@ export function PagoForm({
 
               <div className="flex min-w-0 flex-col gap-2">
                 <Label htmlFor="montoMXN">Equivalente en pesos (MXN) *</Label>
-                <Input
-                  id="montoMXN"
-                  name="montoMXN"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  defaultValue={defaultValues?.montoMXN ? String(defaultValues.montoMXN) : ""}
-                  placeholder="0.00"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="montoMXN"
+                    name="montoMXN"
+                    ref={montoMXNRef}
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    defaultValue={defaultValues?.montoMXN ? String(defaultValues.montoMXN) : ""}
+                    placeholder="0.00"
+                    onChange={() => setTipoCambioInfo(null)}
+                  />
+                  {moneda === "USD" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Sugerir con el tipo de cambio de hoy"
+                      disabled={cargandoTipoCambio}
+                      onClick={usarTipoCambioDeHoy}
+                    >
+                      <Wand2 className={cargandoTipoCambio ? "animate-pulse" : undefined} />
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              <p className="text-xs text-muted-foreground sm:col-span-2">
-                El campo &quot;Monto&quot; de arriba es en {moneda}. Aquí captura cuánto
-                representó en pesos mexicanos — los reportes siempre suman en MXN, así que sin
-                este dato un pago en {moneda} no cuenta bien.
-              </p>
+              <div className="text-xs text-muted-foreground sm:col-span-2">
+                <p>
+                  El campo &quot;Monto&quot; de arriba es en {moneda}. Aquí captura cuánto
+                  representó en pesos mexicanos — los reportes siempre suman en MXN, así que sin
+                  este dato un pago en {moneda} no cuenta bien.
+                </p>
+                {moneda === "USD" && (
+                  <p className="mt-1">
+                    {tipoCambioError ? (
+                      <span className="text-destructive">{tipoCambioError}</span>
+                    ) : tipoCambioInfo ? (
+                      <>
+                        Sugerido con 1 USD ≈ {tipoCambioInfo.rate.toFixed(2)} MXN (
+                        {tipoCambioInfo.fecha ?? "hoy"}) — ajústalo si PayPal te mostró otro
+                        número, el suyo trae su propio margen.
+                      </>
+                    ) : (
+                      <>
+                        Usa <Wand2 className="inline size-3" /> para partir del tipo de cambio de
+                        hoy — PayPal aplica el suyo (con su margen), así que revisa que coincida
+                        con lo que a ti te mostró.
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
