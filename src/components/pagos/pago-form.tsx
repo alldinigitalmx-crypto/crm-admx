@@ -69,8 +69,14 @@ export function PagoForm({
   const [state, formAction, isPending] = useActionState(wrappedAction, undefined);
   const [archivoDataUrl, setArchivoDataUrl] = useState<string | null>(null);
   const [archivoNombre, setArchivoNombre] = useState<string | null>(null);
-  const [moneda, setMoneda] = useState(defaultValues?.moneda ?? "MXN");
-  const monedaEsExtranjera = moneda !== "MXN";
+  // El check arranca marcado si el pago que se edita ya venía en otra
+  // moneda -- así no se le "esconde" el dato al abrir para editarlo.
+  const [monedaEsExtranjera, setMonedaEsExtranjera] = useState(
+    Boolean(defaultValues?.moneda && defaultValues.moneda !== "MXN")
+  );
+  const [moneda, setMoneda] = useState(
+    defaultValues?.moneda && defaultValues.moneda !== "MXN" ? defaultValues.moneda : "USD"
+  );
 
   function onArchivoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -127,7 +133,7 @@ export function PagoForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="fecha">Fecha</Label>
           <Input
             id="fecha"
@@ -137,7 +143,7 @@ export function PagoForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="metodoPago">Método de pago *</Label>
           <Select name="metodoPago" required defaultValue={defaultValues?.metodoPago ?? "Transferencia"}>
             <SelectTrigger id="metodoPago" className="w-full">
@@ -158,7 +164,7 @@ export function PagoForm({
           </Select>
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="monto">Monto *</Label>
           <Input
             id="monto"
@@ -172,7 +178,7 @@ export function PagoForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="comision">Comisión</Label>
           <Input
             id="comision"
@@ -186,7 +192,7 @@ export function PagoForm({
         </div>
 
         {cuentas && (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label htmlFor="cuentaId">Cuenta</Label>
             <Select name="cuentaId" defaultValue={defaultValues?.cuentaId ? String(defaultValues.cuentaId) : "none"}>
               <SelectTrigger id="cuentaId" className="w-full">
@@ -204,41 +210,58 @@ export function PagoForm({
           </div>
         )}
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="moneda">Moneda</Label>
-          <Select name="moneda" value={moneda} onValueChange={setMoneda}>
-            <SelectTrigger id="moneda" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MXN">MXN</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-              <SelectItem value="COP">COP</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-input p-3 sm:col-span-2">
+          <input type="hidden" name="moneda" value={monedaEsExtranjera ? moneda : "MXN"} />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="monedaEsExtranjera"
+              checked={monedaEsExtranjera}
+              onCheckedChange={(v) => setMonedaEsExtranjera(v === true)}
+            />
+            <Label htmlFor="monedaEsExtranjera" className="font-normal">
+              Este pago fue en otra moneda (no pesos)
+            </Label>
+          </div>
+
+          {monedaEsExtranjera && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <Label htmlFor="monedaSelect">Moneda</Label>
+                <Select value={moneda} onValueChange={setMoneda}>
+                  <SelectTrigger id="monedaSelect" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="COP">COP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-2">
+                <Label htmlFor="montoMXN">Equivalente en pesos (MXN) *</Label>
+                <Input
+                  id="montoMXN"
+                  name="montoMXN"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  defaultValue={defaultValues?.montoMXN ? String(defaultValues.montoMXN) : ""}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                El campo &quot;Monto&quot; de arriba es en {moneda}. Aquí captura cuánto
+                representó en pesos mexicanos — los reportes siempre suman en MXN, así que sin
+                este dato un pago en {moneda} no cuenta bien.
+              </p>
+            </div>
+          )}
         </div>
 
-        {monedaEsExtranjera && (
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label htmlFor="montoMXN">Equivalente en pesos (MXN) *</Label>
-            <Input
-              id="montoMXN"
-              name="montoMXN"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              defaultValue={defaultValues?.montoMXN ? String(defaultValues.montoMXN) : ""}
-              placeholder="0.00"
-            />
-            <p className="text-xs text-muted-foreground">
-              Cuánto representó este pago en pesos mexicanos — los reportes siempre suman en
-              MXN, así que un pago en {moneda} necesita este dato para contar bien.
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="comprobante">Referencia</Label>
           <Input
             id="comprobante"
@@ -248,7 +271,7 @@ export function PagoForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="comprobanteArchivo">Comprobante (imagen o PDF)</Label>
           <Input
             id="comprobanteArchivo"
