@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       { header: "Intermediario", key: "intermediario", width: 20 },
       { header: "Inicio", key: "fechaInicio", width: 14 },
       { header: "Monto", key: "monto", width: 14 },
+      { header: "Moneda", key: "moneda", width: 12 },
     ],
     servicios.map((s) => ({
       descripcion: s.descripcion,
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
       intermediario: s.intermediario?.nombre ?? "",
       fechaInicio: s.fechaInicio,
       monto: montoTotalServicio(s),
+      moneda: s.moneda ?? "MXN",
     }))
   );
 }

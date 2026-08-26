@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { buildExcelResponse } from "@/lib/excel";
+import { montoEnMXN } from "@/lib/pago-monto";
 import type { MetodoPago, Prisma } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -48,7 +49,9 @@ export async function GET(request: Request) {
       { header: "Cuenta", key: "cuenta", width: 16 },
       { header: "Status", key: "status", width: 14 },
       { header: "Comisión", key: "comision", width: 14 },
+      { header: "Moneda", key: "moneda", width: 12 },
       { header: "Monto", key: "monto", width: 14 },
+      { header: "Monto (MXN)", key: "montoMXN", width: 14 },
     ],
     pagos.map((p) => ({
       servicio: p.servicio.descripcion,
@@ -58,7 +61,9 @@ export async function GET(request: Request) {
       cuenta: esAdminUsuario ? (p.cuenta?.alias ?? p.cuentaTexto ?? "") : "",
       status: p.confirmado ? "Confirmado" : "Pendiente",
       comision: p.comision ? Number(p.comision) : 0,
+      moneda: p.moneda ?? "MXN",
       monto: Number(p.monto),
+      montoMXN: montoEnMXN(p),
     }))
   );
 }

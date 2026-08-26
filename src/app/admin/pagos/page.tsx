@@ -4,6 +4,7 @@ import { Plus, Pencil, Download, CheckCircle2, Clock } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { montoEnMXN } from "@/lib/pago-monto";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,8 +115,14 @@ export default async function PagosPage({
   if (desde) exportParams.set("desde", desde);
   if (hasta) exportParams.set("hasta", hasta);
 
-  const [agregados, pagos] = await Promise.all([
-    prisma.pago.aggregate({ where, _sum: { monto: true, comision: true }, _count: true }),
+  const [agregados, montosParaTotal, pagos] = await Promise.all([
+    prisma.pago.aggregate({ where, _sum: { comision: true }, _count: true }),
+    // Aparte del aggregate de Prisma (que solo puede sumar la columna en
+    // crudo): un pago en USD/COP no se puede sumar junto con uno en MXN
+    // sin convertir primero, así que este total se arma en JS con
+    // montoEnMXN() sobre TODOS los pagos que cumplen el filtro (no un
+    // _sum de SQL, y no solo la página actual).
+    prisma.pago.findMany({ where, select: { monto: true, moneda: true, montoMXN: true } }),
     prisma.pago.findMany({
       where,
       include: { servicio: { include: { cliente: true } }, cuenta: true },
@@ -126,11 +133,9 @@ export default async function PagosPage({
   ]);
   const totalCount = agregados._count;
   const paginas = totalPages(totalCount);
-  // Suma sobre TODOS los pagos que cumplen el filtro, no solo la página
-  // actual — si no, el total mostrado arriba cambiaría según qué página
-  // esté viendo el usuario.
-  const totalMonto = Number(agregados._sum.monto ?? 0);
+  const totalMonto = montosParaTotal.reduce((acc, p) => acc + montoEnMXN(p), 0);
   const totalComision = Number(agregados._sum.comision ?? 0);
+  const hayMonedaExtranjera = montosParaTotal.some((p) => p.moneda && p.moneda !== "MXN");
 
   const comprobantes = await prisma.archivo.findMany({
     where: { entidadTipo: "Pago", entidadId: { in: pagos.map((p) => p.id) } },
@@ -163,6 +168,7 @@ export default async function PagosPage({
             {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
             {" — Total: "}
             {formatCurrency(totalMonto)}
+            {hayMonedaExtranjera ? " (equivalente en MXN)" : ""}
             {totalComision > 0 ? ` (comisiones: ${formatCurrency(totalComision)})` : ""}
           </p>
         </div>
@@ -330,9 +336,9 @@ export default async function PagosPage({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {p.comision ? formatCurrency(p.comision) : "—"}
+                        {p.comision ? formatCurrency(p.comision, p.moneda) : "—"}
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.monto, p.moneda)}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           {permisos.puedeEditar && !p.confirmado && (
@@ -350,6 +356,7 @@ export default async function PagosPage({
                               monto: Number(p.monto),
                               comision: p.comision ? Number(p.comision) : null,
                               moneda: p.moneda,
+                              montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                               cuentaNombre,
                               comprobante: p.comprobante,
                               confirmado: p.confirmado,
@@ -381,6 +388,7 @@ export default async function PagosPage({
                                 monto: Number(p.monto),
                                 comision: p.comision ? Number(p.comision) : null,
                                 moneda: p.moneda,
+                                montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                                 cuentaId: p.cuentaId,
                                 comprobante: p.comprobante,
                                 confirmado: p.confirmado,
@@ -414,7 +422,7 @@ export default async function PagosPage({
                     avatarClassName={p.confirmado ? CONFIRMADO_COLOR : PENDIENTE_COLOR}
                     title={p.servicio.descripcion}
                     subtitle={`${p.servicio.cliente.nombre} · ${METODO_LABEL[p.metodoPago] ?? p.metodoPago}`}
-                    meta={`${formatDate(p.fecha)} · ${formatCurrency(p.monto)}`}
+                    meta={`${formatDate(p.fecha)} · ${formatCurrency(p.monto, p.moneda)}`}
                     badge={
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -441,6 +449,7 @@ export default async function PagosPage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
+                            montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                             cuentaNombre,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
@@ -472,6 +481,7 @@ export default async function PagosPage({
                               monto: Number(p.monto),
                               comision: p.comision ? Number(p.comision) : null,
                               moneda: p.moneda,
+                              montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                               cuentaId: p.cuentaId,
                               comprobante: p.comprobante,
                               confirmado: p.confirmado,

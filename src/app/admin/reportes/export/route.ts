@@ -23,7 +23,9 @@ export async function GET(request: Request) {
         { header: "Servicio", key: "servicio", width: 32 },
         { header: "Cliente", key: "cliente", width: 26 },
         { header: "Método", key: "metodoPago", width: 18 },
-        { header: "Monto", key: "monto", width: 14 },
+        { header: "Monto (MXN)", key: "monto", width: 14 },
+        { header: "Moneda original", key: "monedaOriginal", width: 15 },
+        { header: "Monto original", key: "montoOriginal", width: 15 },
       ],
       rows: datos.pagosDetalle.map((p) => ({
         fecha: p.fecha,
@@ -31,6 +33,8 @@ export async function GET(request: Request) {
         cliente: p.cliente,
         metodoPago: p.metodoPago,
         monto: p.monto,
+        monedaOriginal: p.monedaOriginal ?? "",
+        montoOriginal: p.montoOriginal ?? "",
       })),
     },
     {

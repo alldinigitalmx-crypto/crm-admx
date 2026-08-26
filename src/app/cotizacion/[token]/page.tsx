@@ -82,7 +82,7 @@ export default async function CotizacionPublicaPage({
     cotizacion.fechaVencimiento < new Date();
 
   const pagoPendiente = cotizacion.pagos.find((p) => !p.confirmado);
-  const montoPagado = montoPagadoCotizacion(cotizacion.pagos);
+  const montoPagado = montoPagadoCotizacion(cotizacion, cotizacion.pagos);
   const montoPendiente = montoPendienteCotizacion(cotizacion, cotizacion.pagos);
   const montoAhora = montoAPagarAhora(cotizacion, cotizacion.pagos);
   const esSegundoPago = montoPagado > 0;

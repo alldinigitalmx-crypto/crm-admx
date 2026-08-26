@@ -94,6 +94,12 @@ model Pago {
   metodoPago      MetodoPago
   monto           Decimal     @db.Decimal(12, 2)
   moneda          Moneda?
+  // Equivalente en pesos mexicanos cuando moneda es distinta de MXN — los
+  // reportes (Reportes, Excel, PDF) siempre suman en MXN, así que sin este
+  // valor un pago en USD/COP se sumaría como si fuera el mismo número de
+  // pesos (ver src/lib/pago-monto.ts). Nulo cuando moneda ya es MXN/nula:
+  // en ese caso el equivalente es el propio monto.
+  montoMXN        Decimal?    @db.Decimal(12, 2)
   comision        Decimal?    @db.Decimal(12, 2)
   comprobante     String?
   // Texto libre histórico (de antes de que existiera el modelo Cuenta) —

@@ -269,7 +269,7 @@ export default async function ServiciosPage({
                       <TableCell className="truncate">{s.intermediario?.nombre ?? "—"}</TableCell>
                       <TableCell className="truncate">{formatDate(s.fechaInicio)}</TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(montoTotalServicio(s))}
+                        {formatCurrency(montoTotalServicio(s), s.moneda)}
                       </TableCell>
                       <TableCell>
                         <Link
@@ -297,7 +297,7 @@ export default async function ServiciosPage({
                       avatarClassName={STATUS_COLOR[s.status]}
                       title={s.descripcion}
                       subtitle={s.cliente.nombre}
-                      meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s))}`}
+                      meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s), s.moneda)}`}
                       badge={
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[s.status]}`}

@@ -96,7 +96,7 @@ export default async function CotizacionDetallePage({
     cotizacion.descuentoTipo === "Porcentaje"
       ? Number(cotizacion.montoSubtotal) * (Number(cotizacion.descuentoValor ?? 0) / 100)
       : Number(cotizacion.descuentoValor ?? 0);
-  const montoPagado = montoPagadoCotizacion(cotizacion.pagos);
+  const montoPagado = montoPagadoCotizacion(cotizacion, cotizacion.pagos);
   const montoPendiente = montoPendienteCotizacion(cotizacion, cotizacion.pagos);
 
   const boundUpdate = actualizarCotizacion.bind(null, cotizacion.id);

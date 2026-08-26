@@ -24,6 +24,7 @@ type PagoDefaults = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
+  montoMXN: (number | string | { toString(): string }) | null;
   cuentaId: number | null;
   comprobante: string | null;
   confirmado: boolean;
@@ -68,6 +69,8 @@ export function PagoForm({
   const [state, formAction, isPending] = useActionState(wrappedAction, undefined);
   const [archivoDataUrl, setArchivoDataUrl] = useState<string | null>(null);
   const [archivoNombre, setArchivoNombre] = useState<string | null>(null);
+  const [moneda, setMoneda] = useState(defaultValues?.moneda ?? "MXN");
+  const monedaEsExtranjera = moneda !== "MXN";
 
   function onArchivoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -203,16 +206,37 @@ export function PagoForm({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="moneda">Moneda</Label>
-          <Select name="moneda" defaultValue={defaultValues?.moneda ?? "MXN"}>
+          <Select name="moneda" value={moneda} onValueChange={setMoneda}>
             <SelectTrigger id="moneda" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="MXN">MXN</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
               <SelectItem value="COP">COP</SelectItem>
             </SelectContent>
           </Select>
         </div>
+
+        {monedaEsExtranjera && (
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <Label htmlFor="montoMXN">Equivalente en pesos (MXN) *</Label>
+            <Input
+              id="montoMXN"
+              name="montoMXN"
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+              defaultValue={defaultValues?.montoMXN ? String(defaultValues.montoMXN) : ""}
+              placeholder="0.00"
+            />
+            <p className="text-xs text-muted-foreground">
+              Cuánto representó este pago en pesos mexicanos — los reportes siempre suman en
+              MXN, así que un pago en {moneda} necesita este dato para contar bien.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="comprobante">Referencia</Label>

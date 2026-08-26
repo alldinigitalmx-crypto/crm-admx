@@ -13,6 +13,7 @@ import {
   type PuntoPeriodo,
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
+import { montoEnMXN } from "@/lib/pago-monto";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 export const STATUS_ORDEN: StatusServicio[] = [
@@ -30,7 +31,12 @@ export type ReportePagoDetalle = {
   servicio: string;
   cliente: string;
   metodoPago: string;
+  // Siempre en MXN (ver montoEnMXN) -- si el pago original fue en otra
+  // moneda, monedaOriginal/montoOriginal traen el dato tal cual se
+  // registró, solo para mostrarlo de referencia.
   monto: number;
+  monedaOriginal: string | null;
+  montoOriginal: number | null;
 };
 export type ReporteGastoDetalle = {
   fecha: Date;
@@ -93,6 +99,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
       select: {
         fecha: true,
         monto: true,
+        moneda: true,
+        montoMXN: true,
         metodoPago: true,
         servicio: { select: { descripcion: true, cliente: { select: { id: true, nombre: true } } } },
       },
@@ -110,12 +118,17 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     prisma.cliente.count({ where: clientesNuevosWhere }),
   ]);
 
-  const totalRecaudado = pagos.reduce((acc, p) => acc + Number(p.monto), 0);
+  // Un pago en USD/COP no se puede sumar en crudo junto con uno en MXN —
+  // montoEnMXN() usa el equivalente en pesos que se capturó al registrar
+  // el pago (ver src/lib/pago-monto.ts). Este es el único total que de
+  // verdad importa para el negocio, por eso todo lo demás de este
+  // archivo (tendencia, por método, por cliente, detalle) también lo usa.
+  const totalRecaudado = pagos.reduce((acc, p) => acc + montoEnMXN(p), 0);
   const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
   const utilidadNeta = totalRecaudado - totalGastos;
 
   const puntosPeriodo = agruparRecaudadoGastos(
-    pagos.map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })),
+    pagos.map((p) => ({ fecha: p.fecha, monto: montoEnMXN(p) })),
     gastos.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
     desdeEfectivo,
     hastaEfectivo
@@ -132,7 +145,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   const metodoTotales = new Map<string, { monto: number; count: number }>();
   for (const p of pagos) {
     const cur = metodoTotales.get(p.metodoPago) ?? { monto: 0, count: 0 };
-    cur.monto += Number(p.monto);
+    cur.monto += montoEnMXN(p);
     cur.count += 1;
     metodoTotales.set(p.metodoPago, cur);
   }
@@ -168,7 +181,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   for (const p of pagos) {
     const c = p.servicio.cliente;
     const cur = porCliente.get(c.id) ?? { nombre: c.nombre, monto: 0, count: 0 };
-    cur.monto += Number(p.monto);
+    cur.monto += montoEnMXN(p);
     cur.count += 1;
     porCliente.set(c.id, cur);
   }
@@ -201,7 +214,9 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
       servicio: p.servicio.descripcion,
       cliente: p.servicio.cliente.nombre,
       metodoPago: METODO_LABEL[p.metodoPago] ?? p.metodoPago,
-      monto: Number(p.monto),
+      monto: montoEnMXN(p),
+      monedaOriginal: p.moneda && p.moneda !== "MXN" ? p.moneda : null,
+      montoOriginal: p.moneda && p.moneda !== "MXN" ? Number(p.monto) : null,
     })),
     gastosDetalle: gastos.map((g) => ({
       fecha: g.fecha,

@@ -4,6 +4,7 @@ import { Pencil, Mail, MessageCircle, CalendarDays } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { montoTotalServicio } from "@/lib/servicio";
+import { montoEnMXN } from "@/lib/pago-monto";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
@@ -115,6 +116,10 @@ export default async function ClienteDetallePage({
   const serviciosActivos = cliente.servicios.filter((s) =>
     ["Aprobado", "EnProceso"].includes(s.status)
   ).length;
+  // Aproximado cuando el cliente tiene servicios en más de una moneda —
+  // suma los totales tal cual, sin convertir (Servicio no guarda un
+  // equivalente en MXN como sí hace Pago.montoMXN). Poco común: un
+  // cliente normalmente factura siempre en la misma moneda.
   const montoTotalFacturado = cliente.servicios.reduce(
     (acc, s) => acc + montoTotalServicio(s),
     0
@@ -123,9 +128,11 @@ export default async function ClienteDetallePage({
   const pagos = cliente.servicios.flatMap((s) =>
     s.pagos.map((p) => ({ ...p, servicioDescripcion: s.descripcion }))
   );
+  // Este sí se puede convertir bien: cada Pago ya trae su equivalente en
+  // MXN (montoMXN) cuando no fue pagado en pesos.
   const montoTotalPagado = pagos
     .filter((p) => p.confirmado)
-    .reduce((acc, p) => acc + Number(p.monto), 0);
+    .reduce((acc, p) => acc + montoEnMXN(p), 0);
 
   const cotizaciones = cliente.servicios.flatMap((s) =>
     s.cotizaciones.map((c) => ({ ...c, servicioDescripcion: s.descripcion }))
@@ -308,7 +315,7 @@ export default async function ClienteDetallePage({
                     <TableCell>{s.intermediario?.nombre ?? "—"}</TableCell>
                     <TableCell>{formatDate(s.fechaInicio)}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(montoTotalServicio(s))}
+                      {formatCurrency(montoTotalServicio(s), s.moneda)}
                     </TableCell>
                   </TableRow>
                 ))}

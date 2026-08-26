@@ -206,12 +206,12 @@ export default async function ServicioDetallePage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Monto inicial" value={formatCurrency(servicio.montoInicial)} />
-        <Kpi label="Órdenes aprobadas" value={formatCurrency(ordenesAprobadasMonto)} />
-        <Kpi label="Monto total" value={formatCurrency(montoTotal)} />
+        <Kpi label="Monto inicial" value={formatCurrency(servicio.montoInicial, servicio.moneda)} />
+        <Kpi label="Órdenes aprobadas" value={formatCurrency(ordenesAprobadasMonto, servicio.moneda)} />
+        <Kpi label="Monto total" value={formatCurrency(montoTotal, servicio.moneda)} />
         <Kpi
           label="Comisión intermediario"
-          value={servicio.intermediario ? formatCurrency(comision) : "—"}
+          value={servicio.intermediario ? formatCurrency(comision, servicio.moneda) : "—"}
         />
       </div>
 
@@ -432,9 +432,9 @@ export default async function ServicioDetallePage({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {p.comision ? formatCurrency(p.comision) : "—"}
+                      {p.comision ? formatCurrency(p.comision, p.moneda) : "—"}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.monto)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(p.monto, p.moneda)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
                         {!p.confirmado && (
@@ -452,6 +452,7 @@ export default async function ServicioDetallePage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
+                            montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                             cuentaNombre,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,
@@ -482,6 +483,7 @@ export default async function ServicioDetallePage({
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
                             moneda: p.moneda,
+                            montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                             cuentaId: p.cuentaId,
                             comprobante: p.comprobante,
                             confirmado: p.confirmado,

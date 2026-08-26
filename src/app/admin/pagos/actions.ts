@@ -24,6 +24,9 @@ function parsePagoForm(formData: FormData) {
   const comisionRaw = String(formData.get("comision") ?? "");
   const monedaRaw = String(formData.get("moneda") ?? "");
   const moneda = monedaRaw && monedaRaw !== "none" ? (monedaRaw as Moneda) : null;
+  // Solo aplica cuando la moneda no es MXN — el campo ni se muestra en el
+  // formulario si moneda es MXN/nula, así que aquí se ignora lo que traiga.
+  const montoMXNRaw = moneda && moneda !== "MXN" ? String(formData.get("montoMXN") ?? "") : "";
   // El select de Cuenta solo se manda al formulario para un Admin — si el
   // campo ni siquiera vino (usuario interno normal) no se debe tocar el
   // cuentaId que ya tuviera el pago, a diferencia de que sí venga vacío
@@ -42,6 +45,7 @@ function parsePagoForm(formData: FormData) {
     montoRaw,
     comisionRaw,
     moneda,
+    montoMXNRaw,
     cuentaId,
     cuentaIdProvisto,
     comprobante,
@@ -72,6 +76,13 @@ function validatePagoForm(data: ReturnType<typeof parsePagoForm>) {
   if (data.comisionRaw && (Number.isNaN(Number(data.comisionRaw)) || Number(data.comisionRaw) < 0)) {
     return "La comisión debe ser un número válido.";
   }
+  if (
+    data.moneda &&
+    data.moneda !== "MXN" &&
+    (!data.montoMXNRaw || Number.isNaN(Number(data.montoMXNRaw)) || Number(data.montoMXNRaw) <= 0)
+  ) {
+    return "Captura el equivalente en pesos (MXN) de este pago.";
+  }
   return null;
 }
 
@@ -100,6 +111,7 @@ export async function crearPago(
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
       moneda: data.moneda,
+      montoMXN: data.montoMXNRaw || null,
       cuentaId: data.cuentaId,
       comprobante: data.comprobante,
       confirmado: data.confirmado,
@@ -158,6 +170,7 @@ export async function actualizarPago(
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
       moneda: data.moneda,
+      montoMXN: data.montoMXNRaw || null,
       ...(data.cuentaIdProvisto ? { cuentaId: data.cuentaId } : {}),
       comprobante: data.comprobante,
       confirmado: data.confirmado,

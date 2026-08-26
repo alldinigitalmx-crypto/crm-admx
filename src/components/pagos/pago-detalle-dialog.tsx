@@ -29,6 +29,7 @@ export type PagoDetalle = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
+  montoMXN: (number | string | { toString(): string }) | null;
   // Ya resuelto por quien arma este objeto: p.cuenta?.alias ?? p.cuentaTexto
   // (el que llame decide si el visitante puede ver esto — no todos deben).
   cuentaNombre: string | null;
@@ -137,12 +138,18 @@ export function PagoDetalleDialog({
             </div>
             <div>
               <p className="text-muted-foreground">Monto</p>
-              <p className="font-medium">{formatCurrency(pago.monto)}</p>
+              <p className="font-medium">{formatCurrency(pago.monto, pago.moneda)}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Comisión</p>
-              <p>{pago.comision ? formatCurrency(pago.comision) : "—"}</p>
+              <p>{pago.comision ? formatCurrency(pago.comision, pago.moneda) : "—"}</p>
             </div>
+            {pago.montoMXN && (
+              <div>
+                <p className="text-muted-foreground">Equivalente MXN</p>
+                <p>{formatCurrency(pago.montoMXN)}</p>
+              </div>
+            )}
             <div>
               <p className="text-muted-foreground">Status</p>
               <Badge variant={pago.confirmado ? "secondary" : "outline"}>

@@ -20,6 +20,7 @@ type PagoDefaults = {
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
   moneda: string | null;
+  montoMXN: (number | string | { toString(): string }) | null;
   cuentaId: number | null;
   comprobante: string | null;
   confirmado: boolean;

@@ -13,14 +13,28 @@ export function nombreClienteCotizacion(c: {
 }
 
 type MontoLike = number | string | { toString(): string };
-type PagoParaMonto = { monto: MontoLike; confirmado: boolean };
-type CotizacionParaMonto = { montoTotal: MontoLike; porcentajeAnticipo: number | null };
+type PagoParaMonto = { monto: MontoLike; confirmado: boolean; moneda?: string | null };
+type CotizacionParaMonto = {
+  montoTotal: MontoLike;
+  porcentajeAnticipo: number | null;
+  moneda?: string | null;
+};
 
 // Suma de lo que el cliente ya pagó y quedó confirmado (los pendientes de
 // revisión — transferencia manual sin confirmar aún — no cuentan).
-export function montoPagadoCotizacion(pagos: PagoParaMonto[]): number {
+//
+// Solo cuentan los pagos en la MISMA moneda que el total de la cotización
+// (tratando null como MXN de los dos lados) -- si no, un pago de $450 USD
+// se sumaría en crudo contra un total en pesos (o viceversa) y una
+// cotización de $900 USD podría marcarse como saldada con pagos que en
+// realidad son de otra moneda y no cubren nada.
+export function montoPagadoCotizacion(
+  cotizacion: CotizacionParaMonto,
+  pagos: PagoParaMonto[]
+): number {
+  const monedaTotal = cotizacion.moneda ?? "MXN";
   return pagos
-    .filter((p) => p.confirmado)
+    .filter((p) => p.confirmado && (p.moneda ?? "MXN") === monedaTotal)
     .reduce((suma, p) => suma + Number(p.monto), 0);
 }
 
@@ -36,7 +50,7 @@ export function montoPendienteCotizacion(
   cotizacion: CotizacionParaMonto,
   pagos: PagoParaMonto[]
 ): number {
-  const pendiente = Number(cotizacion.montoTotal) - montoPagadoCotizacion(pagos);
+  const pendiente = Number(cotizacion.montoTotal) - montoPagadoCotizacion(cotizacion, pagos);
   return Math.max(pendiente, 0);
 }
 
@@ -47,7 +61,7 @@ export function montoAPagarAhora(
   cotizacion: CotizacionParaMonto,
   pagos: PagoParaMonto[]
 ): number {
-  const pagado = montoPagadoCotizacion(pagos);
+  const pagado = montoPagadoCotizacion(cotizacion, pagos);
   const pendiente = Math.max(Number(cotizacion.montoTotal) - pagado, 0);
   if (pagado === 0) {
     const anticipo = montoAnticipoCotizacion(cotizacion);
