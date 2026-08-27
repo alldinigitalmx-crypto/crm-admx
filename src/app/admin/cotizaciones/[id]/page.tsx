@@ -264,9 +264,16 @@ export default async function CotizacionDetallePage({
               terminar.
             </p>
           )}
-          {cotizacion.moneda === "USD" && (
+          {(cotizacion.moneda === "USD" || cotizacion.moneda === "EUR") && (
             <p className="text-xs text-muted-foreground">
-              Cotización en USD — el cliente solo puede pagar en línea con PayPal.
+              Cotización en {cotizacion.moneda} — el cliente solo puede pagar en línea con PayPal
+              (Mercado Pago solo acepta pesos mexicanos).
+            </p>
+          )}
+          {cotizacion.moneda === "COP" && (
+            <p className="text-xs text-muted-foreground">
+              Cotización en COP — no hay pago electrónico disponible (ni Mercado Pago ni PayPal
+              la aceptan), solo transferencia bancaria.
             </p>
           )}
           {cotizacion.status !== "Pagada" && montoPagado > 0 && (

@@ -4,11 +4,13 @@ import { currentUsuario } from "@/lib/current-usuario";
 
 // Proxy a Frankfurter (frankfurter.dev, gratis, sin llave, tipos de cambio
 // de referencia del Banco Central Europeo) para sugerir el equivalente en
-// pesos de un pago en USD -- NO es el tipo de cambio exacto que PayPal le
-// aplicó a la cuenta del dueño (eso solo lo sabe PayPal, y depende de su
-// propio margen), así que esto es un punto de partida editable, no el
-// dato final. Frankfurter no cubre COP, así que este helper solo aplica
-// a USD (ver pago-form.tsx).
+// pesos de un pago en USD/EUR -- NO es el tipo de cambio exacto que PayPal
+// le aplicó a la cuenta del dueño (eso solo lo sabe PayPal, y depende de
+// su propio margen), así que esto es un punto de partida editable, no el
+// dato final. Frankfurter no cubre COP, así que este helper no aplica ahí
+// (ver pago-form.tsx).
+const MONEDAS_SOPORTADAS = ["USD", "EUR"];
+
 export async function GET(request: Request) {
   const usuario = await currentUsuario();
   if (!usuario) {
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
   const from = searchParams.get("from");
   const monto = Number(searchParams.get("monto") ?? "0");
 
-  if (from !== "USD" || !monto || monto <= 0) {
+  if (!from || !MONEDAS_SOPORTADAS.includes(from) || !monto || monto <= 0) {
     return NextResponse.json({ error: "Parámetros inválidos." }, { status: 400 });
   }
 

@@ -316,12 +316,20 @@ export function CotizacionForm({
               <SelectContent>
                 <SelectItem value="MXN">MXN</SelectItem>
                 <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
                 <SelectItem value="COP">COP</SelectItem>
               </SelectContent>
             </Select>
-            {moneda === "USD" && (
+            {(moneda === "USD" || moneda === "EUR") && (
               <p className="text-xs text-muted-foreground">
-                En USD el cliente solo podrá pagar con PayPal — Mercado Pago no acepta dólares.
+                En {moneda} el cliente solo podrá pagar con PayPal — Mercado Pago no acepta esa
+                moneda.
+              </p>
+            )}
+            {moneda === "COP" && (
+              <p className="text-xs text-muted-foreground">
+                En COP no hay pago electrónico disponible (ni Mercado Pago ni PayPal la aceptan)
+                — el cliente solo podrá pagar por transferencia bancaria.
               </p>
             )}
           </div>

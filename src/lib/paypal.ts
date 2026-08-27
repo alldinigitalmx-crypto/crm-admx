@@ -52,7 +52,9 @@ type OrdenPaypal = {
 export async function crearOrdenPaypal(params: {
   titulo: string;
   monto: number;
-  moneda?: "MXN" | "USD";
+  // COP no está aquí a propósito -- PayPal no la acepta como moneda de
+  // cobro para la mayoría de cuentas de negocio (ver pagar-paypal/route.ts).
+  moneda?: "MXN" | "USD" | "EUR";
   externalReference: string;
   returnUrl: string;
   cancelUrl: string;

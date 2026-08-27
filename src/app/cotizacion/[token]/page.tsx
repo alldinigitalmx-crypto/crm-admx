@@ -37,7 +37,7 @@ const MP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   no_configurado: { texto: "El pago con Mercado Pago no está disponible por ahora.", tono: "error" },
   sin_cliente: { texto: "Contáctanos para completar tu registro antes de poder cobrarte.", tono: "warning" },
   pais: { texto: "Mercado Pago no está disponible en tu país. Usa PayPal u otro método.", tono: "warning" },
-  moneda: { texto: "Mercado Pago no acepta cotizaciones en USD. Usa PayPal.", tono: "warning" },
+  moneda: { texto: "Mercado Pago solo acepta cotizaciones en pesos mexicanos. Usa PayPal u otro método.", tono: "warning" },
 };
 
 const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | "error" }> = {
@@ -47,6 +47,7 @@ const PP_MENSAJE: Record<string, { texto: string; tono: "success" | "warning" | 
   error: { texto: "No pudimos completar el pago con PayPal. Intenta de nuevo en un momento.", tono: "error" },
   no_configurado: { texto: "El pago con PayPal no está disponible por ahora.", tono: "error" },
   sin_cliente: { texto: "Contáctanos para completar tu registro antes de poder cobrarte.", tono: "warning" },
+  moneda: { texto: "PayPal no acepta cotizaciones en pesos colombianos. Usa transferencia bancaria.", tono: "warning" },
 };
 
 export default async function CotizacionPublicaPage({
@@ -88,7 +89,10 @@ export default async function CotizacionPublicaPage({
   const esSegundoPago = montoPagado > 0;
   const esCobroPorPartes = Boolean(cotizacion.porcentajeAnticipo);
   const moneda = cotizacion.moneda ?? undefined;
-  const esUSD = cotizacion.moneda === "USD";
+  // Mercado Pago solo cobra en MXN (ver mercadopago.ts) -- cualquier otra
+  // moneda queda fuera. PayPal sí acepta MXN/USD/EUR, pero no COP.
+  const mpBloqueadaPorMoneda = Boolean(cotizacion.moneda) && cotizacion.moneda !== "MXN";
+  const paypalBloqueadoPorMoneda = cotizacion.moneda === "COP";
 
   const montoDescuento =
     cotizacion.descuentoTipo === "Porcentaje"
@@ -236,9 +240,12 @@ export default async function CotizacionPublicaPage({
                 </p>
                 <MetodosPagoElectronicos
                   token={token}
-                  mercadoPagoDisponible={esMexico && !esUSD}
-                  mercadoPagoNoDisponibleTexto={esUSD ? "No disponible en USD" : "No disponible en tu país"}
-                  paypalDisponible
+                  mercadoPagoDisponible={esMexico && !mpBloqueadaPorMoneda}
+                  mercadoPagoNoDisponibleTexto={
+                    mpBloqueadaPorMoneda ? `No disponible en ${moneda}` : "No disponible en tu país"
+                  }
+                  paypalDisponible={!paypalBloqueadoPorMoneda}
+                  paypalNoDisponibleTexto="No disponible en COP"
                 />
 
                 <details className="group rounded-lg border border-input open:bg-muted/20">

@@ -31,10 +31,17 @@ export async function GET(
   if (!servicioId) {
     return volver("?pp=sin_cliente");
   }
+  // PayPal no acepta COP como moneda de cobro -- antes esto caía al else
+  // de abajo y mandaba el monto en COP como si fueran pesos MXN (mismo
+  // número, moneda equivocada, cobrando ~20x de más). Se bloquea en vez
+  // de adivinar.
+  if (cotizacion.moneda === "COP") {
+    return volver("?pp=moneda");
+  }
 
   const descripcion = cotizacion.servicio?.descripcion ?? cotizacion.descripcion ?? `Cotización #${cotizacion.id}`;
   const monto = montoAPagarAhora(cotizacion, cotizacion.pagos);
-  const moneda = cotizacion.moneda === "USD" ? "USD" : "MXN";
+  const moneda = cotizacion.moneda === "USD" || cotizacion.moneda === "EUR" ? cotizacion.moneda : "MXN";
 
   try {
     const orden = await crearOrdenPaypal({

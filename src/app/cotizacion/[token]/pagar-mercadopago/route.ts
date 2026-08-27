@@ -39,7 +39,11 @@ export async function GET(
   if (!servicioId) {
     return volver("?mp=sin_cliente");
   }
-  if (cotizacion.moneda === "USD") {
+  // crearPreferenciaMercadoPago siempre cobra en MXN (currency_id fijo en
+  // mercadopago.ts) -- cualquier otra moneda (USD, COP, EUR...) se
+  // bloquea aquí, o el monto se cobraría en pesos como si fuera la
+  // moneda original (mismo número, moneda equivocada).
+  if (cotizacion.moneda && cotizacion.moneda !== "MXN") {
     return volver("?mp=moneda");
   }
 

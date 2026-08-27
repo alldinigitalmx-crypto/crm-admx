@@ -100,7 +100,7 @@ export function PagoForm({
     setCargandoTipoCambio(true);
     setTipoCambioError(null);
     try {
-      const res = await fetch(`/api/tipo-cambio?from=USD&monto=${montoActual}`);
+      const res = await fetch(`/api/tipo-cambio?from=${moneda}&monto=${montoActual}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "No se pudo obtener el tipo de cambio.");
       if (montoMXNRef.current) montoMXNRef.current.value = Number(data.mxn).toFixed(2);
@@ -270,6 +270,7 @@ export function PagoForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                     <SelectItem value="COP">COP</SelectItem>
                   </SelectContent>
                 </Select>
@@ -290,7 +291,7 @@ export function PagoForm({
                     placeholder="0.00"
                     onChange={() => setTipoCambioInfo(null)}
                   />
-                  {moneda === "USD" && (
+                  {(moneda === "USD" || moneda === "EUR") && (
                     <Button
                       type="button"
                       variant="outline"
@@ -311,13 +312,13 @@ export function PagoForm({
                   representó en pesos mexicanos — los reportes siempre suman en MXN, así que sin
                   este dato un pago en {moneda} no cuenta bien.
                 </p>
-                {moneda === "USD" && (
+                {(moneda === "USD" || moneda === "EUR") && (
                   <p className="mt-1">
                     {tipoCambioError ? (
                       <span className="text-destructive">{tipoCambioError}</span>
                     ) : tipoCambioInfo ? (
                       <>
-                        Sugerido con 1 USD ≈ {tipoCambioInfo.rate.toFixed(2)} MXN (
+                        Sugerido con 1 {moneda} ≈ {tipoCambioInfo.rate.toFixed(2)} MXN (
                         {tipoCambioInfo.fecha ?? "hoy"}) — ajústalo si PayPal te mostró otro
                         número, el suyo trae su propio margen.
                       </>

@@ -58,11 +58,13 @@ export function MetodosPagoElectronicos({
   mercadoPagoDisponible,
   mercadoPagoNoDisponibleTexto,
   paypalDisponible,
+  paypalNoDisponibleTexto,
 }: {
   token: string;
   mercadoPagoDisponible: boolean;
   mercadoPagoNoDisponibleTexto?: string;
   paypalDisponible: boolean;
+  paypalNoDisponibleTexto?: string;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
@@ -78,6 +80,7 @@ export function MetodosPagoElectronicos({
         href={`/cotizacion/${token}/pagar-paypal`}
         disponible={paypalDisponible}
         label="PayPal"
+        labelNoDisponible={paypalNoDisponibleTexto}
         style={{ backgroundColor: "#ffc439", color: "#003087" }}
         icono={<IconoPaypal />}
       />
