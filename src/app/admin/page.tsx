@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
+import { obtenerTasasAMXN, resumirMontoMulti, type ResumenMontoMulti } from "@/lib/tipo-cambio";
+import { formatCurrency } from "@/lib/format";
 import type { Usuario } from "@/generated/prisma/client";
 
 const currency = new Intl.NumberFormat("es-MX", {
@@ -65,6 +67,24 @@ function KpiCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Total del embudo de venta ya convertido a pesos (ver resumirMontoMulti)
+// -- si algo no se pudo convertir (COP, o si falló el tipo de cambio de
+// hoy), se lista aparte en su moneda real en vez de fingir que se sumó.
+function MontoFunnel({ resumen }: { resumen: ResumenMontoMulti }) {
+  return (
+    <>
+      <p className="truncate text-xs text-muted-foreground">
+        {currencyCorta.format(resumen.montoMXN)}
+      </p>
+      {resumen.sinConvertir.map((s) => (
+        <p key={s.moneda} className="truncate text-xs text-muted-foreground">
+          + {formatCurrency(s.monto, s.moneda)}
+        </p>
+      ))}
+    </>
   );
 }
 
@@ -169,6 +189,7 @@ async function PanelAdmin() {
     convertidasAServicio,
     perdidas,
     ventasPorOrigen,
+    tasas,
   ] = await Promise.all([
     prisma.cliente.count(),
     prisma.servicio.count({ where: { status: { in: ["Aprobado", "EnProceso"] } } }),
@@ -214,24 +235,24 @@ async function PanelAdmin() {
       take: 10,
       include: { servicio: true, cotizacion: { include: { cliente: true } } },
     }),
-    prisma.cotizacion.aggregate({
-      _count: true,
-      _sum: { montoTotal: true },
+    // findMany + moneda en vez de aggregate(_sum) -- una cotización en
+    // USD/EUR no se puede sumar en crudo junto con una en MXN (ver
+    // resumirMontoMulti más abajo, mismo criterio que ya se usa en
+    // Reportes y Pagos para no mezclar monedas).
+    prisma.cotizacion.findMany({
+      select: { montoTotal: true, moneda: true },
       where: { status: "Enviada", servicioId: null },
     }),
-    prisma.cotizacion.aggregate({
-      _count: true,
-      _sum: { montoTotal: true },
+    prisma.cotizacion.findMany({
+      select: { montoTotal: true, moneda: true },
       where: { status: "Firmada", servicioId: null },
     }),
-    prisma.cotizacion.aggregate({
-      _count: true,
-      _sum: { montoTotal: true },
+    prisma.cotizacion.findMany({
+      select: { montoTotal: true, moneda: true },
       where: { servicioId: { not: null } },
     }),
-    prisma.cotizacion.aggregate({
-      _count: true,
-      _sum: { montoTotal: true },
+    prisma.cotizacion.findMany({
+      select: { montoTotal: true, moneda: true },
       where: { status: "Perdida" },
     }),
     prisma.venta.groupBy({
@@ -240,7 +261,25 @@ async function PanelAdmin() {
       _count: true,
       where: { fecha: { gte: inicioDeMes } },
     }),
+    obtenerTasasAMXN(),
   ]);
+
+  const resumenEnNegociacion = resumirMontoMulti(
+    enNegociacion.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
+    tasas
+  );
+  const resumenGanadasPorFormalizar = resumirMontoMulti(
+    ganadasPorFormalizar.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
+    tasas
+  );
+  const resumenConvertidasAServicio = resumirMontoMulti(
+    convertidasAServicio.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
+    tasas
+  );
+  const resumenPerdidas = resumirMontoMulti(
+    perdidas.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
+    tasas
+  );
 
   const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
   const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
@@ -320,10 +359,8 @@ async function PanelAdmin() {
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
                 <p className="truncate text-xs text-muted-foreground">En negociación</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{enNegociacion._count}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {currencyCorta.format(Number(enNegociacion._sum.montoTotal ?? 0))}
-                </p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{resumenEnNegociacion.count}</p>
+                <MontoFunnel resumen={resumenEnNegociacion} />
               </CardContent>
             </Card>
           </Link>
@@ -331,30 +368,24 @@ async function PanelAdmin() {
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
                 <p className="truncate text-xs text-muted-foreground">Ganadas por formalizar</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{ganadasPorFormalizar._count}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {currencyCorta.format(Number(ganadasPorFormalizar._sum.montoTotal ?? 0))}
-                </p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{resumenGanadasPorFormalizar.count}</p>
+                <MontoFunnel resumen={resumenGanadasPorFormalizar} />
               </CardContent>
             </Card>
           </Link>
           <Card>
             <CardContent className="py-2">
               <p className="truncate text-xs text-muted-foreground">Convertidas a servicio</p>
-              <p className="truncate text-lg font-semibold sm:text-xl">{convertidasAServicio._count}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {currencyCorta.format(Number(convertidasAServicio._sum.montoTotal ?? 0))}
-              </p>
+              <p className="truncate text-lg font-semibold sm:text-xl">{resumenConvertidasAServicio.count}</p>
+              <MontoFunnel resumen={resumenConvertidasAServicio} />
             </CardContent>
           </Card>
           <Link href="/admin/cotizaciones?status=Perdida">
             <Card className="transition-colors hover:bg-muted/40">
               <CardContent className="py-2">
                 <p className="truncate text-xs text-muted-foreground">Perdidas</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{perdidas._count}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {currencyCorta.format(Number(perdidas._sum.montoTotal ?? 0))}
-                </p>
+                <p className="truncate text-lg font-semibold sm:text-xl">{resumenPerdidas.count}</p>
+                <MontoFunnel resumen={resumenPerdidas} />
               </CardContent>
             </Card>
           </Link>
