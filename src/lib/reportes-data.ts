@@ -14,6 +14,7 @@ import {
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
 import { montoEnMXN } from "@/lib/pago-monto";
+import { montoPendienteServicio } from "@/lib/servicio";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 export const STATUS_ORDEN: StatusServicio[] = [
@@ -44,6 +45,19 @@ export type ReporteGastoDetalle = {
   categoria: string;
   monto: number;
 };
+export type PendienteGrupo = { count: number; monto: number };
+// Un servicio "confirmado" (Aprobado/EnProceso) puede deberse a que ya
+// arrancó pero aún no se cobra completo. No se cuenta Cotizado (todavía
+// no es un trato en firme) ni Entregado/Cancelado (si ya se concluyó y el
+// monto final quedó distinto al cotizado, eso es una diferencia a
+// resolver aparte, no un "pendiente por recibir" real). Separado por
+// moneda porque un pendiente en USD no se puede sumar con uno en MXN.
+export type PendientePorRecibirMoneda = {
+  moneda: string;
+  propios: PendienteGrupo;
+  intermediarios: PendienteGrupo;
+  total: PendienteGrupo;
+};
 
 export type ReporteData = {
   desde?: string;
@@ -66,6 +80,7 @@ export type ReporteData = {
   topClientes: ReporteCliente[];
   pagosDetalle: ReportePagoDetalle[];
   gastosDetalle: ReporteGastoDetalle[];
+  pendientePorRecibir: PendientePorRecibirMoneda[];
 };
 
 export async function obtenerDatosReportes(desde?: string, hasta?: string): Promise<ReporteData> {
@@ -93,7 +108,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   const clientesNuevosWhere: Prisma.ClienteWhereInput = {};
   if (rango) clientesNuevosWhere.creadoEn = rango;
 
-  const [pagos, gastos, serviciosNuevos, serviciosEntregadosCount, clientesNuevosCount] = await Promise.all([
+  const [pagos, gastos, serviciosNuevos, serviciosEntregadosCount, clientesNuevosCount, serviciosActivos] =
+    await Promise.all([
     prisma.pago.findMany({
       where: pagosWhere,
       select: {
@@ -116,6 +132,19 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     }),
     prisma.servicio.count({ where: serviciosEntregadosWhere }),
     prisma.cliente.count({ where: clientesNuevosWhere }),
+    // "Pendiente por recibir" es una foto del momento (cuánto falta hoy
+    // en trabajos ya confirmados), no algo que dependa del rango de
+    // fechas del reporte -- por eso esta consulta no usa `rango`.
+    prisma.servicio.findMany({
+      where: { status: { in: ["Aprobado", "EnProceso"] } },
+      select: {
+        montoInicial: true,
+        moneda: true,
+        intermediarioId: true,
+        ordenesCambio: { select: { status: true, monto: true } },
+        pagos: { select: { monto: true, confirmado: true, moneda: true } },
+      },
+    }),
   ]);
 
   // Un pago en USD/COP no se puede sumar en crudo junto con uno en MXN —
@@ -190,6 +219,29 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     .sort((a, b) => b.monto - a.monto)
     .slice(0, 8);
 
+  const gruposPendiente = new Map<string, PendientePorRecibirMoneda>();
+  for (const s of serviciosActivos) {
+    const pendiente = montoPendienteServicio(s, s.pagos);
+    if (pendiente <= 0.01) continue; // ya saldado -- no cuenta como "falta"
+
+    const moneda = s.moneda ?? "MXN";
+    const grupo = gruposPendiente.get(moneda) ?? {
+      moneda,
+      propios: { count: 0, monto: 0 },
+      intermediarios: { count: 0, monto: 0 },
+      total: { count: 0, monto: 0 },
+    };
+    const bucket = s.intermediarioId ? grupo.intermediarios : grupo.propios;
+    bucket.count += 1;
+    bucket.monto += pendiente;
+    grupo.total.count += 1;
+    grupo.total.monto += pendiente;
+    gruposPendiente.set(moneda, grupo);
+  }
+  const pendientePorRecibir = Array.from(gruposPendiente.values()).sort((a, b) =>
+    a.moneda === "MXN" ? -1 : b.moneda === "MXN" ? 1 : a.moneda.localeCompare(b.moneda)
+  );
+
   return {
     desde,
     hasta,
@@ -209,6 +261,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     metodoItems,
     gastosItems,
     topClientes,
+    pendientePorRecibir,
     pagosDetalle: pagos.map((p) => ({
       fecha: p.fecha,
       servicio: p.servicio.descripcion,

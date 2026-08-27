@@ -116,12 +116,27 @@ function KpiCard({
 export default async function ReportesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string; hasta?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; todo?: string }>;
 }) {
   if (!(await requiereAdmin())) redirect("/admin");
 
-  const { desde, hasta } = await searchParams;
-  const datos = await obtenerDatosReportes(desde, hasta);
+  const { desde, hasta, todo } = await searchParams;
+
+  // Sin filtro en la URL, antes se veía "Todo" por default -- ahora se
+  // manda derecho a "Este mes" (el caso que de verdad se usa a diario).
+  // "Todo" sigue existiendo como su propio preset explícito (?todo=1),
+  // así no se pierde la forma de ver el histórico completo.
+  if (!desde && !hasta && todo !== "1") {
+    const hoyDefault = new Date();
+    const inicioMesDefault = new Date(
+      Date.UTC(hoyDefault.getUTCFullYear(), hoyDefault.getUTCMonth(), 1)
+    );
+    redirect(
+      `/admin/reportes?desde=${isoDate(inicioMesDefault)}&hasta=${isoDate(hoyDefault)}`
+    );
+  }
+
+  const datos = await obtenerDatosReportes(todo === "1" ? undefined : desde, todo === "1" ? undefined : hasta);
   const {
     desdeEfectivo,
     hastaEfectivo,
@@ -139,6 +154,7 @@ export default async function ReportesPage({
     metodoItems: metodoFilas,
     gastosItems: gastosFilas,
     topClientes,
+    pendientePorRecibir,
   } = datos;
 
   const statusItems: ItemBarra[] = statusFilas.map((f) => ({
@@ -174,18 +190,25 @@ export default async function ReportesPage({
   const inicioAno = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
 
   const presets = [
-    { label: "Hoy", desde: hoyIso, hasta: hoyIso },
-    { label: "7 días", desde: isoDate(hace7), hasta: hoyIso },
-    { label: "30 días", desde: isoDate(hace30), hasta: hoyIso },
-    { label: "Este mes", desde: isoDate(inicioMes), hasta: hoyIso },
-    { label: "Este año", desde: isoDate(inicioAno), hasta: hoyIso },
-    { label: "Todo", desde: undefined, hasta: undefined },
+    { label: "Hoy", desde: hoyIso, hasta: hoyIso, todo: false },
+    { label: "7 días", desde: isoDate(hace7), hasta: hoyIso, todo: false },
+    { label: "30 días", desde: isoDate(hace30), hasta: hoyIso, todo: false },
+    { label: "Este mes", desde: isoDate(inicioMes), hasta: hoyIso, todo: false },
+    { label: "Este año", desde: isoDate(inicioAno), hasta: hoyIso, todo: false },
+    { label: "Todo", desde: undefined, hasta: undefined, todo: true },
   ];
-  const presetActivo = presets.find((p) => p.desde === desde && p.hasta === hasta) ?? (!desde && !hasta ? presets[5] : null);
+  const presetActivo =
+    todo === "1"
+      ? presets[5]
+      : (presets.find((p) => !p.todo && p.desde === desde && p.hasta === hasta) ?? null);
 
   const exportParams = new URLSearchParams();
-  if (desde) exportParams.set("desde", desde);
-  if (hasta) exportParams.set("hasta", hasta);
+  if (todo === "1") {
+    exportParams.set("todo", "1");
+  } else {
+    if (desde) exportParams.set("desde", desde);
+    if (hasta) exportParams.set("hasta", hasta);
+  }
   const exportQuery = exportParams.toString();
 
   return (
@@ -221,9 +244,13 @@ export default async function ReportesPage({
           <div className="flex flex-wrap gap-2">
             {presets.map((p) => {
               const params = new URLSearchParams();
-              if (p.desde) params.set("desde", p.desde);
-              if (p.hasta) params.set("hasta", p.hasta);
-              const href = params.toString() ? `/admin/reportes?${params}` : "/admin/reportes";
+              if (p.todo) {
+                params.set("todo", "1");
+              } else {
+                if (p.desde) params.set("desde", p.desde);
+                if (p.hasta) params.set("hasta", p.hasta);
+              }
+              const href = `/admin/reportes?${params}`;
               const activo = presetActivo?.label === p.label;
               return (
                 <Button key={p.label} asChild size="sm" variant={activo ? "default" : "outline"}>
@@ -266,6 +293,56 @@ export default async function ReportesPage({
         <KpiCard title="Servicios nuevos" value={String(serviciosNuevosCount)} icon={Briefcase} sub="Por fecha de inicio" />
         <KpiCard title="Clientes nuevos" value={String(clientesNuevosCount)} icon={Users} />
       </div>
+
+      {pendientePorRecibir.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Pendiente por recibir</CardTitle>
+            <CardDescription className="text-xs">
+              Servicios aprobados o en proceso que aún no se cobran completos — no incluye
+              cotizados, entregados ni cancelados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {pendientePorRecibir.map((g) => (
+              <div key={g.moneda} className="flex flex-col gap-3">
+                {pendientePorRecibir.length > 1 && (
+                  <p className="text-xs font-semibold text-muted-foreground">{g.moneda}</p>
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-input p-3">
+                    <p className="text-xs text-muted-foreground">Trabajos propios</p>
+                    <p className="text-lg font-semibold">
+                      {formatCurrency(g.propios.monto, g.moneda)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {g.propios.count} trabajo{g.propios.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-input p-3">
+                    <p className="text-xs text-muted-foreground">Con intermediario</p>
+                    <p className="text-lg font-semibold">
+                      {formatCurrency(g.intermediarios.monto, g.moneda)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {g.intermediarios.count} trabajo{g.intermediarios.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="text-lg font-semibold">
+                      {formatCurrency(g.total.monto, g.moneda)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {g.total.count} trabajo{g.total.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

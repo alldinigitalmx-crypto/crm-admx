@@ -13,6 +13,25 @@ export function montoTotalServicio(servicio: ServicioConOrdenes) {
   return Number(servicio.montoInicial) + ordenesAprobadas;
 }
 
+type PagoParaMonto = { monto: DecimalLike; confirmado: boolean; moneda?: string | null };
+
+// Cuánto le falta cobrar al negocio por este servicio en concreto -- solo
+// cuenta pagos confirmados en la MISMA moneda que el total del servicio
+// (tratando null como MXN de los dos lados), igual que ya se hace para
+// cotizaciones (ver montoPagadoCotizacion en lib/cotizacion.ts): un pago
+// en otra moneda no debe restarle nada a este total, o el pendiente sale
+// mal.
+export function montoPendienteServicio(
+  servicio: ServicioConOrdenes & { moneda?: string | null },
+  pagos: PagoParaMonto[]
+): number {
+  const monedaServicio = servicio.moneda ?? "MXN";
+  const pagado = pagos
+    .filter((p) => p.confirmado && (p.moneda ?? "MXN") === monedaServicio)
+    .reduce((acc, p) => acc + Number(p.monto), 0);
+  return Math.max(montoTotalServicio(servicio) - pagado, 0);
+}
+
 export function comisionIntermediario(
   montoTotal: number,
   porcentaje: DecimalLike | null | undefined
