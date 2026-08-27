@@ -20,7 +20,15 @@ export default async function TareasPage() {
   const hace30Dias = new Date();
   hace30Dias.setDate(hace30Dias.getDate() - 30);
 
-  const [servicios, cotizaciones, usuarios, tareas, completadasRecientes] = await Promise.all([
+  // El tablero de todos los días no debe cargar CADA tarea completada
+  // desde que existe la cuenta -- eso es justo lo que lo hacía cada vez
+  // más lento y la columna de "Completadas" un scroll infinito de cosas
+  // de hace meses. Solo se traen las completadas de los últimos 14 días;
+  // el resto vive en /admin/tareas/historial (nada se borra).
+  const hace14Dias = new Date();
+  hace14Dias.setDate(hace14Dias.getDate() - 14);
+
+  const [servicios, cotizaciones, usuarios, tareas, completadasAntiguasCount, completadasRecientes] = await Promise.all([
     prisma.servicio.findMany({
       where: { status: { notIn: ["Entregado", "Cancelado"] } },
       select: { id: true, descripcion: true },
@@ -37,7 +45,10 @@ export default async function TareasPage() {
       orderBy: { nombre: "asc" },
     }),
     prisma.tarea.findMany({
-      where: tareaWhere,
+      where: {
+        ...tareaWhere,
+        OR: [{ completada: false }, { completada: true, completadaEn: { gte: hace14Dias } }],
+      },
       orderBy: [{ completada: "asc" }, { fechaLimite: "asc" }, { creadoEn: "desc" }],
       include: {
         servicio: { select: { descripcion: true } },
@@ -46,6 +57,9 @@ export default async function TareasPage() {
         },
         subtareas: { orderBy: { creadoEn: "asc" } },
       },
+    }),
+    prisma.tarea.count({
+      where: { ...tareaWhere, completada: true, completadaEn: { lt: hace14Dias } },
     }),
     prisma.tarea.findMany({
       where: { ...tareaWhere, completada: true, completadaEn: { gte: hace30Dias } },
@@ -75,7 +89,8 @@ export default async function TareasPage() {
         <h1 className="text-2xl font-semibold">Tareas</h1>
         <p className="text-sm text-muted-foreground">
           {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} —{" "}
-          {completadas.length} completada{completadas.length === 1 ? "" : "s"}
+          {completadas.length} completada{completadas.length === 1 ? "" : "s"} en los últimos 14
+          días
         </p>
       </div>
 
@@ -84,6 +99,7 @@ export default async function TareasPage() {
       <TareaKanban
         tareasPendientes={pendientes}
         tareasCompletadas={completadas}
+        completadasAntiguasCount={completadasAntiguasCount}
         puedeEditar={permisos.puedeEditar}
         puedeCrear={permisos.puedeCrear}
         vinculos={vinculos}

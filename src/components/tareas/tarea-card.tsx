@@ -7,6 +7,7 @@ import { Pencil, Copy, Trash2, GripVertical } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatDate } from "@/lib/format";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
 import { SubtareaChecklist, type SubtareaData } from "@/components/tareas/subtarea-checklist";
@@ -64,6 +65,7 @@ export function TareaCard({
   vinculos,
   usuarios,
   usuarioActualId,
+  onToggleCompletada,
 }: {
   tarea: TareaCardData;
   puedeEditar: boolean;
@@ -72,6 +74,12 @@ export function TareaCard({
   vinculos: VinculoOption[];
   usuarios: { id: number; nombre: string }[];
   usuarioActualId?: number;
+  // Además de arrastrar entre columnas (cómodo en PC), un check es la
+  // forma de completar una tarea que de verdad funciona igual de bien
+  // en el celular -- arrastrar una tarjeta a una columna que puede
+  // estar fuera de la pantalla es un patrón de UX que casi nunca
+  // funciona bien en touch.
+  onToggleCompletada: (id: number, completada: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [oculta, setOculta] = useState(false);
@@ -123,11 +131,19 @@ export function TareaCard({
       <div className={`flex flex-1 flex-col gap-1.5 ${compacto ? "px-2.5 py-2" : "px-3 py-2.5"}`}>
         <div className="flex items-start gap-1.5">
           {puedeEditar && (
+            <Checkbox
+              checked={tarea.completada}
+              onCheckedChange={(v) => onToggleCompletada(tarea.id, v === true)}
+              className="mt-0.5 shrink-0"
+              aria-label={tarea.completada ? "Marcar como pendiente" : "Marcar como completada"}
+            />
+          )}
+          {puedeEditar && (
             <button
               type="button"
               {...listeners}
               {...attributes}
-              className="mt-0.5 shrink-0 cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+              className="mt-0.5 hidden shrink-0 cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing md:block"
               aria-label="Arrastrar tarea"
             >
               <GripVertical className="size-3.5" />
@@ -175,7 +191,10 @@ export function TareaCard({
       </div>
 
       {(puedeEditar || puedeCrear) && (
-        <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        // En PC se revelan solo al hover (menos ruido visual); en
+        // celular el hover no existe, así que ahí quedan siempre
+        // visibles -- si no, quedan simplemente inalcanzables.
+        <div className="absolute right-1 top-1 flex gap-0.5 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover:opacity-100">
           {puedeEditar && (
             <TareaFormDialog
               trigger={

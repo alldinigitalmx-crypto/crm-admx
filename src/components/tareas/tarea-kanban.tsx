@@ -13,6 +13,8 @@ import {
 import confetti from "canvas-confetti";
 import { Filter, LayoutGrid, List, Volume2, VolumeX } from "lucide-react";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
@@ -91,6 +93,7 @@ function Columna({
 export function TareaKanban({
   tareasPendientes,
   tareasCompletadas,
+  completadasAntiguasCount,
   puedeEditar,
   puedeCrear,
   vinculos,
@@ -98,7 +101,11 @@ export function TareaKanban({
   usuarioActualId,
 }: {
   tareasPendientes: TareaCardData[];
+  // Solo las completadas recientes (ver admin/tareas/page.tsx) -- las
+  // más viejas viven en /admin/tareas/historial para que este tablero
+  // no crezca para siempre.
   tareasCompletadas: TareaCardData[];
+  completadasAntiguasCount: number;
   puedeEditar: boolean;
   puedeCrear: boolean;
   vinculos: VinculoOption[];
@@ -126,32 +133,40 @@ export function TareaKanban({
     guardarSonido(!sonido);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  // Único punto que de verdad completa/reabre una tarea -- lo usan tanto
+  // soltar la tarjeta en otra columna (PC) como el check de la tarjeta
+  // (funciona igual en PC y celular), así el confeti/sonido/optimista se
+  // ve igual sin importar cómo se disparó.
+  function marcarCompletada(id: number, completada: boolean) {
     if (!puedeEditar) return;
-    const { active, over } = event;
-    if (!over) return;
-
-    const id = Number(active.id);
-    const destino = String(over.id);
     const tarea = todasTareas.find((t) => t.id === id);
     if (!tarea) return;
     const estaCompletada = overrides[id] ?? tarea.completada;
+    if (estaCompletada === completada) return;
 
-    if (destino === "completadas" && !estaCompletada) {
-      setOverrides((prev) => ({ ...prev, [id]: true }));
-      completarTarea(id, true);
+    setOverrides((prev) => ({ ...prev, [id]: completada }));
+    completarTarea(id, completada);
+
+    if (completada) {
       if (sonido) playChime();
-
       const quedanPendientes = pendientes.filter((t) => t.id !== id).length;
       if (quedanPendientes === 0 && !yaFestejo.current) {
         yaFestejo.current = true;
         confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 } });
       }
-    } else if (destino === "pendientes" && estaCompletada) {
-      setOverrides((prev) => ({ ...prev, [id]: false }));
+    } else {
       yaFestejo.current = false;
-      completarTarea(id, false);
     }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const id = Number(active.id);
+    const destino = String(over.id);
+    if (destino !== "completadas" && destino !== "pendientes") return;
+    marcarCompletada(id, destino === "completadas");
   }
 
   const pendientesFiltradas = soloAlta ? pendientes.filter((t) => t.prioridad === "Alta") : pendientes;
@@ -207,6 +222,7 @@ export function TareaKanban({
                   vinculos={vinculos}
                   usuarios={usuarios}
                   usuarioActualId={usuarioActualId}
+                  onToggleCompletada={marcarCompletada}
                 />
               ))
             )}
@@ -228,8 +244,19 @@ export function TareaKanban({
                   vinculos={vinculos}
                   usuarios={usuarios}
                   usuarioActualId={usuarioActualId}
+                  onToggleCompletada={marcarCompletada}
                 />
               ))
+            )}
+            {completadasAntiguasCount > 0 && (
+              <Link
+                href="/admin/tareas/historial"
+                className="block rounded-lg border border-dashed border-input px-3 py-2.5 text-center text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              >
+                Ver {completadasAntiguasCount} completada
+                {completadasAntiguasCount === 1 ? "" : "s"} más antigua
+                {completadasAntiguasCount === 1 ? "" : "s"} en el historial →
+              </Link>
             )}
           </Columna>
         </div>
