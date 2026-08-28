@@ -15,6 +15,7 @@ import {
   Handshake,
   Code2,
   ListTodo,
+  GalleryHorizontalEnd,
   Wallet,
   PiggyBank,
   BarChart3,
@@ -71,6 +72,13 @@ const navPrincipal = [
     href: "/admin/intermediarios",
     icon: Handshake,
     modulo: "Intermediarios",
+    grupo: "negocio",
+  },
+  {
+    title: "Portafolio",
+    href: "/admin/portafolio",
+    icon: GalleryHorizontalEnd,
+    modulo: "Portafolio",
     grupo: "negocio",
   },
   {
