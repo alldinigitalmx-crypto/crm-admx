@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CuentaFormDialog } from "@/components/cuentas/cuenta-form-dialog";
 import { RetiroFormDialog } from "@/components/cuentas/retiro-form-dialog";
+import { montoNetoEnMXN } from "@/lib/pago-monto";
 import { actualizarCuenta, crearCuenta, crearRetiro, eliminarRetiro } from "@/app/admin/cuentas/actions";
 
 export default async function CuentasPage() {
@@ -19,11 +20,13 @@ export default async function CuentasPage() {
     orderBy: [{ activa: "desc" }, { alias: "asc" }],
   });
 
-  const [pagosPorCuenta, gastosPorCuenta, retirosPorCuenta, retiros] = await Promise.all([
-    prisma.pago.groupBy({
-      by: ["cuentaId"],
-      _sum: { monto: true },
+  const [pagosPorCuentaDetalle, gastosPorCuenta, retirosPorCuenta, retiros] = await Promise.all([
+    // No es groupBy() porque hay que restar la comisión de la pasarela
+    // pago por pago (ver montoNetoEnMXN) -- lo que de verdad entró a la
+    // cuenta es el neto, no el bruto que cobró la pasarela.
+    prisma.pago.findMany({
       where: { confirmado: true, cuentaId: { not: null } },
+      select: { cuentaId: true, monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
     }),
     prisma.gasto.groupBy({
       by: ["cuentaId"],
@@ -34,7 +37,11 @@ export default async function CuentasPage() {
     prisma.retiro.findMany({ orderBy: { fecha: "desc" }, take: 200 }),
   ]);
 
-  const pagosMap = new Map(pagosPorCuenta.map((p) => [p.cuentaId, Number(p._sum.monto ?? 0)]));
+  const pagosMap = new Map<number, number>();
+  for (const p of pagosPorCuentaDetalle) {
+    if (p.cuentaId == null) continue;
+    pagosMap.set(p.cuentaId, (pagosMap.get(p.cuentaId) ?? 0) + montoNetoEnMXN(p));
+  }
   const gastosMap = new Map(gastosPorCuenta.map((g) => [g.cuentaId, Number(g._sum.monto ?? 0)]));
   const retirosMap = new Map(retirosPorCuenta.map((r) => [r.cuentaId, Number(r._sum.monto ?? 0)]));
   const retirosPorCuentaLista = new Map<number, typeof retiros>();

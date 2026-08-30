@@ -106,7 +106,15 @@ export type CapturaPaypal = {
   purchase_units: {
     reference_id: string;
     payments?: {
-      captures?: { id: string; status: string; amount: { value: string; currency_code: string } }[];
+      captures?: {
+        id: string;
+        status: string;
+        amount: { value: string; currency_code: string };
+        // PayPal desglosa aquí lo que se queda por procesar el cobro --
+        // se usa para no contar como ingreso lo que ellos ya descontaron
+        // (ver montoNetoEnMXN).
+        seller_receivable_breakdown?: { paypal_fee?: { value: string; currency_code: string } };
+      }[];
     };
   }[];
 };

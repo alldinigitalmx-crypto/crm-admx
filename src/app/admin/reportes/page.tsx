@@ -280,7 +280,7 @@ export default async function ReportesPage({
       </Card>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagosCount} pagos confirmados`} />
+        <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`} />
         <KpiCard title="Gastos (empresa)" value={formatCurrency(totalGastos)} icon={TrendingDown} tone="bad" sub={`${gastosCount} movimientos`} />
         <KpiCard
           title="Utilidad neta"

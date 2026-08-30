@@ -85,33 +85,40 @@ model OrdenCambio {
 }
 
 model Pago {
-  id              Int         @id @default(autoincrement())
-  servicioId      Int
-  servicio        Servicio    @relation(fields: [servicioId], references: [id])
-  cotizacionId    Int?
-  cotizacion      Cotizacion? @relation(fields: [cotizacionId], references: [id])
-  fecha           DateTime    @default(now())
-  metodoPago      MetodoPago
-  monto           Decimal     @db.Decimal(12, 2)
-  moneda          Moneda?
+  id                   Int         @id @default(autoincrement())
+  servicioId           Int
+  servicio             Servicio    @relation(fields: [servicioId], references: [id])
+  cotizacionId         Int?
+  cotizacion           Cotizacion? @relation(fields: [cotizacionId], references: [id])
+  fecha                DateTime    @default(now())
+  metodoPago           MetodoPago
+  monto                Decimal     @db.Decimal(12, 2)
+  moneda               Moneda?
   // Equivalente en pesos mexicanos cuando moneda es distinta de MXN — los
   // reportes (Reportes, Excel, PDF) siempre suman en MXN, así que sin este
   // valor un pago en USD/COP se sumaría como si fuera el mismo número de
   // pesos (ver src/lib/pago-monto.ts). Nulo cuando moneda ya es MXN/nula:
   // en ese caso el equivalente es el propio monto.
-  montoMXN        Decimal?    @db.Decimal(12, 2)
-  comision        Decimal?    @db.Decimal(12, 2)
-  comprobante     String?
+  montoMXN             Decimal?    @db.Decimal(12, 2)
+  comision             Decimal?    @db.Decimal(12, 2)
+  // true = "monto" es el bruto que cobró la pasarela (hay que restarle
+  // comision para saber cuánto ingresó realmente) -- así se registra todo
+  // pago nuevo. false = "monto" ya es lo que de verdad llegó y comision es
+  // solo informativa -- así se registraban los pagos antes de este campo,
+  // y se dejan así para no alterar cifras de reportes ya generados (ver
+  // montoNetoEnMXN en src/lib/pago-monto.ts).
+  montoIncluyeComision Boolean     @default(true)
+  comprobante          String?
   // Texto libre histórico (de antes de que existiera el modelo Cuenta) —
   // se conserva solo para mostrarlo en pagos viejos; ya no se escribe.
   // El campo real es cuentaId/cuenta, de dónde de verdad entró el dinero.
-  cuentaTexto     String?
-  cuentaId        Int?
-  cuenta          Cuenta?     @relation(fields: [cuentaId], references: [id])
-  confirmado      Boolean     @default(true)
-  confirmadoPorId Int?
-  confirmadoPor   Usuario?    @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
-  confirmadoEn    DateTime?
+  cuentaTexto          String?
+  cuentaId             Int?
+  cuenta               Cuenta?     @relation(fields: [cuentaId], references: [id])
+  confirmado           Boolean     @default(true)
+  confirmadoPorId      Int?
+  confirmadoPor        Usuario?    @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  confirmadoEn         DateTime?
 }
 
 // ---------- COTIZACIONES (Fase 1) ----------

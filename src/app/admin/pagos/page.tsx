@@ -4,7 +4,7 @@ import { Plus, Pencil, Download, CheckCircle2, Clock } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { montoEnMXN } from "@/lib/pago-monto";
+import { montoEnMXN, montoNetoEnMXN } from "@/lib/pago-monto";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,13 +116,17 @@ export default async function PagosPage({
   if (hasta) exportParams.set("hasta", hasta);
 
   const [agregados, montosParaTotal, pagos] = await Promise.all([
-    prisma.pago.aggregate({ where, _sum: { comision: true }, _count: true }),
+    prisma.pago.aggregate({ where, _count: true }),
     // Aparte del aggregate de Prisma (que solo puede sumar la columna en
     // crudo): un pago en USD/COP no se puede sumar junto con uno en MXN
-    // sin convertir primero, así que este total se arma en JS con
-    // montoEnMXN() sobre TODOS los pagos que cumplen el filtro (no un
-    // _sum de SQL, y no solo la página actual).
-    prisma.pago.findMany({ where, select: { monto: true, moneda: true, montoMXN: true } }),
+    // sin convertir primero, y hay que restar la comisión de la pasarela
+    // pago por pago -- este total se arma en JS con montoNetoEnMXN()
+    // sobre TODOS los pagos que cumplen el filtro (no un _sum de SQL, y
+    // no solo la página actual).
+    prisma.pago.findMany({
+      where,
+      select: { monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
+    }),
     prisma.pago.findMany({
       where,
       include: { servicio: { include: { cliente: true } }, cuenta: true },
@@ -133,8 +137,9 @@ export default async function PagosPage({
   ]);
   const totalCount = agregados._count;
   const paginas = totalPages(totalCount);
-  const totalMonto = montosParaTotal.reduce((acc, p) => acc + montoEnMXN(p), 0);
-  const totalComision = Number(agregados._sum.comision ?? 0);
+  const totalBruto = montosParaTotal.reduce((acc, p) => acc + montoEnMXN(p), 0);
+  const totalNeto = montosParaTotal.reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
+  const totalComisionDescontada = totalBruto - totalNeto;
   const hayMonedaExtranjera = montosParaTotal.some((p) => p.moneda && p.moneda !== "MXN");
 
   const comprobantes = await prisma.archivo.findMany({
@@ -166,10 +171,12 @@ export default async function PagosPage({
           <p className="text-sm text-muted-foreground">
             {totalCount} pago{totalCount === 1 ? "" : "s"}
             {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
-            {" — Total: "}
-            {formatCurrency(totalMonto)}
+            {" — Total neto: "}
+            {formatCurrency(totalNeto)}
             {hayMonedaExtranjera ? " (equivalente en MXN)" : ""}
-            {totalComision > 0 ? ` (comisiones: ${formatCurrency(totalComision)})` : ""}
+            {totalComisionDescontada > 0.01
+              ? ` (bruto: ${formatCurrency(totalBruto)}, comisión de pasarela: ${formatCurrency(totalComisionDescontada)})`
+              : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -355,6 +362,7 @@ export default async function PagosPage({
                               metodoPago: p.metodoPago,
                               monto: Number(p.monto),
                               comision: p.comision ? Number(p.comision) : null,
+                              montoIncluyeComision: p.montoIncluyeComision,
                               moneda: p.moneda,
                               montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                               cuentaNombre,
@@ -448,6 +456,7 @@ export default async function PagosPage({
                             metodoPago: p.metodoPago,
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
+                            montoIncluyeComision: p.montoIncluyeComision,
                             moneda: p.moneda,
                             montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                             cuentaNombre,

@@ -78,7 +78,17 @@ export type PagoMercadoPago = {
   status_detail: string;
   transaction_amount: number;
   external_reference: string | null;
+  // La comisión que se queda Mercado Pago viene desglosada aquí (puede
+  // traer más de un renglón, ej. comisión + IVA de la comisión) -- se sea
+  // suma todo para saber cuánto se descontó en total.
+  fee_details?: { type: string; amount: number }[] | null;
 };
+
+export function comisionMercadoPago(pago: PagoMercadoPago): number | null {
+  if (!pago.fee_details?.length) return null;
+  const total = pago.fee_details.reduce((acc, f) => acc + f.amount, 0);
+  return total > 0 ? total : null;
+}
 
 export async function obtenerPagoMercadoPago(paymentId: string): Promise<PagoMercadoPago> {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN;

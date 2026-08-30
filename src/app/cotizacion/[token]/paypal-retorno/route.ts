@@ -47,6 +47,8 @@ export async function GET(
     const existente = await prisma.pago.findFirst({ where: { comprobante: referencia } });
     if (!existente) {
       const montoPagado = Number(pago.amount.value);
+      const comisionRaw = pago.seller_receivable_breakdown?.paypal_fee?.value;
+      const comision = comisionRaw ? Number(comisionRaw) : null;
       const quedaSaldada = cotizacionQuedaSaldada(cotizacion, [
         ...cotizacion.pagos,
         { monto: montoPagado, confirmado: true },
@@ -59,6 +61,8 @@ export async function GET(
             cotizacionId: cotizacion.id,
             metodoPago: "PayPal",
             monto: montoPagado,
+            comision,
+            montoIncluyeComision: true,
             confirmado: true,
             confirmadoEn: new Date(),
             comprobante: referencia,

@@ -79,7 +79,22 @@ export function PagoForm({
     defaultValues?.moneda && defaultValues.moneda !== "MXN" ? defaultValues.moneda : "USD"
   );
   const montoRef = useRef<HTMLInputElement>(null);
+  const comisionRef = useRef<HTMLInputElement>(null);
   const montoMXNRef = useRef<HTMLInputElement>(null);
+  const [neto, setNeto] = useState<number | null>(
+    defaultValues?.comision ? Number(defaultValues.monto) - Number(defaultValues.comision) : null
+  );
+
+  // El campo "Monto" siempre es lo que le cobraron al cliente (el bruto);
+  // "Comisión" es lo que se quedó la pasarela. Este preview es lo único
+  // que hace falta para no volver a confundir bruto con neto: se ve al
+  // teclear, antes de guardar, y se compara fácil contra lo que el
+  // banco/PayPal/Mercado Pago de verdad depositó.
+  function actualizarNeto() {
+    const monto = Number(montoRef.current?.value ?? "");
+    const comision = Number(comisionRef.current?.value ?? "");
+    setNeto(monto > 0 && comision > 0 ? monto - comision : null);
+  }
   const [cargandoTipoCambio, setCargandoTipoCambio] = useState(false);
   const [tipoCambioInfo, setTipoCambioInfo] = useState<{ rate: number; fecha: string | null } | null>(
     null
@@ -201,7 +216,7 @@ export function PagoForm({
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor="monto">Monto *</Label>
+          <Label htmlFor="monto">Monto (lo que le cobraron al cliente) *</Label>
           <Input
             id="monto"
             name="monto"
@@ -212,20 +227,29 @@ export function PagoForm({
             required
             defaultValue={defaultValues?.monto ? String(defaultValues.monto) : ""}
             placeholder="0.00"
+            onChange={actualizarNeto}
           />
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor="comision">Comisión</Label>
+          <Label htmlFor="comision">Comisión de la pasarela</Label>
           <Input
             id="comision"
             name="comision"
+            ref={comisionRef}
             type="number"
             step="0.01"
             min="0"
             defaultValue={defaultValues?.comision ? String(defaultValues.comision) : ""}
             placeholder="0.00"
+            onChange={actualizarNeto}
           />
+          {neto != null && (
+            <p className="text-xs text-muted-foreground">
+              Te depositan (neto): <span className="font-medium text-foreground">{neto.toFixed(2)}</span> —
+              compáralo con lo que de verdad te llegó antes de guardar.
+            </p>
+          )}
         </div>
 
         {cuentas && (

@@ -28,6 +28,7 @@ export type PagoDetalle = {
   metodoPago: string;
   monto: number | string | { toString(): string };
   comision: (number | string | { toString(): string }) | null;
+  montoIncluyeComision?: boolean;
   moneda: string | null;
   montoMXN: (number | string | { toString(): string }) | null;
   // Ya resuelto por quien arma este objeto: p.cuenta?.alias ?? p.cuentaTexto
@@ -144,6 +145,14 @@ export function PagoDetalleDialog({
               <p className="text-muted-foreground">Comisión</p>
               <p>{pago.comision ? formatCurrency(pago.comision, pago.moneda) : "—"}</p>
             </div>
+            {pago.comision != null && pago.montoIncluyeComision && (
+              <div>
+                <p className="text-muted-foreground">Neto (lo que llegó)</p>
+                <p className="font-medium">
+                  {formatCurrency(Number(pago.monto) - Number(pago.comision), pago.moneda)}
+                </p>
+              </div>
+            )}
             {pago.montoMXN && (
               <div>
                 <p className="text-muted-foreground">Equivalente MXN</p>

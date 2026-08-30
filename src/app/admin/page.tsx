@@ -22,6 +22,7 @@ import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { obtenerTasasAMXN, resumirMontoMulti, type ResumenMontoMulti } from "@/lib/tipo-cambio";
+import { montoNetoEnMXN } from "@/lib/pago-monto";
 import { formatCurrency } from "@/lib/format";
 import type { Usuario } from "@/generated/prisma/client";
 
@@ -194,9 +195,12 @@ async function PanelAdmin() {
     prisma.cliente.count(),
     prisma.servicio.count({ where: { status: { in: ["Aprobado", "EnProceso"] } } }),
     prisma.servicio.count(),
-    prisma.pago.aggregate({
-      _sum: { monto: true },
+    // No es un aggregate() de Prisma porque hay que restar la comisión de
+    // la pasarela y convertir a MXN registro por registro (ver
+    // montoNetoEnMXN) -- son pocos pagos al mes, no pesa nada.
+    prisma.pago.findMany({
       where: { fecha: { gte: inicioDeMes }, confirmado: true },
+      select: { monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
     }),
     prisma.servicio.groupBy({ by: ["status"], _count: true }),
     prisma.cotizacion.findMany({
@@ -316,7 +320,7 @@ async function PanelAdmin() {
         />
         <KpiCard
           title="Ingresos del mes"
-          value={currencyCorta.format(Number(ingresosMes._sum.monto ?? 0))}
+          value={currencyCorta.format(ingresosMes.reduce((acc, p) => acc + montoNetoEnMXN(p), 0))}
           icon={CreditCard}
         />
         <KpiCard

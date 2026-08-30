@@ -451,6 +451,7 @@ export default async function ServicioDetallePage({
                             metodoPago: p.metodoPago,
                             monto: Number(p.monto),
                             comision: p.comision ? Number(p.comision) : null,
+                            montoIncluyeComision: p.montoIncluyeComision,
                             moneda: p.moneda,
                             montoMXN: p.montoMXN ? Number(p.montoMXN) : null,
                             cuentaNombre,

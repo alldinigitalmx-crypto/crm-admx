@@ -13,7 +13,7 @@ import {
   type PuntoPeriodo,
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
-import { montoEnMXN } from "@/lib/pago-monto";
+import { montoEnMXN, montoNetoEnMXN } from "@/lib/pago-monto";
 import { montoPendienteServicio } from "@/lib/servicio";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
@@ -36,6 +36,7 @@ export type ReportePagoDetalle = {
   // moneda, monedaOriginal/montoOriginal traen el dato tal cual se
   // registró, solo para mostrarlo de referencia.
   monto: number;
+  comisionMXN: number;
   monedaOriginal: string | null;
   montoOriginal: number | null;
 };
@@ -117,6 +118,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
         monto: true,
         moneda: true,
         montoMXN: true,
+        comision: true,
+        montoIncluyeComision: true,
         metodoPago: true,
         servicio: { select: { descripcion: true, cliente: { select: { id: true, nombre: true } } } },
       },
@@ -148,16 +151,19 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   ]);
 
   // Un pago en USD/COP no se puede sumar en crudo junto con uno en MXN —
-  // montoEnMXN() usa el equivalente en pesos que se capturó al registrar
-  // el pago (ver src/lib/pago-monto.ts). Este es el único total que de
-  // verdad importa para el negocio, por eso todo lo demás de este
-  // archivo (tendencia, por método, por cliente, detalle) también lo usa.
-  const totalRecaudado = pagos.reduce((acc, p) => acc + montoEnMXN(p), 0);
+  // montoNetoEnMXN() usa el equivalente en pesos que se capturó al
+  // registrar el pago, y le resta la comisión de la pasarela cuando
+  // corresponde (ver src/lib/pago-monto.ts) para que "cuánto ingresó" no
+  // cuente de más lo que PayPal/Mercado Pago se quedaron. Este es el
+  // único total que de verdad importa para el negocio, por eso todo lo
+  // demás de este archivo (tendencia, por método, por cliente, detalle)
+  // también lo usa.
+  const totalRecaudado = pagos.reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
   const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
   const utilidadNeta = totalRecaudado - totalGastos;
 
   const puntosPeriodo = agruparRecaudadoGastos(
-    pagos.map((p) => ({ fecha: p.fecha, monto: montoEnMXN(p) })),
+    pagos.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
     gastos.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
     desdeEfectivo,
     hastaEfectivo
@@ -174,7 +180,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   const metodoTotales = new Map<string, { monto: number; count: number }>();
   for (const p of pagos) {
     const cur = metodoTotales.get(p.metodoPago) ?? { monto: 0, count: 0 };
-    cur.monto += montoEnMXN(p);
+    cur.monto += montoNetoEnMXN(p);
     cur.count += 1;
     metodoTotales.set(p.metodoPago, cur);
   }
@@ -210,7 +216,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   for (const p of pagos) {
     const c = p.servicio.cliente;
     const cur = porCliente.get(c.id) ?? { nombre: c.nombre, monto: 0, count: 0 };
-    cur.monto += montoEnMXN(p);
+    cur.monto += montoNetoEnMXN(p);
     cur.count += 1;
     porCliente.set(c.id, cur);
   }
@@ -267,7 +273,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
       servicio: p.servicio.descripcion,
       cliente: p.servicio.cliente.nombre,
       metodoPago: METODO_LABEL[p.metodoPago] ?? p.metodoPago,
-      monto: montoEnMXN(p),
+      monto: montoNetoEnMXN(p),
+      comisionMXN: p.montoIncluyeComision ? montoEnMXN(p) - montoNetoEnMXN(p) : 0,
       monedaOriginal: p.moneda && p.moneda !== "MXN" ? p.moneda : null,
       montoOriginal: p.moneda && p.moneda !== "MXN" ? Number(p.monto) : null,
     })),

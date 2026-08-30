@@ -110,6 +110,9 @@ export async function crearPago(
       metodoPago: data.metodoPago,
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
+      // Todo pago nuevo se captura con la convención "monto = bruto que
+      // cobró la pasarela" -- ver montoNetoEnMXN en src/lib/pago-monto.ts.
+      montoIncluyeComision: true,
       moneda: data.moneda,
       montoMXN: data.montoMXNRaw || null,
       cuentaId: data.cuentaId,

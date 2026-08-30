@@ -21,3 +21,30 @@ export function montoEnMXN(pago: PagoParaMXN): number {
   }
   return Number(pago.monto);
 }
+
+export type PagoParaNeto = PagoParaMXN & {
+  comision?: DecimalLike | null;
+  montoIncluyeComision?: boolean;
+};
+
+// Cuánto ingresó de verdad de este pago, en pesos -- para reportes,
+// paneles y cualquier cosa que responda "cuánto gané", a diferencia de
+// montoEnMXN() que es "cuánto pagó el cliente" (eso sigue sirviendo para
+// saber si un servicio/cotización ya quedó saldado, sin tocar).
+//
+// montoIncluyeComision distingue dos convenciones de captura: en pagos
+// nuevos, "monto" es el bruto que cobró la pasarela y hay que restarle la
+// comisión; en pagos viejos, "monto" ya era lo que realmente llegó (la
+// comisión ahí es solo informativa) y restarla de nuevo lo contaría dos
+// veces -- por eso NUNCA se resta si el campo viene en false.
+export function montoNetoEnMXN(pago: PagoParaNeto): number {
+  const bruto = montoEnMXN(pago);
+  if (!pago.montoIncluyeComision || !pago.comision) return bruto;
+
+  const montoOriginal = Number(pago.monto);
+  // La comisión se cobra en la misma moneda del pago -- se escala con la
+  // misma tasa implícita que ya se usó para convertir el monto a MXN
+  // (bruto / montoOriginal), en vez de asumir que ya viene en pesos.
+  const factor = montoOriginal !== 0 ? bruto / montoOriginal : 1;
+  return bruto - Number(pago.comision) * factor;
+}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { obtenerPagoMercadoPago } from "@/lib/mercadopago";
+import { obtenerPagoMercadoPago, comisionMercadoPago } from "@/lib/mercadopago";
 import { registrarEvento } from "@/lib/evento";
 import { cotizacionQuedaSaldada } from "@/lib/cotizacion";
 import { asegurarServicioParaCotizacion } from "@/lib/cotizacion-servicio";
@@ -74,6 +74,11 @@ export async function POST(request: Request) {
           cotizacionId: cotizacion.id,
           metodoPago: "MercadoPago",
           monto: pago.transaction_amount,
+          // Mercado Pago ya trae desglosada su comisión en el mismo pago
+          // -- se guarda de una vez para que el ingreso real no cuente de
+          // más lo que ellos se quedan (ver montoNetoEnMXN).
+          comision: comisionMercadoPago(pago),
+          montoIncluyeComision: true,
           confirmado: true,
           confirmadoEn: new Date(),
           comprobante: referencia,
