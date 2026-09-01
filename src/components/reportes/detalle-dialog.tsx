@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Columna = { key: string; label: string };
+type Columna = { key: string; label: string; ancha?: boolean };
 type Fila = Record<string, string>;
 type Respuesta = { columnas: Columna[]; filas: Fila[]; totalCount: number; truncado: boolean };
 
@@ -109,7 +109,7 @@ export function DetalleDialog({
           <ChevronRight className="size-3.5" />
         </button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] flex-col overflow-hidden sm:max-w-3xl lg:max-w-4xl">
+      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] flex-col overflow-hidden sm:max-w-3xl lg:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
@@ -154,7 +154,14 @@ export function DetalleDialog({
                   {datos.filas.map((fila, i) => (
                     <TableRow key={i}>
                       {datos.columnas.map((c) => (
-                        <TableCell key={c.key} className="whitespace-nowrap">
+                        <TableCell
+                          key={c.key}
+                          className={
+                            c.ancha
+                              ? "max-w-0 min-w-40 whitespace-normal break-words"
+                              : "whitespace-nowrap"
+                          }
+                        >
                           {fila[c.key]}
                         </TableCell>
                       ))}

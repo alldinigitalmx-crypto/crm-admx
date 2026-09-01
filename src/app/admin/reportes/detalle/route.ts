@@ -17,7 +17,16 @@ import type { Prisma } from "@/generated/prisma/client";
 const MAX_FILAS = 200;
 
 type Fila = Record<string, string>;
-type Respuesta = { columnas: { key: string; label: string }[]; filas: Fila[]; totalCount: number; truncado: boolean };
+// "ancha" marca las columnas de texto libre (descripción/nombre/email)
+// que en la tabla de escritorio deben poder partirse en varias líneas en
+// vez de forzar todo el modal a ensancharse hasta desbordar y necesitar
+// scroll lateral (ver DetalleDialog).
+type Respuesta = {
+  columnas: { key: string; label: string; ancha?: boolean }[];
+  filas: Fila[];
+  totalCount: number;
+  truncado: boolean;
+};
 
 export async function GET(request: Request) {
   if (!(await requiereAdmin())) {
@@ -59,8 +68,8 @@ export async function GET(request: Request) {
       respuesta = {
         columnas: [
           { key: "fecha", label: "Fecha" },
-          { key: "servicio", label: "Servicio" },
-          { key: "cliente", label: "Cliente" },
+          { key: "servicio", label: "Servicio", ancha: true },
+          { key: "cliente", label: "Cliente", ancha: true },
           { key: "metodoPago", label: "Método" },
           { key: "monto", label: "Monto (neto)" },
         ],
@@ -92,7 +101,7 @@ export async function GET(request: Request) {
       respuesta = {
         columnas: [
           { key: "fecha", label: "Fecha" },
-          { key: "descripcion", label: "Descripción" },
+          { key: "descripcion", label: "Descripción", ancha: true },
           { key: "categoria", label: "Categoría" },
           { key: "monto", label: "Monto" },
         ],
@@ -126,8 +135,8 @@ export async function GET(request: Request) {
       respuesta = {
         columnas: [
           { key: "fecha", label: tipo === "servicios-entregados" ? "Fecha fin" : "Fecha inicio" },
-          { key: "descripcion", label: "Servicio" },
-          { key: "cliente", label: "Cliente" },
+          { key: "descripcion", label: "Servicio", ancha: true },
+          { key: "cliente", label: "Cliente", ancha: true },
           { key: "status", label: "Status" },
           { key: "monto", label: "Monto" },
         ],
@@ -157,8 +166,8 @@ export async function GET(request: Request) {
       respuesta = {
         columnas: [
           { key: "fecha", label: "Alta" },
-          { key: "nombre", label: "Nombre" },
-          { key: "email", label: "Email" },
+          { key: "nombre", label: "Nombre", ancha: true },
+          { key: "email", label: "Email", ancha: true },
           { key: "pais", label: "País" },
           { key: "etiqueta", label: "Etiqueta" },
         ],
