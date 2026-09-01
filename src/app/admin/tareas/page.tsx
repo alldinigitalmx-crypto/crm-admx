@@ -223,58 +223,61 @@ export default async function TareasPage({
             solo para mirar hacia atrás.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {/* El filtro va arriba de todo: primero eliges el rango, y las
-              cuentas de abajo + la gráfica reaccionan a esa elección. */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            {presets.map((p) => {
-              const params = new URLSearchParams();
-              if (p.todo) {
-                params.set("todo", "1");
-              } else {
-                if (p.desde) params.set("desde", p.desde);
-                if (p.hasta) params.set("hasta", p.hasta);
-              }
-              const href = `/admin/tareas?${params}`;
-              const activo = presetActivo?.label === p.label;
-              return (
-                <Link
-                  key={p.label}
-                  href={href}
-                  className={`flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 text-center transition-colors ${
-                    activo
-                      ? "border-primary/40 bg-primary/10"
-                      : "border-input hover:bg-muted/60"
-                  }`}
-                >
-                  <span className={`text-lg font-semibold tabular-nums ${activo ? "text-primary" : ""}`}>
-                    {p.count}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">{p.label}</span>
-                </Link>
-              );
-            })}
+        <CardContent className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          {/* En PC, filtros a la izquierda en una columna angosta y la
+              gráfica a la derecha con el resto del ancho -- en vez de
+              apilar todo en una sola columna angosta que desperdicia el
+              espacio horizontal que sí hay en escritorio. En móvil se
+              queda apilado como antes. */}
+          <div className="flex flex-col gap-4 lg:w-60 lg:shrink-0">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-2">
+              {presets.map((p) => {
+                const params = new URLSearchParams();
+                if (p.todo) {
+                  params.set("todo", "1");
+                } else {
+                  if (p.desde) params.set("desde", p.desde);
+                  if (p.hasta) params.set("hasta", p.hasta);
+                }
+                const href = `/admin/tareas?${params}`;
+                const activo = presetActivo?.label === p.label;
+                return (
+                  <Link
+                    key={p.label}
+                    href={href}
+                    className={`flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 text-center transition-colors ${
+                      activo
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-input hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className={`text-lg font-semibold tabular-nums ${activo ? "text-primary" : ""}`}>
+                      {p.count}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">{p.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <form className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-stretch">
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <label htmlFor="desde" className="text-xs text-muted-foreground">
+                  Desde
+                </label>
+                <Input id="desde" type="date" name="desde" defaultValue={desde ?? ""} />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <label htmlFor="hasta" className="text-xs text-muted-foreground">
+                  Hasta
+                </label>
+                <Input id="hasta" type="date" name="hasta" defaultValue={hasta ?? ""} />
+              </div>
+              <Button type="submit">Filtrar</Button>
+            </form>
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="desde" className="text-xs text-muted-foreground">
-                Desde
-              </label>
-              <Input id="desde" type="date" name="desde" defaultValue={desde ?? ""} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="hasta" className="text-xs text-muted-foreground">
-                Hasta
-              </label>
-              <Input id="hasta" type="date" name="hasta" defaultValue={hasta ?? ""} />
-            </div>
-            <Button type="submit" className="self-end">
-              Filtrar
-            </Button>
-          </form>
-
-          <div className="border-t border-border pt-4">
+          <div className="min-w-0 flex-1 lg:border-l lg:border-border lg:pl-6">
             <p className="mb-2 text-xs text-muted-foreground">
               {totalCompletadasRango} completada{totalCompletadasRango === 1 ? "" : "s"} en el
               rango elegido — {granularidad === "mes" ? "un punto por mes" : "un punto por día"}.
