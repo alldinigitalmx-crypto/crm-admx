@@ -9,55 +9,12 @@ const PRIORIDAD_LABEL: Record<string, string> = {
   Baja: "Prioridad baja",
 };
 
-function Sparkline({ tendencia7 }: { tendencia7: ResumenTareas["tendencia7"] }) {
-  const max = Math.max(1, ...tendencia7.map((d) => d.completadas));
-  const w = 120;
-  const h = 32;
-  const step = w / (tendencia7.length - 1 || 1);
-
-  const points = tendencia7
-    .map((d, i) => {
-      const x = i * step;
-      const y = h - (d.completadas / max) * (h - 4) - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-8 w-full max-w-[140px] overflow-visible">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-primary"
-      />
-      {tendencia7.map((d, i) => {
-        const x = i * step;
-        const y = h - (d.completadas / max) * (h - 4) - 2;
-        return (
-          <circle
-            key={d.fecha}
-            cx={x}
-            cy={y}
-            r={i === tendencia7.length - 1 ? 2.5 : 1.5}
-            className="fill-primary"
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
 export function TareasResumen({ resumen }: { resumen: ResumenTareas }) {
-  const { pendientesCount, completadasHoy, progresoPct, racha, tendencia7, proximaPrioridad } =
-    resumen;
+  const { pendientesCount, completadasHoy, progresoPct, racha, proximaPrioridad } = resumen;
   const totalHoy = pendientesCount + completadasHoy;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-3">
       <Card>
         <CardContent className="flex flex-col gap-1 py-2">
           <p className="text-xs text-muted-foreground">Progreso de hoy</p>
@@ -98,13 +55,6 @@ export function TareasResumen({ resumen }: { resumen: ResumenTareas }) {
           ) : (
             <p className="text-sm text-muted-foreground">Sin pendientes 🎉</p>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="flex flex-col gap-1 py-2">
-          <p className="text-xs text-muted-foreground">Últimos 7 días</p>
-          <Sparkline tendencia7={tendencia7} />
         </CardContent>
       </Card>
     </div>

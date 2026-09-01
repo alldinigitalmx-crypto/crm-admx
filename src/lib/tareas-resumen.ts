@@ -1,5 +1,6 @@
 import type { PrioridadTarea } from "@/generated/prisma/client";
 import { diaMexicoISO, hoyEnMexico } from "@/lib/fecha";
+import { granularidadPeriodo, type Granularidad } from "@/lib/reportes";
 
 // Día en México, no en UTC -- si no, una tarea completada entrada la
 // noche (hora de México) se contaba en el día siguiente, y "completadas
@@ -11,7 +12,6 @@ export type ResumenTareas = {
   completadasHoy: number;
   progresoPct: number;
   racha: number;
-  tendencia7: { fecha: string; completadas: number }[];
   proximaPrioridad: PrioridadTarea | null;
 };
 
@@ -51,18 +51,67 @@ export function calcularResumenTareas(
     }
   }
 
-  // Tendencia de los últimos 7 días (incluye hoy).
-  const tendencia7: { fecha: string; completadas: number }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(hoy);
-    d.setUTCDate(d.getUTCDate() - i);
-    const key = toDateKey(d);
-    tendencia7.push({ fecha: key, completadas: porDia.get(key) ?? 0 });
-  }
-
   const ORDEN: PrioridadTarea[] = ["Alta", "Media", "Baja"];
   const proximaPrioridad =
     ORDEN.find((p) => pendientes.some((t) => t.prioridad === p)) ?? null;
 
-  return { pendientesCount, completadasHoy, progresoPct, racha, tendencia7, proximaPrioridad };
+  return { pendientesCount, completadasHoy, progresoPct, racha, proximaPrioridad };
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+const MES_CORTO_TAREAS = [
+  "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+export type PuntoTareas = { key: string; label: string; completadas: number };
+
+/** Igual espíritu que agruparRecaudadoGastos (reportes.ts) pero para una
+ * sola serie (tareas completadas) -- día o mes según el rango, mismo
+ * criterio de granularidad, para que el gráfico de Tareas se sienta
+ * como el de Reportes en vez de una cosa aparte y más pobre. */
+export function agruparTareasCompletadasPorPeriodo(
+  fechas: Date[],
+  desde: Date,
+  hasta: Date
+): { puntos: PuntoTareas[]; granularidad: Granularidad } {
+  const granularidad = granularidadPeriodo(desde, hasta);
+
+  function claveYLabel(fecha: Date): { key: string; label: string } {
+    if (granularidad === "dia") {
+      const key = `${fecha.getUTCFullYear()}-${pad2(fecha.getUTCMonth() + 1)}-${pad2(fecha.getUTCDate())}`;
+      return { key, label: `${pad2(fecha.getUTCDate())} ${MES_CORTO_TAREAS[fecha.getUTCMonth()]}` };
+    }
+    const key = `${fecha.getUTCFullYear()}-${pad2(fecha.getUTCMonth() + 1)}`;
+    return { key, label: `${MES_CORTO_TAREAS[fecha.getUTCMonth()]} ${String(fecha.getUTCFullYear()).slice(2)}` };
+  }
+
+  const puntos = new Map<string, PuntoTareas>();
+  const cursor = new Date(desde);
+  let guard = 0;
+  while (cursor.getTime() <= hasta.getTime() && guard < 400) {
+    const { key, label } = claveYLabel(cursor);
+    if (!puntos.has(key)) puntos.set(key, { key, label, completadas: 0 });
+    if (granularidad === "mes") {
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    } else {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    guard++;
+  }
+  const { key: keyHasta, label: labelHasta } = claveYLabel(hasta);
+  if (!puntos.has(keyHasta)) puntos.set(keyHasta, { key: keyHasta, label: labelHasta, completadas: 0 });
+
+  for (const fecha of fechas) {
+    const { key } = claveYLabel(fecha);
+    const punto = puntos.get(key);
+    if (punto) punto.completadas += 1;
+  }
+
+  return {
+    puntos: Array.from(puntos.values()).sort((a, b) => a.key.localeCompare(b.key)),
+    granularidad,
+  };
 }
