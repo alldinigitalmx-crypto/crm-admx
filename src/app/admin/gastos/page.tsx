@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Download } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { requiereAdmin } from "@/lib/alcance";
@@ -53,6 +53,12 @@ export default async function GastosPage({
 
   const hasFiltros = Boolean(ambito || categoria || desde || hasta);
 
+  const exportParams = new URLSearchParams();
+  if (ambito) exportParams.set("ambito", ambito);
+  if (categoria) exportParams.set("categoria", categoria);
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
+
   const [gastos, cuentasDisponibles] = await Promise.all([
     prisma.gasto.findMany({ where, include: { cuenta: true }, orderBy: { fecha: "desc" } }),
     prisma.cuenta.findMany({ where: { activa: true }, orderBy: { alias: "asc" } }),
@@ -71,18 +77,26 @@ export default async function GastosPage({
             {formatCurrency(totalGastos)}
           </p>
         </div>
-        <GastoFormDialog
-          trigger={
-            <Button>
-              <Plus />
-              Nuevo gasto
-            </Button>
-          }
-          title="Nuevo gasto"
-          action={crearGasto}
-          cuentas={cuentasDisponibles}
-          submitLabel="Registrar gasto"
-        />
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/admin/gastos/export?${exportParams.toString()}`}>
+              <Download />
+              Exportar Excel
+            </a>
+          </Button>
+          <GastoFormDialog
+            trigger={
+              <Button>
+                <Plus />
+                Nuevo gasto
+              </Button>
+            }
+            title="Nuevo gasto"
+            action={crearGasto}
+            cuentas={cuentasDisponibles}
+            submitLabel="Registrar gasto"
+          />
+        </div>
       </div>
 
       <Card>

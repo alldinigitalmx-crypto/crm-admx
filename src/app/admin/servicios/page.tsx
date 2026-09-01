@@ -66,7 +66,12 @@ export default async function ServiciosPage({
   if (status) where.status = status as StatusServicio;
   if (intermediarioId) where.intermediarioId = Number(intermediarioId);
   if (desde || hasta) {
-    where.fechaInicio = {
+    // "Entregado" se cuenta en Reportes por su fecha de fin, no de inicio
+    // (ver serviciosEntregadosWhere en reportes-data.ts) -- aquí se sigue
+    // el mismo criterio para que "Ver detalles" muestre exactamente lo
+    // que la tarjeta contó, ni un servicio de más ni de menos.
+    const campoFecha = status === "Entregado" ? "fechaFin" : "fechaInicio";
+    where[campoFecha] = {
       ...(desde ? { gte: new Date(desde) } : {}),
       ...(hasta ? { lte: new Date(hasta) } : {}),
     };

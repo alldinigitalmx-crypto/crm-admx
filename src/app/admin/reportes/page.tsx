@@ -10,6 +10,7 @@ import {
   Download,
   FileDown,
   User,
+  ChevronRight,
 } from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
@@ -86,12 +87,19 @@ function KpiCard({
   icon: Icon,
   tone = "default",
   sub,
+  detalleHref,
 }: {
   title: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "good" | "bad";
   sub?: string;
+  // Lleva al listado real (Pagos/Gastos/Servicios/Clientes) ya filtrado
+  // con el mismo rango y criterio que se usó para esta cifra -- ahí el
+  // usuario puede exportar a Excel esos registros exactos. Se omite en
+  // tarjetas sin una lista propia detrás (ej. Utilidad neta, que es una
+  // resta, no un conjunto de registros).
+  detalleHref?: string;
 }) {
   const toneClass =
     tone === "good"
@@ -101,15 +109,26 @@ function KpiCard({
         : "bg-primary/10 text-primary";
   return (
     <Card>
-      <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-        <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${toneClass}`}>
-          <Icon className="size-4 sm:size-5" />
+      <CardContent className="flex flex-col gap-2 py-2">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${toneClass}`}>
+            <Icon className="size-4 sm:size-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs text-muted-foreground">{title}</p>
+            <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
+            {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{title}</p>
-          <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
-          {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
-        </div>
+        {detalleHref && (
+          <Link
+            href={detalleHref}
+            className="flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
+          >
+            Ver detalles
+            <ChevronRight className="size-3.5" />
+          </Link>
+        )}
       </CardContent>
     </Card>
   );
@@ -290,26 +309,66 @@ export default async function ReportesPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        <KpiCard title="Total recaudado" value={formatCurrency(totalRecaudado)} icon={TrendingUp} tone="good" sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`} />
-        <KpiCard title="Gastos (empresa)" value={formatCurrency(totalGastos)} icon={TrendingDown} tone="bad" sub={`${gastosCount} movimientos`} />
-        <KpiCard
-          title="Utilidad neta"
-          value={formatCurrency(utilidadNeta)}
-          icon={Wallet}
-          tone={utilidadNeta >= 0 ? "good" : "bad"}
-          sub="Recaudado − gastos (solo empresa)"
-        />
-        <KpiCard
-          title="Gastos personales"
-          value={formatCurrency(totalGastosPersonales)}
-          icon={User}
-          sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
-        />
-        <KpiCard title="Servicios entregados" value={String(serviciosEntregadosCount)} icon={CheckCircle2} sub="Por fecha de fin" />
-        <KpiCard title="Servicios nuevos" value={String(serviciosNuevosCount)} icon={Briefcase} sub="Por fecha de inicio" />
-        <KpiCard title="Clientes nuevos" value={String(clientesNuevosCount)} icon={Users} />
-      </div>
+      {(() => {
+        // Mismo rango que se está reportando (aunque el usuario haya
+        // entrado sin filtro/con "Todo") -- así "Ver detalles" siempre
+        // trae exactamente lo que la tarjeta contó, ni un registro de más.
+        const rangoQS = `desde=${isoDate(desdeEfectivo)}&hasta=${isoDate(hastaEfectivo)}`;
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+            <KpiCard
+              title="Total recaudado"
+              value={formatCurrency(totalRecaudado)}
+              icon={TrendingUp}
+              tone="good"
+              sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`}
+              detalleHref={`/admin/pagos?confirmado=true&${rangoQS}`}
+            />
+            <KpiCard
+              title="Gastos (empresa)"
+              value={formatCurrency(totalGastos)}
+              icon={TrendingDown}
+              tone="bad"
+              sub={`${gastosCount} movimientos`}
+              detalleHref={`/admin/gastos?ambito=Empresa&${rangoQS}`}
+            />
+            <KpiCard
+              title="Utilidad neta"
+              value={formatCurrency(utilidadNeta)}
+              icon={Wallet}
+              tone={utilidadNeta >= 0 ? "good" : "bad"}
+              sub="Recaudado − gastos (solo empresa)"
+            />
+            <KpiCard
+              title="Gastos personales"
+              value={formatCurrency(totalGastosPersonales)}
+              icon={User}
+              sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
+              detalleHref={`/admin/gastos?ambito=Personal&${rangoQS}`}
+            />
+            <KpiCard
+              title="Servicios entregados"
+              value={String(serviciosEntregadosCount)}
+              icon={CheckCircle2}
+              sub="Por fecha de fin"
+              detalleHref={`/admin/servicios?status=Entregado&${rangoQS}`}
+            />
+            <KpiCard
+              title="Servicios nuevos"
+              value={String(serviciosNuevosCount)}
+              icon={Briefcase}
+              sub="Por fecha de inicio"
+              detalleHref={`/admin/servicios?${rangoQS}`}
+            />
+            <KpiCard
+              title="Clientes nuevos"
+              value={String(clientesNuevosCount)}
+              icon={Users}
+              detalleHref={`/admin/clientes?${rangoQS}`}
+            />
+          </div>
+        );
+      })()}
 
       {pendientePorRecibir.length > 0 && (
         <Card>

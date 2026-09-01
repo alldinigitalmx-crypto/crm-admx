@@ -24,7 +24,10 @@ export async function GET(request: Request) {
   if (status) where.status = status as StatusServicio;
   if (intermediarioId) where.intermediarioId = Number(intermediarioId);
   if (desde || hasta) {
-    where.fechaInicio = {
+    // Mismo criterio que la página: "Entregado" se cuenta por fecha de fin
+    // (ver serviciosEntregadosWhere en reportes-data.ts).
+    const campoFecha = status === "Entregado" ? "fechaFin" : "fechaInicio";
+    where[campoFecha] = {
       ...(desde ? { gte: new Date(desde) } : {}),
       ...(hasta ? { lte: new Date(hasta) } : {}),
     };

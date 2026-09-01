@@ -35,9 +35,9 @@ const AVATAR_DEFAULT = "bg-primary/10 text-primary";
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; etiqueta?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; etiqueta?: string; desde?: string; hasta?: string; page?: string }>;
 }) {
-  const { q, etiqueta, page: pageParam } = await searchParams;
+  const { q, etiqueta, desde, hasta, page: pageParam } = await searchParams;
   const query = q?.trim();
   const page = parsePage(pageParam);
 
@@ -58,6 +58,12 @@ export default async function ClientesPage({
   } else if (etiqueta) {
     where.etiqueta = etiqueta as Etiqueta;
   }
+  if (desde || hasta) {
+    where.creadoEn = {
+      ...(desde ? { gte: new Date(desde) } : {}),
+      ...(hasta ? { lte: new Date(hasta) } : {}),
+    };
+  }
 
   const [totalCount, clientes] = await Promise.all([
     prisma.cliente.count({ where }),
@@ -70,16 +76,20 @@ export default async function ClientesPage({
   ]);
   const paginas = totalPages(totalCount);
 
-  const hasFiltros = Boolean(query || etiqueta);
+  const hasFiltros = Boolean(query || etiqueta || desde || hasta);
 
   const exportParams = new URLSearchParams();
   if (query) exportParams.set("q", query);
   if (etiqueta) exportParams.set("etiqueta", etiqueta);
+  if (desde) exportParams.set("desde", desde);
+  if (hasta) exportParams.set("hasta", hasta);
 
   function buildHref(targetPage: number) {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (etiqueta) params.set("etiqueta", etiqueta);
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
     if (targetPage > 1) params.set("page", String(targetPage));
     const qs = params.toString();
     return qs ? `/admin/clientes?${qs}` : "/admin/clientes";
@@ -132,7 +142,7 @@ export default async function ClientesPage({
       <Card>
         <CardHeader className="gap-3">
           <CardTitle className="text-sm font-medium">Listado</CardTitle>
-          <form className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto]">
             <Input
               type="search"
               name="q"
@@ -148,6 +158,20 @@ export default async function ClientesPage({
               ))}
               <option value="ninguna">Sin etiqueta</option>
             </select>
+            <input
+              type="date"
+              name="desde"
+              defaultValue={desde ?? ""}
+              aria-label="Alta desde"
+              className={selectClass}
+            />
+            <input
+              type="date"
+              name="hasta"
+              defaultValue={hasta ?? ""}
+              aria-label="Alta hasta"
+              className={selectClass}
+            />
             <div className="flex gap-2">
               <Button type="submit" size="sm">
                 Filtrar

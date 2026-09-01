@@ -14,6 +14,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim();
   const etiqueta = searchParams.get("etiqueta");
+  const desde = searchParams.get("desde");
+  const hasta = searchParams.get("hasta");
 
   const where: Prisma.ClienteWhereInput = {};
   if (query) {
@@ -27,6 +29,12 @@ export async function GET(request: Request) {
     where.etiqueta = null;
   } else if (etiqueta) {
     where.etiqueta = etiqueta as Etiqueta;
+  }
+  if (desde || hasta) {
+    where.creadoEn = {
+      ...(desde ? { gte: new Date(desde) } : {}),
+      ...(hasta ? { lte: new Date(hasta) } : {}),
+    };
   }
 
   let clientes = await prisma.cliente.findMany({ where, orderBy: { creadoEn: "desc" } });
