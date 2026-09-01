@@ -8,15 +8,28 @@ export function promedio(valores: number[]): number {
   return valores.length ? valores.reduce((acc, v) => acc + v, 0) / valores.length : 0;
 }
 
-export type TicketPromedio = { promedio: number; count: number; excluidos: number };
+/** La mediana (a diferencia del promedio) no se deja arrastrar por un
+ * solo contrato gigante metido en una muestra chica -- con 5-6 servicios
+ * nuevos al mes (el caso típico), un solo trato grande puede triplicar
+ * el promedio y dar una cifra que no representa "un trato normal" de
+ * ese mes. La mediana sí. */
+export function mediana(valores: number[]): number {
+  if (valores.length === 0) return 0;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const mitad = Math.floor(ordenados.length / 2);
+  return ordenados.length % 2 !== 0
+    ? ordenados[mitad]
+    : (ordenados[mitad - 1] + ordenados[mitad]) / 2;
+}
 
-/** Ticket promedio = tamaño promedio de los servicios nuevos del rango
- * (montoTotalServicio ya convertido a MXN por el caller, null cuando no
- * se pudo convertir -- ver resumirMontoMulti/obtenerTasasAMXN). Los que
- * no se pudieron convertir se cuentan aparte, nunca se fingen en 0. */
-export function calcularTicketPromedio(montosMXN: (number | null)[]): TicketPromedio {
-  const validos = montosMXN.filter((m): m is number => m !== null);
-  return { promedio: promedio(validos), count: validos.length, excluidos: montosMXN.length - validos.length };
+export type TicketTipico = { mediana: number; count: number };
+
+/** Ticket típico = valor mediano de lo que de verdad se ha pagado por
+ * cada servicio nuevo del rango (suma de sus pagos confirmados, ya en
+ * MXN -- ver montoEnMXN). Mediana en vez de promedio a propósito: un
+ * solo contrato grande no debe disparar la cifra de todo el mes. */
+export function calcularTicketTipico(montosMXN: number[]): TicketTipico {
+  return { mediana: mediana(montosMXN), count: montosMXN.length };
 }
 
 export type TasaConversion = { ganadas: number; total: number; pct: number };
@@ -96,16 +109,16 @@ export function agruparIngresoPorOrigen(
     .sort((a, b) => b.montoMXN - a.montoMXN);
 }
 
-export type TicketPorMes = { key: string; label: string; promedio: number; count: number };
+export type TicketPorMes = { key: string; label: string; mediana: number; count: number };
 
 const MES_CORTO_KPI = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-/** Ticket promedio mes a mes dentro del rango -- a diferencia de
- * agruparRecaudadoGastos (reportes.ts), aquí siempre es por mes (nunca
- * por día): un "ticket promedio de hoy" no dice nada, y la pregunta que
- * de verdad importa es cómo se mueve mes a mes. */
-export function agruparTicketPromedioPorMes(
-  servicios: { fecha: Date; montoMXN: number | null }[],
+/** Ticket típico mes a mes dentro del rango (mediana, ver arriba) -- a
+ * diferencia de agruparRecaudadoGastos (reportes.ts), aquí siempre es
+ * por mes (nunca por día): un "ticket de hoy" no dice nada, y la
+ * pregunta que de verdad importa es cómo se mueve mes a mes. */
+export function agruparTicketTipicoPorMes(
+  servicios: { fecha: Date; montoMXN: number }[],
   desde: Date,
   hasta: Date
 ): TicketPorMes[] {
@@ -121,12 +134,11 @@ export function agruparTicketPromedioPorMes(
     guard++;
   }
   for (const s of servicios) {
-    if (s.montoMXN === null) continue;
     const key = `${s.fecha.getUTCFullYear()}-${String(s.fecha.getUTCMonth() + 1).padStart(2, "0")}`;
     const grupo = grupos.get(key);
     if (grupo) grupo.montos.push(s.montoMXN);
   }
   return Array.from(grupos.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([key, g]) => ({ key, label: g.label, promedio: promedio(g.montos), count: g.montos.length }));
+    .map(([key, g]) => ({ key, label: g.label, mediana: mediana(g.montos), count: g.montos.length }));
 }

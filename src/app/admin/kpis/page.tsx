@@ -8,13 +8,13 @@ import { hoyEnMexico } from "@/lib/fecha";
 import { construirRangoFecha, rangoEfectivo } from "@/lib/reportes";
 import { montoNetoEnMXN, montoEnMXN } from "@/lib/pago-monto";
 import {
-  calcularTicketPromedio,
+  calcularTicketTipico,
   calcularTasaConversion,
   calcularTiempoCierrePromedio,
   calcularTiempoDesarrolloPromedio,
   calcularClientesRecurrentes,
   agruparIngresoPorOrigen,
-  agruparTicketPromedioPorMes,
+  agruparTicketTipicoPorMes,
 } from "@/lib/kpis";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,7 +180,7 @@ export default async function KpisPage({
   const montoServicioAMXN = (s: { pagos: { monto: unknown; moneda: string | null; montoMXN: unknown }[] }) =>
     s.pagos.reduce((acc, p) => acc + montoEnMXN(p as Parameters<typeof montoEnMXN>[0]), 0);
 
-  const ticket = calcularTicketPromedio(serviciosNuevos.map(montoServicioAMXN));
+  const ticket = calcularTicketTipico(serviciosNuevos.map(montoServicioAMXN));
   const conversion = calcularTasaConversion(cotizacionesEmitidas.map((c) => c.status));
   const cierre = calcularTiempoCierrePromedio(cotizacionesCerradas);
   const desarrollo = calcularTiempoDesarrolloPromedio(
@@ -194,7 +194,7 @@ export default async function KpisPage({
       origen: p.servicio.cliente.medioCaptacion,
     }))
   );
-  const ticketPorMes = agruparTicketPromedioPorMes(
+  const ticketPorMes = agruparTicketTipicoPorMes(
     serviciosNuevos.map((s) => ({ fecha: s.fechaInicio, montoMXN: montoServicioAMXN(s) })),
     desdeEfectivo,
     hastaEfectivo
@@ -215,7 +215,7 @@ export default async function KpisPage({
 
   const ticketMesItems: ItemBarra[] = ticketPorMes.map((m) => ({
     label: m.label,
-    valor: m.promedio,
+    valor: m.mediana,
     detalle: m.count > 0 ? `${m.count} servicio${m.count === 1 ? "" : "s"}` : "Sin servicios nuevos",
     colorClass: "bg-primary",
   }));
@@ -294,9 +294,9 @@ export default async function KpisPage({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
-          title="Ticket promedio"
-          value={formatCurrency(ticket.promedio)}
-          sub={`${ticket.count} servicios nuevos en el rango — según lo ya pagado`}
+          title="Ticket típico"
+          value={formatCurrency(ticket.mediana)}
+          sub={`Mediana de ${ticket.count} servicios nuevos — un contrato grande no la dispara`}
           icon={Ticket}
         />
         <KpiCard
@@ -362,9 +362,10 @@ export default async function KpisPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Ticket promedio por mes</CardTitle>
+            <CardTitle className="text-sm font-medium">Ticket típico por mes</CardTitle>
             <CardDescription className="text-xs">
-              Tamaño promedio de los servicios nuevos, mes a mes dentro del rango.
+              Mediana del tamaño de los servicios nuevos, mes a mes — un contrato grande no
+              dispara el mes entero.
             </CardDescription>
           </CardHeader>
           <CardContent>
