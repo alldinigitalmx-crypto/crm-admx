@@ -13,14 +13,16 @@ import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
 import { TareaLista } from "@/components/tareas/tarea-lista";
 import { COTIZACION_STATUS_COLOR, COTIZACION_STATUS_ICON } from "@/lib/status-colors";
 
-// Un "prospecto" es, a propósito, solo un Cliente con la etiqueta que ya
-// existía en el módulo Clientes -- sin tabla nueva, sin duplicar datos
-// de contacto. El status que se muestra es el de su cotización más
-// reciente (el mismo embudo Enviada→Firmada→Pagada/Vencida/Perdida que
-// ya usa Cotizaciones); si todavía no tiene ninguna, se ve "Sin
-// propuesta". El seguimiento (WhatsApp, llamada, lo que sea) se agenda
-// como una Tarea normal ligada a este cliente -- mismo tablero de
-// /admin/tareas, solo que aquí se ve de un vistazo por prospecto.
+// Esta lista no es solo prospectos nuevos -- también entra un cliente
+// que YA es cliente pero está negociando un servicio adicional (tiene
+// una cotización Enviada/Firmada todavía sin convertir a servicio). Es
+// un embudo de venta de verdad: no importa si es la primera vez que
+// habla contigo o la quinta. Sin tabla nueva: sigue siendo el mismo
+// Cliente + Cotización de siempre. El status que se muestra es el de
+// su cotización más reciente (mismo embudo Enviada→Firmada→Pagada/
+// Vencida/Perdida de Cotizaciones); sin ninguna, se ve "Sin propuesta".
+// El seguimiento se agenda como una Tarea normal ligada a este cliente
+// -- mismo tablero de /admin/tareas, solo que aquí se ve de un vistazo.
 export default async function ProspectosPage() {
   const usuario = await currentUsuario();
   const permisos = await permisosModulo(usuario, "Clientes");
@@ -28,7 +30,12 @@ export default async function ProspectosPage() {
 
   const [prospectos, usuarios] = await Promise.all([
     prisma.cliente.findMany({
-      where: { etiqueta: "Prospecto" },
+      where: {
+        OR: [
+          { etiqueta: "Prospecto" },
+          { cotizaciones: { some: { status: { in: ["Enviada", "Firmada"] }, servicioId: null } } },
+        ],
+      },
       include: {
         cotizaciones: {
           orderBy: { creadoEn: "desc" },
@@ -54,16 +61,16 @@ export default async function ProspectosPage() {
       <div>
         <h1 className="text-2xl font-semibold">Prospectos</h1>
         <p className="text-sm text-muted-foreground">
-          {prospectos.length} prospecto{prospectos.length === 1 ? "" : "s"} — clientes etiquetados
-          &quot;Prospecto&quot;
+          {prospectos.length} en el embudo — nuevos etiquetados &quot;Prospecto&quot; y clientes ya
+          existentes con una propuesta activa sin cerrar
         </p>
       </div>
 
       {prospectos.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Aún no tienes prospectos. Etiqueta un cliente como &quot;Prospecto&quot; desde su ficha
-            (en Clientes) para que aparezca aquí.
+            Nadie en el embudo ahora mismo. Etiqueta un cliente como &quot;Prospecto&quot; desde su
+            ficha (en Clientes), o envíale una cotización a uno existente, para que aparezca aquí.
           </CardContent>
         </Card>
       ) : (
@@ -81,9 +88,16 @@ export default async function ProspectosPage() {
               <Card key={p.id}>
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
                   <div className="min-w-0">
-                    <Link href={`/admin/clientes/${p.id}`} className="font-semibold hover:underline">
-                      {p.nombre}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/admin/clientes/${p.id}`} className="font-semibold hover:underline">
+                        {p.nombre}
+                      </Link>
+                      {p.etiqueta !== "Prospecto" && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Cliente existente
+                        </Badge>
+                      )}
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {[p.telefono, p.email, p.pais].filter(Boolean).join(" · ") ||
                         "Sin datos de contacto"}
