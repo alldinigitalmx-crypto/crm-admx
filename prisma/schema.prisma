@@ -27,6 +27,9 @@ model Cliente {
   ventasReferidas    Venta[]
   quejas             Queja[]
   cotizaciones       Cotizacion[]
+
+  // "Clientes nuevos" en Reportes filtra por fecha de alta.
+  @@index([creadoEn])
 }
 
 // ---------- SERVICIOS (desarrollo a la medida) ----------
@@ -68,6 +71,11 @@ model Servicio {
   cotizaciones            Cotizacion[]
   quejas                  Queja[]
   tareas                  Tarea[]
+
+  // "Servicios nuevos" filtra por fechaInicio; "Servicios entregados" por
+  // status + fechaFin (ver serviciosEntregadosWhere en reportes-data.ts).
+  @@index([fechaInicio])
+  @@index([status, fechaFin])
 }
 
 model OrdenCambio {
@@ -119,6 +127,11 @@ model Pago {
   confirmadoPorId      Int?
   confirmadoPor        Usuario?    @relation("PagoConfirmadoPor", fields: [confirmadoPorId], references: [id])
   confirmadoEn         DateTime?
+
+  // Reportes y el panel filtran pagos confirmados por rango de fecha en
+  // casi cada consulta -- sin este índice, cada una recorre toda la
+  // tabla completa.
+  @@index([confirmado, fecha])
 }
 
 // ---------- COTIZACIONES (Fase 1) ----------
@@ -210,6 +223,10 @@ model Gasto {
   creadoPorId Int?
   creadoPor   Usuario?    @relation("GastoCreadoPor", fields: [creadoPorId], references: [id])
   creadoEn    DateTime    @default(now())
+
+  // Reportes siempre filtra por ámbito (Empresa/Personal) + rango de
+  // fecha juntos -- ver ese orden en el índice.
+  @@index([ambito, fecha])
 }
 
 // ---------- CUENTAS (dónde vive el dinero: bancos, efectivo, billeteras) ----------
