@@ -9,6 +9,7 @@ import {
   Users,
   Download,
   FileDown,
+  User,
 } from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
@@ -144,8 +145,10 @@ export default async function ReportesPage({
     totalRecaudado,
     totalGastos,
     utilidadNeta,
+    totalGastosPersonales,
     pagosCount,
     gastosCount,
+    gastosPersonalesCount,
     serviciosEntregadosCount,
     serviciosNuevosCount,
     clientesNuevosCount,
@@ -154,6 +157,7 @@ export default async function ReportesPage({
     statusItems: statusFilas,
     metodoItems: metodoFilas,
     gastosItems: gastosFilas,
+    gastosPersonalesItems: gastosPersonalesFilas,
     topClientes,
     pendientePorRecibir,
   } = datos;
@@ -175,6 +179,12 @@ export default async function ReportesPage({
     color: f.label === "Otros" ? METODO_COLOR_HEX.Otro : (METODO_COLOR_HEX[f.label] ?? METODO_COLOR_HEX.Otro),
   }));
   const gastosItems: ItemBarra[] = gastosFilas.map((f, i) => ({
+    label: f.label,
+    valor: f.monto,
+    detalle: `${f.count} gasto${f.count === 1 ? "" : "s"}`,
+    colorClass: f.label === "Otros" ? COLOR_OTROS : CATEGORICOS_GASTO[i % CATEGORICOS_GASTO.length],
+  }));
+  const gastosPersonalesItems: ItemBarra[] = gastosPersonalesFilas.map((f, i) => ({
     label: f.label,
     valor: f.monto,
     detalle: `${f.count} gasto${f.count === 1 ? "" : "s"}`,
@@ -288,7 +298,13 @@ export default async function ReportesPage({
           value={formatCurrency(utilidadNeta)}
           icon={Wallet}
           tone={utilidadNeta >= 0 ? "good" : "bad"}
-          sub="Recaudado − gastos"
+          sub="Recaudado − gastos (solo empresa)"
+        />
+        <KpiCard
+          title="Gastos personales"
+          value={formatCurrency(totalGastosPersonales)}
+          icon={User}
+          sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
         />
         <KpiCard title="Servicios entregados" value={String(serviciosEntregadosCount)} icon={CheckCircle2} sub="Por fecha de fin" />
         <KpiCard title="Servicios nuevos" value={String(serviciosNuevosCount)} icon={Briefcase} sub="Por fecha de inicio" />
@@ -398,6 +414,21 @@ export default async function ReportesPage({
           </CardContent>
         </Card>
       </div>
+
+      {(gastosPersonalesItems.length > 0 || totalGastosPersonales > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Gastos personales por categoría</CardTitle>
+            <CardDescription className="text-xs">
+              Aparte de los números del negocio — no se suman a Gastos (empresa) ni restan de la
+              utilidad neta.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DesgloseBarras items={gastosPersonalesItems} vacio="No hay gastos personales en este rango." />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -54,5 +54,22 @@ export async function GET(request: Request) {
         monto: g.monto,
       })),
     },
+    {
+      // Aparte de "Gastos" a propósito -- son personales, no del negocio
+      // (no cuentan para la utilidad neta).
+      name: "Gastos personales",
+      columns: [
+        { header: "Fecha", key: "fecha", width: 14 },
+        { header: "Descripción", key: "descripcion", width: 32 },
+        { header: "Categoría", key: "categoria", width: 22 },
+        { header: "Monto", key: "monto", width: 14 },
+      ],
+      rows: datos.gastosPersonalesDetalle.map((g) => ({
+        fecha: g.fecha,
+        descripcion: g.descripcion,
+        categoria: g.categoria,
+        monto: g.monto,
+      })),
+    },
   ]);
 }

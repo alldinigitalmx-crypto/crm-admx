@@ -68,8 +68,14 @@ export type ReporteData = {
   totalRecaudado: number;
   totalGastos: number;
   utilidadNeta: number;
+  // Gasto personal del dueño -- se muestra aparte a propósito, nunca
+  // sumado a totalGastos ni restado de utilidadNeta (esa sigue siendo
+  // solo del negocio). Cuando algún día se agreguen impuestos, este es
+  // el lugar natural para sumarlos también por separado.
+  totalGastosPersonales: number;
   pagosCount: number;
   gastosCount: number;
+  gastosPersonalesCount: number;
   serviciosEntregadosCount: number;
   serviciosNuevosCount: number;
   clientesNuevosCount: number;
@@ -78,9 +84,11 @@ export type ReporteData = {
   statusItems: ReporteFila[];
   metodoItems: ReporteFila[];
   gastosItems: ReporteFila[];
+  gastosPersonalesItems: ReporteFila[];
   topClientes: ReporteCliente[];
   pagosDetalle: ReportePagoDetalle[];
   gastosDetalle: ReporteGastoDetalle[];
+  gastosPersonalesDetalle: ReporteGastoDetalle[];
   pendientePorRecibir: PendientePorRecibirMoneda[];
 };
 
@@ -102,6 +110,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   if (rango) pagosWhere.fecha = rango;
   const gastosWhere: Prisma.GastoWhereInput = { ambito: "Empresa" };
   if (rango) gastosWhere.fecha = rango;
+  const gastosPersonalesWhere: Prisma.GastoWhereInput = { ambito: "Personal" };
+  if (rango) gastosPersonalesWhere.fecha = rango;
   const serviciosNuevosWhere: Prisma.ServicioWhereInput = {};
   if (rango) serviciosNuevosWhere.fechaInicio = rango;
   const serviciosEntregadosWhere: Prisma.ServicioWhereInput = { status: "Entregado" };
@@ -109,8 +119,15 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   const clientesNuevosWhere: Prisma.ClienteWhereInput = {};
   if (rango) clientesNuevosWhere.creadoEn = rango;
 
-  const [pagos, gastos, serviciosNuevos, serviciosEntregadosCount, clientesNuevosCount, serviciosActivos] =
-    await Promise.all([
+  const [
+    pagos,
+    gastos,
+    gastosPersonales,
+    serviciosNuevos,
+    serviciosEntregadosCount,
+    clientesNuevosCount,
+    serviciosActivos,
+  ] = await Promise.all([
     prisma.pago.findMany({
       where: pagosWhere,
       select: {
@@ -127,6 +144,10 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     }),
     prisma.gasto.findMany({
       where: gastosWhere,
+      select: { fecha: true, descripcion: true, monto: true, categoria: true },
+    }),
+    prisma.gasto.findMany({
+      where: gastosPersonalesWhere,
       select: { fecha: true, descripcion: true, monto: true, categoria: true },
     }),
     prisma.servicio.findMany({
@@ -161,6 +182,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
   const totalRecaudado = pagos.reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
   const totalGastos = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
   const utilidadNeta = totalRecaudado - totalGastos;
+  // Aparte a propósito -- ver el comentario en ReporteData.
+  const totalGastosPersonales = gastosPersonales.reduce((acc, g) => acc + Number(g.monto), 0);
 
   const puntosPeriodo = agruparRecaudadoGastos(
     pagos.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
@@ -212,6 +235,22 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     5
   );
 
+  const gastosPersonalesPorCategoria = new Map<string, { monto: number; count: number }>();
+  for (const g of gastosPersonales) {
+    const cur = gastosPersonalesPorCategoria.get(g.categoria) ?? { monto: 0, count: 0 };
+    cur.monto += Number(g.monto);
+    cur.count += 1;
+    gastosPersonalesPorCategoria.set(g.categoria, cur);
+  }
+  const gastosPersonalesItems: ReporteFila[] = topNConOtros(
+    Array.from(gastosPersonalesPorCategoria.entries()).map(([label, v]) => ({
+      label,
+      monto: v.monto,
+      count: v.count,
+    })),
+    5
+  );
+
   const porCliente = new Map<number, { nombre: string; monto: number; count: number }>();
   for (const p of pagos) {
     const c = p.servicio.cliente;
@@ -256,8 +295,10 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     totalRecaudado,
     totalGastos,
     utilidadNeta,
+    totalGastosPersonales,
     pagosCount: pagos.length,
     gastosCount: gastos.length,
+    gastosPersonalesCount: gastosPersonales.length,
     serviciosEntregadosCount,
     serviciosNuevosCount: serviciosNuevos.length,
     clientesNuevosCount,
@@ -266,6 +307,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     statusItems,
     metodoItems,
     gastosItems,
+    gastosPersonalesItems,
     topClientes,
     pendientePorRecibir,
     pagosDetalle: pagos.map((p) => ({
@@ -279,6 +321,12 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
       montoOriginal: p.moneda && p.moneda !== "MXN" ? Number(p.monto) : null,
     })),
     gastosDetalle: gastos.map((g) => ({
+      fecha: g.fecha,
+      descripcion: g.descripcion,
+      categoria: g.categoria,
+      monto: Number(g.monto),
+    })),
+    gastosPersonalesDetalle: gastosPersonales.map((g) => ({
       fecha: g.fecha,
       descripcion: g.descripcion,
       categoria: g.categoria,

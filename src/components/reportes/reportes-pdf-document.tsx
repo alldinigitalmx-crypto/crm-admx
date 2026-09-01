@@ -204,6 +204,26 @@ export function ReportesPdfDocument({ datos }: { datos: ReporteData }) {
         <Tabla titulo="Pagos por método" filas={datos.metodoItems} vacio="Sin pagos confirmados en este rango." />
         <Tabla titulo="Gastos por categoría" filas={datos.gastosItems} vacio="Sin gastos de empresa en este rango." />
 
+        {datos.totalGastosPersonales > 0 && (
+          <View wrap={false}>
+            <Text style={styles.sectionTitle}>
+              Gastos personales (informativo — no forman parte de la utilidad del negocio)
+            </Text>
+            <View style={styles.tableRow}>
+              <Text style={[styles.cellText, styles.colLabel]}>Total del periodo</Text>
+              <Text style={[styles.cellText, styles.colCount]}>{datos.gastosPersonalesCount}</Text>
+              <Text style={[styles.cellText, styles.colMonto]}>{currency(datos.totalGastosPersonales)}</Text>
+            </View>
+            {datos.gastosPersonalesItems.map((f) => (
+              <View style={styles.tableRow} key={f.label}>
+                <Text style={[styles.cellText, styles.colLabel, { color: MUTED }]}>{f.label}</Text>
+                <Text style={[styles.cellText, styles.colCount, { color: MUTED }]}>{f.count}</Text>
+                <Text style={[styles.cellText, styles.colMonto, { color: MUTED }]}>{currency(f.monto)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View wrap={false}>
           <Text style={styles.sectionTitle}>Clientes con más recaudación</Text>
           {datos.topClientes.length === 0 ? (
