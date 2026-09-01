@@ -193,12 +193,13 @@ export default async function TareasPage({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* En PC: tablero a la izquierda, filtro fijo (sticky) a la derecha
+      {/* En PC: filtro fijo (sticky) a la izquierda, tablero a la derecha
           -- así filtrar nunca pide bajar toda la pantalla más allá del
           tablero, no importa qué tan largo esté. En móvil todo se
-          apila normal, en el orden en que aparece aquí. */}
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_280px] lg:items-start lg:gap-6">
-        <div className="flex min-w-0 flex-col gap-6">
+          apila normal (tablero primero, filtro después -- el orden de
+          la izquierda no aplica sin lg:, ver lg:order-*). */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[280px_1fr] lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-6 lg:order-2">
           <div>
             <h1 className="text-2xl font-semibold">Tareas</h1>
             <p className="text-sm text-muted-foreground">
@@ -222,7 +223,7 @@ export default async function TareasPage({
           />
         </div>
 
-        <Card className="lg:sticky lg:top-6">
+        <Card className="lg:sticky lg:top-6 lg:order-1">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Tareas completadas</CardTitle>
             <CardDescription className="text-xs">
