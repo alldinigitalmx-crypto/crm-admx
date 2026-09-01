@@ -23,6 +23,7 @@ import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { obtenerTasasAMXN, resumirMontoMulti, type ResumenMontoMulti } from "@/lib/tipo-cambio";
 import { montoNetoEnMXN } from "@/lib/pago-monto";
+import { hoyEnMexico } from "@/lib/fecha";
 import { formatCurrency } from "@/lib/format";
 import type { Usuario } from "@/generated/prisma/client";
 
@@ -169,9 +170,12 @@ export default async function AdminDashboardPage() {
 }
 
 async function PanelAdmin() {
-  const inicioDeMes = new Date();
-  inicioDeMes.setDate(1);
-  inicioDeMes.setHours(0, 0, 0, 0);
+  // hoyEnMexico() en vez de new Date(): el servidor corre en UTC, y
+  // new Date().setDate(1) se adelanta al mes siguiente desde la tarde del
+  // último día de cada mes (hora de México) -- justo cuando "Ingresos del
+  // mes" más importa que no se vacíe de golpe.
+  const inicioDeMes = hoyEnMexico();
+  inicioDeMes.setUTCDate(1);
 
   const [
     totalClientes,

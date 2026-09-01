@@ -1,8 +1,10 @@
 import type { PrioridadTarea } from "@/generated/prisma/client";
+import { diaMexicoISO, hoyEnMexico } from "@/lib/fecha";
 
-function toDateKey(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
+// Día en México, no en UTC -- si no, una tarea completada entrada la
+// noche (hora de México) se contaba en el día siguiente, y "completadas
+// hoy"/la racha se veían en cero aunque sí se hubiera completado algo.
+const toDateKey = diaMexicoISO;
 
 export type ResumenTareas = {
   pendientesCount: number;
@@ -22,7 +24,7 @@ export function calcularResumenTareas(
   pendientes: { prioridad: PrioridadTarea }[],
   completadasEnFechas: Date[]
 ): ResumenTareas {
-  const hoy = new Date();
+  const hoy = hoyEnMexico();
   const hoyKey = toDateKey(hoy);
 
   const porDia = new Map<string, number>();
@@ -43,7 +45,7 @@ export function calcularResumenTareas(
     const key = toDateKey(cursor);
     if ((porDia.get(key) ?? 0) > 0) {
       racha += 1;
-      cursor.setDate(cursor.getDate() - 1);
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
     } else {
       break;
     }
@@ -53,7 +55,7 @@ export function calcularResumenTareas(
   const tendencia7: { fecha: string; completadas: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(hoy);
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     const key = toDateKey(d);
     tendencia7.push({ fecha: key, completadas: porDia.get(key) ?? 0 });
   }

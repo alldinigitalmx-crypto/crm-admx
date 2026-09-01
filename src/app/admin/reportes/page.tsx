@@ -14,6 +14,7 @@ import {
 import { requiereAdmin } from "@/lib/alcance";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
+import { hoyEnMexico } from "@/lib/fecha";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -127,7 +128,7 @@ export default async function ReportesPage({
   // "Todo" sigue existiendo como su propio preset explícito (?todo=1),
   // así no se pierde la forma de ver el histórico completo.
   if (!desde && !hasta && todo !== "1") {
-    const hoyDefault = new Date();
+    const hoyDefault = hoyEnMexico();
     const inicioMesDefault = new Date(
       Date.UTC(hoyDefault.getUTCFullYear(), hoyDefault.getUTCMonth(), 1)
     );
@@ -180,7 +181,7 @@ export default async function ReportesPage({
     colorClass: f.label === "Otros" ? COLOR_OTROS : CATEGORICOS_GASTO[i % CATEGORICOS_GASTO.length],
   }));
 
-  const hoy = new Date();
+  const hoy = hoyEnMexico();
   const hoyIso = isoDate(hoy);
   const hace7 = new Date(hoy);
   hace7.setUTCDate(hace7.getUTCDate() - 6);
