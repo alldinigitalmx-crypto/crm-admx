@@ -14,11 +14,19 @@ async function currentUserId() {
   return usuario?.id ?? null;
 }
 
-function revalidateTareaPaths(servicioId: number | null, cotizacionId: number | null) {
+function revalidateTareaPaths(
+  servicioId: number | null,
+  cotizacionId: number | null,
+  clienteId: number | null = null
+) {
   revalidatePath("/admin/tareas");
   revalidatePath("/admin");
   if (servicioId) revalidatePath(`/admin/servicios/${servicioId}`);
   if (cotizacionId) revalidatePath(`/admin/cotizaciones/${cotizacionId}`);
+  if (clienteId) {
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    revalidatePath("/admin/prospectos");
+  }
 }
 
 export async function crearTarea(
@@ -40,6 +48,7 @@ export async function crearTarea(
   const [tipo, idRaw] = vinculoRaw.split(":");
   const servicioId = tipo === "servicio" ? Number(idRaw) : null;
   const cotizacionId = tipo === "cotizacion" ? Number(idRaw) : null;
+  const clienteId = tipo === "cliente" ? Number(idRaw) : null;
 
   const asignadoAIdRaw = String(formData.get("asignadoAId") ?? "");
 
@@ -53,12 +62,13 @@ export async function crearTarea(
       fechaLimite: fechaLimiteRaw ? new Date(fechaLimiteRaw) : null,
       servicioId,
       cotizacionId,
+      clienteId,
       creadoPorId: userId,
       asignadoAId: asignadoAIdRaw ? Number(asignadoAIdRaw) : userId,
     },
   });
 
-  revalidateTareaPaths(servicioId, cotizacionId);
+  revalidateTareaPaths(servicioId, cotizacionId, clienteId);
   return undefined;
 }
 
@@ -70,7 +80,7 @@ export async function completarTarea(id: number, completada: boolean) {
     data: { completada, completadaEn: completada ? new Date() : null },
   });
 
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
 }
 
 export async function eliminarTarea(id: number) {
@@ -81,7 +91,7 @@ export async function eliminarTarea(id: number) {
 
   await prisma.subtarea.deleteMany({ where: { tareaId: id } });
   await prisma.tarea.delete({ where: { id } });
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
 }
 
 export async function actualizarTarea(
@@ -107,6 +117,7 @@ export async function actualizarTarea(
   const [tipo, idRaw] = vinculoRaw.split(":");
   const servicioId = tipo === "servicio" ? Number(idRaw) : null;
   const cotizacionId = tipo === "cotizacion" ? Number(idRaw) : null;
+  const clienteId = tipo === "cliente" ? Number(idRaw) : null;
 
   const asignadoAIdRaw = String(formData.get("asignadoAId") ?? "");
 
@@ -119,12 +130,13 @@ export async function actualizarTarea(
       fechaLimite: fechaLimiteRaw ? new Date(fechaLimiteRaw) : null,
       servicioId,
       cotizacionId,
+      clienteId,
       asignadoAId: asignadoAIdRaw ? Number(asignadoAIdRaw) : null,
     },
   });
 
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
-  revalidateTareaPaths(servicioId, cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
+  revalidateTareaPaths(servicioId, cotizacionId, clienteId);
   return undefined;
 }
 
@@ -132,7 +144,7 @@ export async function cambiarPrioridad(id: number, prioridad: PrioridadTarea) {
   if (!(await requiereNivelTarea(id, "Editar"))) return;
 
   const tarea = await prisma.tarea.update({ where: { id }, data: { prioridad } });
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
 }
 
 export async function crearSubtarea(tareaId: number, titulo: string) {
@@ -144,7 +156,7 @@ export async function crearSubtarea(tareaId: number, titulo: string) {
   if (!tarea) return;
 
   await prisma.subtarea.create({ data: { tareaId, titulo: limpio } });
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
 }
 
 export async function alternarSubtarea(id: number, completada: boolean) {
@@ -160,7 +172,7 @@ export async function alternarSubtarea(id: number, completada: boolean) {
     data: { completada },
     include: { tarea: true },
   });
-  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId);
+  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId, subtarea.tarea.clienteId);
 }
 
 export async function eliminarSubtarea(id: number) {
@@ -169,7 +181,7 @@ export async function eliminarSubtarea(id: number) {
   if (!(await requiereNivelTarea(subtarea.tareaId, "Editar"))) return;
 
   await prisma.subtarea.delete({ where: { id } });
-  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId);
+  revalidateTareaPaths(subtarea.tarea.servicioId, subtarea.tarea.cotizacionId, subtarea.tarea.clienteId);
 }
 
 export async function duplicarTarea(id: number) {
@@ -188,10 +200,11 @@ export async function duplicarTarea(id: number) {
       fechaLimite: tarea.fechaLimite,
       servicioId: tarea.servicioId,
       cotizacionId: tarea.cotizacionId,
+      clienteId: tarea.clienteId,
       creadoPorId: userId,
       asignadoAId: tarea.asignadoAId,
     },
   });
 
-  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId);
+  revalidateTareaPaths(tarea.servicioId, tarea.cotizacionId, tarea.clienteId);
 }

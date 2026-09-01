@@ -29,9 +29,11 @@ import type { Prisma } from "@/generated/prisma/client";
 function vinculoLabel(tarea: {
   servicio: { descripcion: string } | null;
   cotizacion: { cliente: { nombre: string } | null; prospectoNombre: string | null } | null;
+  cliente: { nombre: string } | null;
 }) {
   if (tarea.servicio) return `💼 ${tarea.servicio.descripcion}`;
   if (tarea.cotizacion) return `📄 ${nombreClienteCotizacion(tarea.cotizacion)}`;
+  if (tarea.cliente) return `👤 ${tarea.cliente.nombre}`;
   return "📌 Suelta";
 }
 
@@ -68,6 +70,7 @@ export default async function TareasHistorialPage({
       include: {
         servicio: { select: { descripcion: true } },
         cotizacion: { select: { cliente: { select: { nombre: true } }, prospectoNombre: true } },
+        cliente: { select: { nombre: true } },
         asignadoA: { select: { nombre: true } },
       },
     }),

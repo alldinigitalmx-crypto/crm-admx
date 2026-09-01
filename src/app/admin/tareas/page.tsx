@@ -28,7 +28,8 @@ export default async function TareasPage() {
   const hace14Dias = new Date();
   hace14Dias.setDate(hace14Dias.getDate() - 14);
 
-  const [servicios, cotizaciones, usuarios, tareas, completadasAntiguasCount, completadasRecientes] = await Promise.all([
+  const [servicios, cotizaciones, prospectos, usuarios, tareas, completadasAntiguasCount, completadasRecientes] =
+    await Promise.all([
     prisma.servicio.findMany({
       where: { status: { notIn: ["Entregado", "Cancelado"] } },
       select: { id: true, descripcion: true },
@@ -38,6 +39,11 @@ export default async function TareasPage() {
       where: { servicioId: null, status: { in: ["Enviada", "Firmada"] } },
       include: { cliente: true },
       orderBy: { creadoEn: "desc" },
+    }),
+    prisma.cliente.findMany({
+      where: { etiqueta: "Prospecto" },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
     }),
     prisma.usuario.findMany({
       where: { activo: true },
@@ -55,6 +61,7 @@ export default async function TareasPage() {
         cotizacion: {
           select: { cliente: { select: { nombre: true } }, prospectoNombre: true },
         },
+        cliente: { select: { nombre: true } },
         subtareas: { orderBy: { creadoEn: "asc" } },
       },
     }),
@@ -73,6 +80,7 @@ export default async function TareasPage() {
       value: `cotizacion:${c.id}`,
       label: `Negociación: ${nombreClienteCotizacion(c)}`,
     })),
+    ...prospectos.map((p) => ({ value: `cliente:${p.id}`, label: `Prospecto: ${p.nombre}` })),
   ];
 
   const pendientes = tareas.filter((t) => !t.completada);

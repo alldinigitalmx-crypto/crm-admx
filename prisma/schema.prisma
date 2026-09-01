@@ -27,6 +27,7 @@ model Cliente {
   ventasReferidas    Venta[]
   quejas             Queja[]
   cotizaciones       Cotizacion[]
+  tareas             Tarea[]
 
   // "Clientes nuevos" en Reportes filtra por fecha de alta.
   @@index([creadoEn])
@@ -190,6 +191,11 @@ model Tarea {
   servicio     Servicio?      @relation(fields: [servicioId], references: [id])
   cotizacionId Int?
   cotizacion   Cotizacion?    @relation(fields: [cotizacionId], references: [id])
+  // Seguimiento a un prospecto (Cliente con etiqueta Prospecto) que
+  // todavía no tiene ni cotización -- las otras dos ligas (servicio,
+  // cotización) no sirven para ese caso.
+  clienteId    Int?
+  cliente      Cliente?       @relation(fields: [clienteId], references: [id])
   creadoPorId  Int?
   creadoPor    Usuario?       @relation("TareaCreadoPor", fields: [creadoPorId], references: [id])
   asignadoAId  Int?

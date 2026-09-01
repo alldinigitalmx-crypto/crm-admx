@@ -31,9 +31,11 @@ export type TareaCardData = {
   completada: boolean;
   servicioId: number | null;
   cotizacionId: number | null;
+  clienteId: number | null;
   asignadoAId: number | null;
   servicio?: { descripcion: string } | null;
   cotizacion?: { cliente: { nombre: string } | null; prospectoNombre?: string | null } | null;
+  cliente?: { nombre: string } | null;
   subtareas: SubtareaData[];
 };
 
@@ -53,6 +55,9 @@ function vinculoInfo(tarea: TareaCardData): { icono: string; label: string | nul
       label: nombreClienteCotizacion(tarea.cotizacion),
       valor: `cotizacion:${tarea.cotizacionId}`,
     };
+  }
+  if (tarea.clienteId && tarea.cliente) {
+    return { icono: "👤", label: tarea.cliente.nombre, valor: `cliente:${tarea.clienteId}` };
   }
   return { icono: "📌", label: null };
 }

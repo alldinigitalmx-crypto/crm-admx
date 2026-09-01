@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   Briefcase,
   FileText,
   CreditCard,
@@ -19,6 +20,7 @@ import {
   Wallet,
   PiggyBank,
   BarChart3,
+  Gauge,
   LogOut,
 } from "lucide-react";
 
@@ -59,7 +61,23 @@ const navPrincipal = [
     // otorgables a un usuario interno (ver alcance.ts: requiereAdmin).
     soloAdmin: true,
   },
+  {
+    title: "KPIs",
+    href: "/admin/kpis",
+    icon: Gauge,
+    modulo: null,
+    grupo: "general",
+    // Mismo criterio que Reportes: solo el dueño.
+    soloAdmin: true,
+  },
   { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes", grupo: "operacion" },
+  {
+    title: "Prospectos",
+    href: "/admin/prospectos",
+    icon: UserPlus,
+    modulo: "Clientes",
+    grupo: "operacion",
+  },
   { title: "Servicios", href: "/admin/servicios", icon: Briefcase, modulo: "Servicios", grupo: "operacion" },
   { title: "Cotizaciones", href: "/admin/cotizaciones", icon: FileText, modulo: "Cotizaciones", grupo: "operacion" },
   { title: "Pagos", href: "/admin/pagos", icon: CreditCard, modulo: "Pagos", grupo: "operacion" },
