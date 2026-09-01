@@ -6,9 +6,7 @@ import { requiereAdmin } from "@/lib/alcance";
 import { prisma } from "@/lib/prisma";
 import { hoyEnMexico } from "@/lib/fecha";
 import { construirRangoFecha, rangoEfectivo } from "@/lib/reportes";
-import { obtenerTasasAMXN } from "@/lib/tipo-cambio";
-import { montoTotalServicio } from "@/lib/servicio";
-import { montoNetoEnMXN } from "@/lib/pago-monto";
+import { montoNetoEnMXN, montoEnMXN } from "@/lib/pago-monto";
 import {
   calcularTicketPromedio,
   calcularTasaConversion,
@@ -127,15 +125,17 @@ export default async function KpisPage({
     clientes,
     pagosConOrigen,
     prospectosActivos,
-    tasas,
   ] = await Promise.all([
     prisma.servicio.findMany({
       where: whereServiciosNuevos,
       select: {
         fechaInicio: true,
-        montoInicial: true,
-        moneda: true,
-        ordenesCambio: { select: { status: true, monto: true } },
+        // Ticket promedio usa lo que de verdad se pagó, no lo cotizado
+        // (ver montoServicioAMXN más abajo).
+        pagos: {
+          where: { confirmado: true },
+          select: { monto: true, moneda: true, montoMXN: true },
+        },
       },
     }),
     prisma.cotizacion.findMany({ where: whereCotizacionesEmitidas, select: { status: true } }),
@@ -166,19 +166,19 @@ export default async function KpisPage({
         OR: [
           { etiqueta: "Prospecto" },
           { cotizaciones: { some: { status: { in: ["Enviada", "Firmada"] }, servicioId: null } } },
+          { tareas: { some: { completada: false } } },
         ],
       },
     }),
-    obtenerTasasAMXN(),
   ]);
 
-  const montoServicioAMXN = (s: { moneda: string | null; montoInicial: unknown; ordenesCambio: { status: string; monto: unknown }[] }) => {
-    const moneda = s.moneda ?? "MXN";
-    const total = montoTotalServicio(s as Parameters<typeof montoTotalServicio>[0]);
-    if (moneda === "MXN") return total;
-    const tasa = tasas[moneda as "USD" | "EUR"];
-    return tasa ? total * tasa : null;
-  };
+  // Ticket promedio usa siempre lo que de verdad se ha cobrado (suma de
+  // sus pagos confirmados), nunca el monto cotizado -- a veces se cobra
+  // menos, a veces más, y lo que importa aquí es cuánto entró de verdad
+  // (ver conversación sobre abril/mayo 2026, donde montoInicial se había
+  // quedado en $0 aunque sí hubo pagos reales).
+  const montoServicioAMXN = (s: { pagos: { monto: unknown; moneda: string | null; montoMXN: unknown }[] }) =>
+    s.pagos.reduce((acc, p) => acc + montoEnMXN(p as Parameters<typeof montoEnMXN>[0]), 0);
 
   const ticket = calcularTicketPromedio(serviciosNuevos.map(montoServicioAMXN));
   const conversion = calcularTasaConversion(cotizacionesEmitidas.map((c) => c.status));
@@ -296,11 +296,7 @@ export default async function KpisPage({
         <KpiCard
           title="Ticket promedio"
           value={formatCurrency(ticket.promedio)}
-          sub={
-            ticket.excluidos > 0
-              ? `${ticket.count} servicios nuevos (${ticket.excluidos} sin convertir de moneda)`
-              : `${ticket.count} servicios nuevos en el rango`
-          }
+          sub={`${ticket.count} servicios nuevos en el rango — según lo ya pagado`}
           icon={Ticket}
         />
         <KpiCard

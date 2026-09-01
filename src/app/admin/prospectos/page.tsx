@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
 import { crearTarea } from "@/app/admin/tareas/actions";
+import { whatsappHref } from "@/lib/contacto";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ export default async function ProspectosPage() {
         OR: [
           { etiqueta: "Prospecto" },
           { cotizaciones: { some: { status: { in: ["Enviada", "Firmada"] }, servicioId: null } } },
+          // Un cliente de siempre al que le pusiste un recordatorio de
+          // seguimiento (desde su ficha) también cuenta como "en el
+          // embudo" -- no hace falta ni cotización ni la etiqueta
+          // Prospecto para eso.
+          { tareas: { some: { completada: false } } },
         ],
       },
       include: {
@@ -61,16 +67,18 @@ export default async function ProspectosPage() {
       <div>
         <h1 className="text-2xl font-semibold">Prospectos</h1>
         <p className="text-sm text-muted-foreground">
-          {prospectos.length} en el embudo — nuevos etiquetados &quot;Prospecto&quot; y clientes ya
-          existentes con una propuesta activa sin cerrar
+          {prospectos.length} en el embudo — nuevos etiquetados &quot;Prospecto&quot;, clientes con
+          una propuesta activa sin cerrar, y cualquier cliente con un recordatorio de seguimiento
+          pendiente
         </p>
       </div>
 
       {prospectos.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Nadie en el embudo ahora mismo. Etiqueta un cliente como &quot;Prospecto&quot; desde su
-            ficha (en Clientes), o envíale una cotización a uno existente, para que aparezca aquí.
+            Nadie en el embudo ahora mismo. Etiqueta un cliente como &quot;Prospecto&quot;,
+            envíale una cotización, o agrégale un recordatorio de seguimiento desde su ficha (en
+            Clientes), para que aparezca aquí.
           </CardContent>
         </Card>
       ) : (
@@ -78,11 +86,7 @@ export default async function ProspectosPage() {
           {prospectos.map((p) => {
             const cotizacion = p.cotizaciones[0];
             const Icono = cotizacion ? COTIZACION_STATUS_ICON[cotizacion.status] : null;
-            // El campo de teléfono en Clientes no fuerza un formato --
-            // se manda solo lo que ya sea puro dígito (con o sin lada
-            // internacional, lo que haya guardado quien lo capturó).
-            const digitos = p.telefono?.replace(/\D/g, "") ?? "";
-            const whatsapp = digitos ? `https://wa.me/${digitos}` : null;
+            const whatsapp = p.telefono ? whatsappHref(p.telefono) : null;
 
             return (
               <Card key={p.id}>

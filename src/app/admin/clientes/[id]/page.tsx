@@ -24,6 +24,8 @@ import { PortalAccessCard } from "@/components/clientes/portal-access-card";
 import { DeleteClienteButton } from "@/components/clientes/delete-cliente-button";
 import { QuejaFormDialog } from "@/components/quejas/queja-form-dialog";
 import { QuejaDetalleDialog } from "@/components/quejas/queja-detalle-dialog";
+import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
+import { TareaLista } from "@/components/tareas/tarea-lista";
 import {
   desactivarPortalCliente,
   eliminarCliente,
@@ -31,6 +33,7 @@ import {
   updateCliente,
 } from "@/app/admin/clientes/actions";
 import { actualizarQueja, crearQueja } from "@/app/admin/quejas/actions";
+import { crearTarea } from "@/app/admin/tareas/actions";
 import {
   SERVICIO_STATUS_COLOR,
   COTIZACION_STATUS_COLOR,
@@ -73,6 +76,10 @@ export default async function ClienteDetallePage({
             },
           },
           quejas: { orderBy: { creadoEn: "desc" }, include: { servicio: true } },
+          tareas: {
+            where: { completada: false },
+            orderBy: [{ fechaLimite: "asc" }, { creadoEn: "desc" }],
+          },
         },
       })
     : null;
@@ -266,6 +273,26 @@ export default async function ClienteDetallePage({
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium">
+            Seguimiento ({cliente.tareas.length})
+          </CardTitle>
+          <TareaFormDialog
+            action={crearTarea}
+            vinculoFijo={{ value: `cliente:${cliente.id}`, label: cliente.nombre }}
+            usuarios={usuarios}
+            usuarioActualId={usuarioActual?.id}
+            triggerLabel="+ Recordatorio"
+            title={`Nuevo recordatorio — ${cliente.nombre}`}
+            description="Ej. mandar WhatsApp de seguimiento, llamar, mandar propuesta."
+          />
+        </CardHeader>
+        <CardContent>
+          <TareaLista tareas={cliente.tareas} emptyText="Sin recordatorios pendientes con este cliente." />
         </CardContent>
       </Card>
 
