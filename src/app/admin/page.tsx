@@ -12,6 +12,8 @@ import {
   ListTodo,
   ShoppingBag,
   CheckCircle2,
+  Wallet,
+  User,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
@@ -194,6 +196,7 @@ async function PanelAdmin() {
     convertidasAServicio,
     perdidas,
     ventasPorOrigen,
+    gastosPorAmbito,
     tasas,
   ] = await Promise.all([
     prisma.cliente.count(),
@@ -269,6 +272,15 @@ async function PanelAdmin() {
       _count: true,
       where: { fecha: { gte: inicioDeMes } },
     }),
+    // Personal y Empresa por separado -- para que el dueño vea cuánto se
+    // gastó en él mismo vs. en el negocio, nunca mezclado en un solo
+    // total (a diferencia de Reportes/Utilidad neta, que es solo Empresa).
+    prisma.gasto.groupBy({
+      by: ["ambito"],
+      _sum: { monto: true },
+      _count: true,
+      where: { fecha: { gte: inicioDeMes } },
+    }),
     obtenerTasasAMXN(),
   ]);
 
@@ -291,6 +303,8 @@ async function PanelAdmin() {
 
   const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
   const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
+  const gastosEmpresa = gastosPorAmbito.find((g) => g.ambito === "Empresa");
+  const gastosPersonal = gastosPorAmbito.find((g) => g.ambito === "Personal");
 
   // En móvil, seis tarjetas repitiendo "no hay nada pendiente" es puro
   // scroll sin información — las vacías se colapsan en una sola tarjeta
@@ -437,6 +451,49 @@ async function PanelAdmin() {
                   <p className="truncate text-xs text-muted-foreground">
                     {ventasManual?._count ?? 0} venta
                     {(ventasManual?._count ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold">Gastos del mes</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Personal vs. empresa</p>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <Link href="/admin/gastos?ambito=Empresa">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
+                  <Wallet className="size-4 sm:size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Empresa</p>
+                  <p className="truncate text-lg font-semibold sm:text-xl">
+                    {currencyCorta.format(Number(gastosEmpresa?._sum.monto ?? 0))}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/gastos?ambito=Personal">
+            <Card className="transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 sm:size-10 dark:text-orange-400">
+                  <User className="size-4 sm:size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Personal</p>
+                  <p className="truncate text-lg font-semibold sm:text-xl">
+                    {currencyCorta.format(Number(gastosPersonal?._sum.monto ?? 0))}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {gastosPersonal?._count ?? 0} gasto{(gastosPersonal?._count ?? 0) === 1 ? "" : "s"}
                   </p>
                 </div>
               </CardContent>
