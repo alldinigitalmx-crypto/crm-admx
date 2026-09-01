@@ -193,43 +193,43 @@ export default async function TareasPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Tareas</h1>
-        <p className="text-sm text-muted-foreground">
-          {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} —{" "}
-          {completadas.length} completada{completadas.length === 1 ? "" : "s"} en los últimos 14
-          días
-        </p>
-      </div>
+      {/* En PC: tablero a la izquierda, filtro fijo (sticky) a la derecha
+          -- así filtrar nunca pide bajar toda la pantalla más allá del
+          tablero, no importa qué tan largo esté. En móvil todo se
+          apila normal, en el orden en que aparece aquí. */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_280px] lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold">Tareas</h1>
+            <p className="text-sm text-muted-foreground">
+              {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} —{" "}
+              {completadas.length} completada{completadas.length === 1 ? "" : "s"} en los últimos
+              14 días
+            </p>
+          </div>
 
-      <TareasResumen resumen={resumen} />
+          <TareasResumen resumen={resumen} />
 
-      <TareaKanban
-        tareasPendientes={pendientes}
-        tareasCompletadas={completadas}
-        completadasAntiguasCount={completadasAntiguasCount}
-        puedeEditar={permisos.puedeEditar}
-        puedeCrear={permisos.puedeCrear}
-        vinculos={vinculos}
-        usuarios={usuarios}
-        usuarioActualId={usuario?.id}
-      />
+          <TareaKanban
+            tareasPendientes={pendientes}
+            tareasCompletadas={completadas}
+            completadasAntiguasCount={completadasAntiguasCount}
+            puedeEditar={permisos.puedeEditar}
+            puedeCrear={permisos.puedeCrear}
+            vinculos={vinculos}
+            usuarios={usuarios}
+            usuarioActualId={usuario?.id}
+          />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Tareas completadas</CardTitle>
-          <CardDescription className="text-xs">
-            Las pendientes siempre están arriba en el tablero, sin importar este filtro — esto es
-            solo para mirar hacia atrás.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          {/* En PC, filtros a la izquierda en una columna angosta y la
-              gráfica a la derecha con el resto del ancho -- en vez de
-              apilar todo en una sola columna angosta que desperdicia el
-              espacio horizontal que sí hay en escritorio. En móvil se
-              queda apilado como antes. */}
-          <div className="flex flex-col gap-4 lg:w-60 lg:shrink-0">
+        <Card className="lg:sticky lg:top-6">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Tareas completadas</CardTitle>
+            <CardDescription className="text-xs">
+              Las pendientes del tablero nunca dependen de este filtro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-2">
               {presets.map((p) => {
                 const params = new URLSearchParams();
@@ -275,15 +275,22 @@ export default async function TareasPage({
               </div>
               <Button type="submit">Filtrar</Button>
             </form>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <div className="min-w-0 flex-1 lg:border-l lg:border-border lg:pl-6">
-            <p className="mb-2 text-xs text-muted-foreground">
-              {totalCompletadasRango} completada{totalCompletadasRango === 1 ? "" : "s"} en el
-              rango elegido — {granularidad === "mes" ? "un punto por mes" : "un punto por día"}.
-            </p>
-            <TareasChart datos={puntosTareas} />
-          </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">
+            Tareas completadas — {totalCompletadasRango}
+          </CardTitle>
+          <CardDescription className="text-xs">
+            {granularidad === "mes" ? "Un punto por mes." : "Un punto por día."} Ajusta el rango
+            con el filtro de arriba.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TareasChart datos={puntosTareas} />
         </CardContent>
       </Card>
     </div>
