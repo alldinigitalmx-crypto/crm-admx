@@ -186,6 +186,17 @@ export default async function TareasPage({
 
       <TareasResumen resumen={resumen} />
 
+      <TareaKanban
+        tareasPendientes={pendientes}
+        tareasCompletadas={completadas}
+        completadasAntiguasCount={completadasAntiguasCount}
+        puedeEditar={permisos.puedeEditar}
+        puedeCrear={permisos.puedeCrear}
+        vinculos={vinculos}
+        usuarios={usuarios}
+        usuarioActualId={usuario?.id}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Rango de fechas</CardTitle>
@@ -242,17 +253,6 @@ export default async function TareasPage({
           <TareasChart datos={puntosTareas} />
         </CardContent>
       </Card>
-
-      <TareaKanban
-        tareasPendientes={pendientes}
-        tareasCompletadas={completadas}
-        completadasAntiguasCount={completadasAntiguasCount}
-        puedeEditar={permisos.puedeEditar}
-        puedeCrear={permisos.puedeCrear}
-        vinculos={vinculos}
-        usuarios={usuarios}
-        usuarioActualId={usuario?.id}
-      />
     </div>
   );
 }
