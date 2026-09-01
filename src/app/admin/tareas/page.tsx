@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { TareaKanban } from "@/components/tareas/tarea-kanban";
 import { TareasResumen } from "@/components/tareas/tareas-resumen";
 import { TareasChart } from "@/components/tareas/tareas-chart";
-import { calcularResumenTareas, agruparTareasCompletadasPorPeriodo } from "@/lib/tareas-resumen";
+import {
+  calcularResumenTareas,
+  agruparTareasCompletadasPorPeriodo,
+  calcularCompletadasPorPeriodosFijos,
+} from "@/lib/tareas-resumen";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
 import { nombreClienteCotizacion } from "@/lib/cotizacion";
@@ -55,6 +59,9 @@ export default async function TareasPage({
   const hace14Dias = new Date();
   hace14Dias.setDate(hace14Dias.getDate() - 14);
 
+  const hoy = hoyEnMexico();
+  const inicioAno = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
+
   const rango = construirRangoFecha(todo === "1" ? undefined : desde, todo === "1" ? undefined : hasta);
   const whereCompletadasRango: Prisma.TareaWhereInput = {
     ...tareaWhere,
@@ -71,6 +78,8 @@ export default async function TareasPage({
     completadasAntiguasCount,
     completadasRecientes,
     completadasEnRango,
+    completadasEsteAno,
+    completadasTotalCount,
     minTarea,
   ] = await Promise.all([
     prisma.servicio.findMany({
@@ -121,6 +130,13 @@ export default async function TareasPage({
       where: whereCompletadasRango,
       select: { completadaEn: true },
     }),
+    // Para las cuentas fijas (hoy/7 días/30 días/mes/año) que siempre se
+    // ven sin importar el filtro personalizado de arriba.
+    prisma.tarea.findMany({
+      where: { ...tareaWhere, completada: true, completadaEn: { gte: inicioAno } },
+      select: { completadaEn: true },
+    }),
+    prisma.tarea.count({ where: { ...tareaWhere, completada: true } }),
     prisma.tarea.aggregate({ where: tareaWhere, _min: { creadoEn: true } }),
   ]);
 
@@ -152,23 +168,25 @@ export default async function TareasPage({
     hastaEfectivo
   );
   const totalCompletadasRango = completadasEnRango.length;
+  const fijos = calcularCompletadasPorPeriodosFijos(
+    completadasEsteAno.map((t) => t.completadaEn!),
+    hoy
+  );
 
-  const hoy = hoyEnMexico();
   const hoyIso = isoDate(hoy);
   const hace7 = new Date(hoy);
   hace7.setUTCDate(hace7.getUTCDate() - 6);
   const hace30 = new Date(hoy);
   hace30.setUTCDate(hace30.getUTCDate() - 29);
   const inicioMes = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
-  const inicioAno = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
 
   const presets = [
-    { label: "Hoy", desde: hoyIso, hasta: hoyIso, todo: false },
-    { label: "7 días", desde: isoDate(hace7), hasta: hoyIso, todo: false },
-    { label: "30 días", desde: isoDate(hace30), hasta: hoyIso, todo: false },
-    { label: "Este mes", desde: isoDate(inicioMes), hasta: hoyIso, todo: false },
-    { label: "Este año", desde: isoDate(inicioAno), hasta: hoyIso, todo: false },
-    { label: "Todo", desde: undefined, hasta: undefined, todo: true },
+    { label: "Hoy", desde: hoyIso, hasta: hoyIso, todo: false, count: fijos.hoy },
+    { label: "7 días", desde: isoDate(hace7), hasta: hoyIso, todo: false, count: fijos.dias7 },
+    { label: "30 días", desde: isoDate(hace30), hasta: hoyIso, todo: false, count: fijos.dias30 },
+    { label: "Este mes", desde: isoDate(inicioMes), hasta: hoyIso, todo: false, count: fijos.mes },
+    { label: "Este año", desde: isoDate(inicioAno), hasta: hoyIso, todo: false, count: fijos.ano },
+    { label: "Todo", desde: undefined, hasta: undefined, todo: true, count: completadasTotalCount },
   ];
   const presetActivo =
     todo === "1" ? presets[5] : (presets.find((p) => !p.todo && p.desde === desde && p.hasta === hasta) ?? null);
@@ -199,10 +217,16 @@ export default async function TareasPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Rango de fechas</CardTitle>
+          <CardTitle className="text-sm font-medium">Tareas completadas</CardTitle>
+          <CardDescription className="text-xs">
+            Las pendientes siempre están arriba en el tablero, sin importar este filtro — esto es
+            solo para mirar hacia atrás.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
+        <CardContent className="flex flex-col gap-4">
+          {/* El filtro va arriba de todo: primero eliges el rango, y las
+              cuentas de abajo + la gráfica reaccionan a esa elección. */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {presets.map((p) => {
               const params = new URLSearchParams();
               if (p.todo) {
@@ -214,12 +238,24 @@ export default async function TareasPage({
               const href = `/admin/tareas?${params}`;
               const activo = presetActivo?.label === p.label;
               return (
-                <Button key={p.label} asChild size="sm" variant={activo ? "default" : "outline"}>
-                  <Link href={href}>{p.label}</Link>
-                </Button>
+                <Link
+                  key={p.label}
+                  href={href}
+                  className={`flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 text-center transition-colors ${
+                    activo
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-input hover:bg-muted/60"
+                  }`}
+                >
+                  <span className={`text-lg font-semibold tabular-nums ${activo ? "text-primary" : ""}`}>
+                    {p.count}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">{p.label}</span>
+                </Link>
               );
             })}
           </div>
+
           <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="desde" className="text-xs text-muted-foreground">
@@ -237,20 +273,14 @@ export default async function TareasPage({
               Filtrar
             </Button>
           </form>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">
-            Tareas completadas ({totalCompletadasRango})
-          </CardTitle>
-          <CardDescription className="text-xs">
-            {granularidad === "mes" ? "Un punto por mes." : "Un punto por día."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TareasChart datos={puntosTareas} />
+          <div className="border-t border-border pt-4">
+            <p className="mb-2 text-xs text-muted-foreground">
+              {totalCompletadasRango} completada{totalCompletadasRango === 1 ? "" : "s"} en el
+              rango elegido — {granularidad === "mes" ? "un punto por mes" : "un punto por día"}.
+            </p>
+            <TareasChart datos={puntosTareas} />
+          </div>
         </CardContent>
       </Card>
     </div>

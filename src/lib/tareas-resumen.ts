@@ -58,6 +58,39 @@ export function calcularResumenTareas(
   return { pendientesCount, completadasHoy, progresoPct, racha, proximaPrioridad };
 }
 
+export type CompletadasPorPeriodo = { hoy: number; dias7: number; dias30: number; mes: number; ano: number };
+
+/** Cuenta rápida de completadas en cada ventana fija (hoy/7 días/30
+ * días/este mes/este año), siempre visible sin importar qué rango
+ * personalizado esté eligiendo el filtro de la página -- para tener el
+ * dato de un vistazo sin tener que ir cambiando el filtro uno por uno.
+ * `ahora` debe ser hoyEnMexico() (medianoche UTC del día de hoy en
+ * México), y `fechas` debe cubrir al menos desde el 1 de enero. */
+export function calcularCompletadasPorPeriodosFijos(fechas: Date[], ahora: Date): CompletadasPorPeriodo {
+  const inicioHoy = ahora.getTime();
+  const inicio7 = inicioHoy - 6 * 86_400_000;
+  const inicio30 = inicioHoy - 29 * 86_400_000;
+  const inicioMes = Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1);
+  const inicioAno = Date.UTC(ahora.getUTCFullYear(), 0, 1);
+  // "Hoy" llega hasta el final del día, no solo su medianoche.
+  const finHoy = inicioHoy + 86_400_000;
+
+  let hoy = 0;
+  let dias7 = 0;
+  let dias30 = 0;
+  let mes = 0;
+  let ano = 0;
+  for (const fecha of fechas) {
+    const t = fecha.getTime();
+    if (t >= inicioHoy && t < finHoy) hoy++;
+    if (t >= inicio7) dias7++;
+    if (t >= inicio30) dias30++;
+    if (t >= inicioMes) mes++;
+    if (t >= inicioAno) ano++;
+  }
+  return { hoy, dias7, dias30, mes, ano };
+}
+
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
