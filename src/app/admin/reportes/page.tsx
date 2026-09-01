@@ -10,13 +10,13 @@ import {
   Download,
   FileDown,
   User,
-  ChevronRight,
 } from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { hoyEnMexico } from "@/lib/fecha";
+import { DetalleDialog } from "@/components/reportes/detalle-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -87,19 +87,19 @@ function KpiCard({
   icon: Icon,
   tone = "default",
   sub,
-  detalleHref,
+  detalle,
 }: {
   title: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "good" | "bad";
   sub?: string;
-  // Lleva al listado real (Pagos/Gastos/Servicios/Clientes) ya filtrado
-  // con el mismo rango y criterio que se usó para esta cifra -- ahí el
-  // usuario puede exportar a Excel esos registros exactos. Se omite en
-  // tarjetas sin una lista propia detrás (ej. Utilidad neta, que es una
-  // resta, no un conjunto de registros).
-  detalleHref?: string;
+  // Abre un modal con el listado real (Pagos/Gastos/Servicios/Clientes)
+  // ya filtrado con el mismo rango y criterio que se usó para esta cifra,
+  // sin salir de Reportes -- ahí mismo se puede exportar a Excel esos
+  // registros exactos. Se omite en tarjetas sin una lista propia detrás
+  // (ej. Utilidad neta, que es una resta, no un conjunto de registros).
+  detalle?: { tipo: string; exportHref: string; rangoQS: string };
 }) {
   const toneClass =
     tone === "good"
@@ -120,14 +120,13 @@ function KpiCard({
             {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
           </div>
         </div>
-        {detalleHref && (
-          <Link
-            href={detalleHref}
-            className="flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
-          >
-            Ver detalles
-            <ChevronRight className="size-3.5" />
-          </Link>
+        {detalle && (
+          <DetalleDialog
+            tipo={detalle.tipo}
+            titulo={title}
+            rangoQS={detalle.rangoQS}
+            exportHref={detalle.exportHref}
+          />
         )}
       </CardContent>
     </Card>
@@ -322,7 +321,11 @@ export default async function ReportesPage({
               icon={TrendingUp}
               tone="good"
               sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`}
-              detalleHref={`/admin/pagos?confirmado=true&${rangoQS}`}
+              detalle={{
+                tipo: "pagos",
+                rangoQS,
+                exportHref: `/admin/pagos/export?confirmado=true&${rangoQS}`,
+              }}
             />
             <KpiCard
               title="Gastos (empresa)"
@@ -330,7 +333,11 @@ export default async function ReportesPage({
               icon={TrendingDown}
               tone="bad"
               sub={`${gastosCount} movimientos`}
-              detalleHref={`/admin/gastos?ambito=Empresa&${rangoQS}`}
+              detalle={{
+                tipo: "gastos-empresa",
+                rangoQS,
+                exportHref: `/admin/gastos/export?ambito=Empresa&${rangoQS}`,
+              }}
             />
             <KpiCard
               title="Utilidad neta"
@@ -344,27 +351,43 @@ export default async function ReportesPage({
               value={formatCurrency(totalGastosPersonales)}
               icon={User}
               sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
-              detalleHref={`/admin/gastos?ambito=Personal&${rangoQS}`}
+              detalle={{
+                tipo: "gastos-personal",
+                rangoQS,
+                exportHref: `/admin/gastos/export?ambito=Personal&${rangoQS}`,
+              }}
             />
             <KpiCard
               title="Servicios entregados"
               value={String(serviciosEntregadosCount)}
               icon={CheckCircle2}
               sub="Por fecha de fin"
-              detalleHref={`/admin/servicios?status=Entregado&${rangoQS}`}
+              detalle={{
+                tipo: "servicios-entregados",
+                rangoQS,
+                exportHref: `/admin/servicios/export?status=Entregado&${rangoQS}`,
+              }}
             />
             <KpiCard
               title="Servicios nuevos"
               value={String(serviciosNuevosCount)}
               icon={Briefcase}
               sub="Por fecha de inicio"
-              detalleHref={`/admin/servicios?${rangoQS}`}
+              detalle={{
+                tipo: "servicios-nuevos",
+                rangoQS,
+                exportHref: `/admin/servicios/export?${rangoQS}`,
+              }}
             />
             <KpiCard
               title="Clientes nuevos"
               value={String(clientesNuevosCount)}
               icon={Users}
-              detalleHref={`/admin/clientes?${rangoQS}`}
+              detalle={{
+                tipo: "clientes-nuevos",
+                rangoQS,
+                exportHref: `/admin/clientes/export?${rangoQS}`,
+              }}
             />
           </div>
         );
