@@ -31,7 +31,17 @@ export function rangoEfectivo(
   return { desde: desdeDate, hasta: hastaDate };
 }
 
-export type PuntoPeriodo = { key: string; label: string; recaudado: number; gastos: number };
+export type PuntoPeriodo = {
+  key: string;
+  label: string;
+  recaudado: number;
+  gastos: number;
+  // Gasto personal del dueño en el mismo periodo -- aparte de `gastos`
+  // (que es solo empresa) a propósito, para que el gráfico pueda
+  // mostrarlos como líneas separadas o el que las junte (ver
+  // RecaudadoGastosChart) sin recalcular nada.
+  gastosPersonales: number;
+};
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -69,7 +79,8 @@ export function agruparRecaudadoGastos(
   pagos: { fecha: Date; monto: number }[],
   gastos: { fecha: Date; monto: number }[],
   desde: Date,
-  hasta: Date
+  hasta: Date,
+  gastosPersonales: { fecha: Date; monto: number }[] = []
 ): PuntoPeriodo[] {
   const granularidad = granularidadPeriodo(desde, hasta);
 
@@ -90,7 +101,7 @@ export function agruparRecaudadoGastos(
   let guard = 0;
   while (cursor.getTime() <= hasta.getTime() && guard < 400) {
     const { key, label } = claveYLabel(cursor);
-    if (!periodos.has(key)) periodos.set(key, { key, label, recaudado: 0, gastos: 0 });
+    if (!periodos.has(key)) periodos.set(key, { key, label, recaudado: 0, gastos: 0, gastosPersonales: 0 });
     if (granularidad === "mes") {
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     } else {
@@ -100,7 +111,9 @@ export function agruparRecaudadoGastos(
   }
   // Asegura que el periodo de "hasta" quede incluido aunque el paso lo salte.
   const { key: keyHasta, label: labelHasta } = claveYLabel(hasta);
-  if (!periodos.has(keyHasta)) periodos.set(keyHasta, { key: keyHasta, label: labelHasta, recaudado: 0, gastos: 0 });
+  if (!periodos.has(keyHasta)) {
+    periodos.set(keyHasta, { key: keyHasta, label: labelHasta, recaudado: 0, gastos: 0, gastosPersonales: 0 });
+  }
 
   for (const p of pagos) {
     const { key } = claveYLabel(p.fecha);
@@ -111,6 +124,11 @@ export function agruparRecaudadoGastos(
     const { key } = claveYLabel(g.fecha);
     const punto = periodos.get(key);
     if (punto) punto.gastos += g.monto;
+  }
+  for (const g of gastosPersonales) {
+    const { key } = claveYLabel(g.fecha);
+    const punto = periodos.get(key);
+    if (punto) punto.gastosPersonales += g.monto;
   }
 
   return Array.from(periodos.values()).sort((a, b) => a.key.localeCompare(b.key));

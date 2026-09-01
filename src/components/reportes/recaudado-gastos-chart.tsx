@@ -81,6 +81,12 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   const gradientId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  // "Unificar gastos" es una preferencia de vista, no de datos -- el
+  // usuario decide cuándo quiere ver empresa y personal por separado (2
+  // líneas de gasto) y cuándo junto como un solo total (1 línea de
+  // gasto, para comparar de un vistazo contra lo recaudado).
+  const [unificado, setUnificado] = useState(false);
+  const hayGastosPersonales = datos.some((d) => d.gastosPersonales > 0);
   // Se mide el ancho real del contenedor (en vez de un viewBox fijo que
   // luego el navegador escala) para que el trazo y el texto del SVG
   // siempre midan 1:1 con los píxeles reales — en un celular angosto, un
@@ -104,7 +110,7 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
     return () => observer.disconnect();
   }, []);
 
-  const hayActividad = datos.some((d) => d.recaudado > 0 || d.gastos > 0);
+  const hayActividad = datos.some((d) => d.recaudado > 0 || d.gastos > 0 || d.gastosPersonales > 0);
   if (datos.length === 0 || !hayActividad) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
@@ -113,6 +119,11 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
     );
   }
 
+  // Unificado: una sola línea de "gasto total" (empresa + personal), para
+  // comparar de un vistazo contra lo recaudado. Sin unificar: cada uno por
+  // su lado, para no perder de vista qué es del negocio y qué es propio.
+  const gastosCombinados = datos.map((d) => d.gastos + d.gastosPersonales);
+
   const W = width;
   const H = Math.min(H_MAX, Math.max(H_MIN, Math.round(W / ASPECT)));
   const innerW = W - PAD_LEFT - PAD_RIGHT;
@@ -120,7 +131,12 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   const baseline = H - PAD_BOTTOM;
   const step = datos.length > 1 ? innerW / (datos.length - 1) : 0;
 
-  const maxRaw = Math.max(1, ...datos.map((d) => Math.max(d.recaudado, d.gastos)));
+  const maxRaw = Math.max(
+    1,
+    ...datos.map((d, i) =>
+      unificado ? Math.max(d.recaudado, gastosCombinados[i]) : Math.max(d.recaudado, d.gastos, d.gastosPersonales)
+    )
+  );
   // Redondea el techo del eje Y a un número "bonito" para que las líneas de
   // referencia no queden en valores arbitrarios como $17,342.
   const magnitud = 10 ** Math.floor(Math.log10(maxRaw));
@@ -134,9 +150,11 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   }
 
   const puntosRecaudado = datos.map((d, i) => ({ x: x(i), y: y(d.recaudado) }));
-  const puntosGastos = datos.map((d, i) => ({ x: x(i), y: y(d.gastos) }));
+  const puntosGastos = datos.map((d, i) => ({ x: x(i), y: y(unificado ? gastosCombinados[i] : d.gastos) }));
+  const puntosGastosPersonales = datos.map((d, i) => ({ x: x(i), y: y(d.gastosPersonales) }));
   const lineaRecaudado = pathSuave(puntosRecaudado);
   const lineaGastos = pathSuave(puntosGastos);
+  const lineaGastosPersonales = pathSuave(puntosGastosPersonales);
   const areaRecaudado =
     puntosRecaudado.length > 0
       ? `${lineaRecaudado} L ${x(datos.length - 1).toFixed(1)},${baseline} L ${x(0).toFixed(1)},${baseline} Z`
@@ -180,15 +198,39 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-primary" />
-          <span className="font-medium text-foreground">Recaudado</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-orange-500 dark:bg-orange-400" />
-          <span className="font-medium text-foreground">Gastos</span>
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-primary" />
+            <span className="font-medium text-foreground">Recaudado</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-orange-500 dark:bg-orange-400" />
+            <span className="font-medium text-foreground">
+              {unificado ? "Gastos (empresa + personal)" : "Gastos empresa"}
+            </span>
+          </span>
+          {!unificado && hayGastosPersonales && (
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full bg-violet-500 dark:bg-violet-400" />
+              <span className="font-medium text-foreground">Gastos personales</span>
+            </span>
+          )}
+        </div>
+
+        {hayGastosPersonales && (
+          <button
+            type="button"
+            onClick={() => setUnificado((v) => !v)}
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              unificado
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-input text-muted-foreground hover:bg-muted/60"
+            }`}
+          >
+            {unificado ? "Viendo unificado" : "Unificar gastos"}
+          </button>
+        )}
       </div>
 
       <div
@@ -259,6 +301,18 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
           <path d={areaRecaudado} fill={`url(#${gradientId})`} stroke="none" />
 
+          {!unificado && hayGastosPersonales && (
+            <path
+              d={lineaGastosPersonales}
+              fill="none"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeOpacity={0.85}
+              strokeDasharray="5 3"
+              className="stroke-violet-500 dark:stroke-violet-400"
+            />
+          )}
           <path
             d={lineaGastos}
             fill="none"
@@ -280,8 +334,15 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
           {/* Puntos + monto de cada punto (cuando hay pocos, ver
               mostrarValores) — así se ve la cifra sin tener que pasar el
               mouse o tocar cada uno. */}
+          {!unificado &&
+            hayGastosPersonales &&
+            puntosGastosPersonales.map((p, i) =>
+              datos[i].gastosPersonales > 0 ? (
+                <circle key={`pgp-${datos[i].key}`} cx={p.x} cy={p.y} r={2.5} className="fill-violet-500 dark:fill-violet-400" />
+              ) : null
+            )}
           {puntosGastos.map((p, i) =>
-            datos[i].gastos > 0 ? (
+            (unificado ? datos[i].gastos + datos[i].gastosPersonales : datos[i].gastos) > 0 ? (
               <circle key={`pg-${datos[i].key}`} cx={p.x} cy={p.y} r={2.5} className="fill-orange-500 dark:fill-orange-400" />
             ) : null
           )}
@@ -293,12 +354,20 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
             datos.map((d, i) => (
               <g key={`v-${d.key}`}>
                 <EtiquetaValor x={x(i)} y={y(d.recaudado) - 9} text={formatCorto(d.recaudado)} className="fill-primary" />
-                {d.gastos > 0 && (
+                {(unificado ? d.gastos + d.gastosPersonales : d.gastos) > 0 && (
                   <EtiquetaValor
                     x={x(i)}
-                    y={y(d.gastos) + 15}
-                    text={formatCorto(d.gastos)}
+                    y={y(unificado ? d.gastos + d.gastosPersonales : d.gastos) + 15}
+                    text={formatCorto(unificado ? d.gastos + d.gastosPersonales : d.gastos)}
                     className="fill-orange-600 dark:fill-orange-400"
+                  />
+                )}
+                {!unificado && d.gastosPersonales > 0 && (
+                  <EtiquetaValor
+                    x={x(i)}
+                    y={y(d.gastosPersonales) + 15}
+                    text={formatCorto(d.gastosPersonales)}
+                    className="fill-violet-600 dark:fill-violet-400"
                   />
                 )}
               </g>
@@ -306,7 +375,20 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
           {hoverIndex !== null && hovered && (
             <>
-              <circle cx={x(hoverIndex)} cy={y(hovered.gastos)} r={4.5} className="fill-orange-500 dark:fill-orange-400" />
+              {!unificado && hayGastosPersonales && (
+                <circle
+                  cx={x(hoverIndex)}
+                  cy={y(hovered.gastosPersonales)}
+                  r={4.5}
+                  className="fill-violet-500 dark:fill-violet-400"
+                />
+              )}
+              <circle
+                cx={x(hoverIndex)}
+                cy={y(unificado ? hovered.gastos + hovered.gastosPersonales : hovered.gastos)}
+                r={4.5}
+                className="fill-orange-500 dark:fill-orange-400"
+              />
               <circle cx={x(hoverIndex)} cy={y(hovered.recaudado)} r={4.5} className="fill-primary" />
               <circle
                 cx={x(hoverIndex)}
@@ -322,7 +404,7 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
 
         {hovered && (
           <div
-            className="pointer-events-none absolute top-0 z-10 w-40 rounded-lg border border-input bg-popover p-2.5 text-xs text-popover-foreground shadow-lg"
+            className="pointer-events-none absolute top-0 z-10 w-48 rounded-lg border border-input bg-popover p-2.5 text-xs text-popover-foreground shadow-lg"
             style={{
               left: `${tooltipLeftPct}%`,
               transform: tooltipAlignEnd ? "translateX(-100%)" : "translateX(0%)",
@@ -340,10 +422,38 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-orange-500 dark:bg-orange-400" />
-                Gastos
+                {unificado ? "Gastos (todo)" : "Gastos empresa"}
               </span>
-              <span className="tabular-nums font-medium">{formatCurrency(hovered.gastos)}</span>
+              <span className="tabular-nums font-medium">
+                {formatCurrency(unificado ? hovered.gastos + hovered.gastosPersonales : hovered.gastos)}
+              </span>
             </div>
+            {!unificado && hovered.gastosPersonales > 0 && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <span className="size-1.5 rounded-full bg-violet-500 dark:bg-violet-400" />
+                  Gastos personales
+                </span>
+                <span className="tabular-nums font-medium">{formatCurrency(hovered.gastosPersonales)}</span>
+              </div>
+            )}
+            {(() => {
+              // Siempre contra el gasto total (empresa + personal), sin
+              // importar si la vista está unificada o no -- "a favor" es
+              // sobre el dinero real que entró y salió, no sobre cómo se
+              // está dibujando el gráfico en este momento.
+              const favor = hovered.recaudado - hovered.gastos - hovered.gastosPersonales;
+              return (
+                <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-border pt-1.5">
+                  <span className="text-muted-foreground">{favor >= 0 ? "A favor" : "En contra"}</span>
+                  <span
+                    className={`tabular-nums font-semibold ${favor >= 0 ? "text-success" : "text-destructive"}`}
+                  >
+                    {formatCurrency(Math.abs(favor))}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

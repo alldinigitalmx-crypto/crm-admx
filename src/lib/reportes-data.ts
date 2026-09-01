@@ -189,7 +189,8 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     pagos.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
     gastos.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
     desdeEfectivo,
-    hastaEfectivo
+    hastaEfectivo,
+    gastosPersonales.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) }))
   );
 
   const statusCounts = Object.fromEntries(STATUS_ORDEN.map((s) => [s, 0])) as Record<StatusServicio, number>;
