@@ -81,19 +81,20 @@ export function PagoForm({
   const montoRef = useRef<HTMLInputElement>(null);
   const comisionRef = useRef<HTMLInputElement>(null);
   const montoMXNRef = useRef<HTMLInputElement>(null);
-  const [neto, setNeto] = useState<number | null>(
-    defaultValues?.comision ? Number(defaultValues.monto) - Number(defaultValues.comision) : null
+  const [brutoInformativo, setBrutoInformativo] = useState<number | null>(
+    defaultValues?.comision ? Number(defaultValues.monto) + Number(defaultValues.comision) : null
   );
 
-  // El campo "Monto" siempre es lo que le cobraron al cliente (el bruto);
-  // "Comisión" es lo que se quedó la pasarela. Este preview es lo único
-  // que hace falta para no volver a confundir bruto con neto: se ve al
-  // teclear, antes de guardar, y se compara fácil contra lo que el
-  // banco/PayPal/Mercado Pago de verdad depositó.
-  function actualizarNeto() {
+  // El campo "Monto" es lo que de verdad te llegó (el neto) -- la
+  // comisión es solo informativa, para llevar cuenta de lo que se queda
+  // la pasarela, y nunca se resta de nuevo (pedir el bruto antes de
+  // comisión era tedioso: casi nunca se sabe de memoria). Este preview
+  // solo suma monto+comisión para que puedas comparar contra lo que el
+  // cliente en verdad pagó, sin que afecte el cálculo real.
+  function actualizarBrutoInformativo() {
     const monto = Number(montoRef.current?.value ?? "");
     const comision = Number(comisionRef.current?.value ?? "");
-    setNeto(monto > 0 && comision > 0 ? monto - comision : null);
+    setBrutoInformativo(monto > 0 && comision > 0 ? monto + comision : null);
   }
   const [cargandoTipoCambio, setCargandoTipoCambio] = useState(false);
   const [tipoCambioInfo, setTipoCambioInfo] = useState<{ rate: number; fecha: string | null } | null>(
@@ -216,7 +217,7 @@ export function PagoForm({
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor="monto">Monto (lo que le cobraron al cliente) *</Label>
+          <Label htmlFor="monto">Monto (lo que de verdad te llegó) *</Label>
           <Input
             id="monto"
             name="monto"
@@ -227,12 +228,12 @@ export function PagoForm({
             required
             defaultValue={defaultValues?.monto ? String(defaultValues.monto) : ""}
             placeholder="0.00"
-            onChange={actualizarNeto}
+            onChange={actualizarBrutoInformativo}
           />
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor="comision">Comisión de la pasarela</Label>
+          <Label htmlFor="comision">Comisión de la pasarela (informativa)</Label>
           <Input
             id="comision"
             name="comision"
@@ -242,12 +243,13 @@ export function PagoForm({
             min="0"
             defaultValue={defaultValues?.comision ? String(defaultValues.comision) : ""}
             placeholder="0.00"
-            onChange={actualizarNeto}
+            onChange={actualizarBrutoInformativo}
           />
-          {neto != null && (
+          {brutoInformativo != null && (
             <p className="text-xs text-muted-foreground">
-              Te depositan (neto): <span className="font-medium text-foreground">{neto.toFixed(2)}</span> —
-              compáralo con lo que de verdad te llegó antes de guardar.
+              Lo que le cobraron al cliente (informativo):{" "}
+              <span className="font-medium text-foreground">{brutoInformativo.toFixed(2)}</span> — no
+              se resta del monto, solo es referencia.
             </p>
           )}
         </div>

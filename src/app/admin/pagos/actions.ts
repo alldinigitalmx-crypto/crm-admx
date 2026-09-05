@@ -110,9 +110,15 @@ export async function crearPago(
       metodoPago: data.metodoPago,
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
-      // Todo pago nuevo se captura con la convención "monto = bruto que
-      // cobró la pasarela" -- ver montoNetoEnMXN en src/lib/pago-monto.ts.
-      montoIncluyeComision: true,
+      // Captura manual: "monto" es lo que de verdad llegó (neto) y la
+      // comisión es solo informativa, no se resta de nuevo -- pedirle al
+      // usuario el bruto que cobró la pasarela antes de su comisión era
+      // tedioso y propenso a error (rara vez lo sabe de memoria). Los
+      // pagos que sí captura la app sola vía webhook (MercadoPago/PayPal,
+      // ver esas rutas) conocen el bruto y la comisión exactos de la API
+      // del propio gateway, así que esos sí guardan montoIncluyeComision
+      // true -- ver montoNetoEnMXN en src/lib/pago-monto.ts.
+      montoIncluyeComision: false,
       moneda: data.moneda,
       montoMXN: data.montoMXNRaw || null,
       cuentaId: data.cuentaId,
