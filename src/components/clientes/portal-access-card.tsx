@@ -107,9 +107,9 @@ function PasswordDialog({
                   className="font-mono"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
                 <Button
                   type="button"

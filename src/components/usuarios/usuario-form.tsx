@@ -82,7 +82,7 @@ export function UsuarioForm({
           name="password"
           type="password"
           required={!isEditing}
-          placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Mínimo 6 caracteres"}
+          placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Mínimo 8 caracteres"}
         />
       </div>
 

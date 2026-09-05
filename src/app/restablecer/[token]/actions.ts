@@ -14,7 +14,7 @@ export async function restablecerPassword(token: string, formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const confirmar = String(formData.get("confirmar") ?? "");
 
-  if (password.length < 6) redirect(`/restablecer/${token}?error=corta`);
+  if (password.length < 8) redirect(`/restablecer/${token}?error=corta`);
   if (password !== confirmar) redirect(`/restablecer/${token}?error=nocoincide`);
 
   const usuario = await prisma.usuario.findFirst({

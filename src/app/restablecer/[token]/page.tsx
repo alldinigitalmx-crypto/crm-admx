@@ -15,7 +15,7 @@ function hashToken(token: string) {
 }
 
 const ERRORES: Record<string, string> = {
-  corta: "La contraseña debe tener al menos 6 caracteres.",
+  corta: "La contraseña debe tener al menos 8 caracteres.",
   nocoincide: "Las contraseñas no coinciden.",
   invalido: "Este enlace ya no es válido. Solicita uno nuevo.",
 };
@@ -81,7 +81,7 @@ export default async function RestablecerPage({
                     name="password"
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     placeholder="••••••••"
                     className="pl-9"
                   />
@@ -97,7 +97,7 @@ export default async function RestablecerPage({
                     name="confirmar"
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     placeholder="••••••••"
                     className="pl-9"
                   />

@@ -44,8 +44,8 @@ function validateUsuarioForm(
   if (!data.nombre) return "El nombre es obligatorio.";
   if (!data.email) return "El correo es obligatorio.";
   if (requirePassword && !data.password) return "La contraseña es obligatoria.";
-  if (data.password && data.password.length < 6) {
-    return "La contraseña debe tener al menos 6 caracteres.";
+  if (data.password && data.password.length < 8) {
+    return "La contraseña debe tener al menos 8 caracteres.";
   }
   return null;
 }

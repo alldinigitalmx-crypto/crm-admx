@@ -23,6 +23,9 @@ model Cliente {
   passwordHash       String?
   portalActivo       Boolean         @default(false)
   ultimoAccesoPortal DateTime?
+  // Freno anti fuerza bruta en el login del portal — ver Usuario.intentosFallidos.
+  intentosFallidos   Int             @default(0)
+  bloqueadoHasta     DateTime?
   servicios          Servicio[]
   ventasReferidas    Venta[]
   quejas             Queja[]
@@ -609,6 +612,14 @@ model Usuario {
   creadoEn           DateTime   @default(now())
   resetTokenHash     String?
   resetTokenExpiraEn DateTime?
+  // Freno anti fuerza bruta: cada password incorrecto suma uno; al llegar
+  // al umbral (ver auth.ts) se guarda bloqueadoHasta y ya no se ni
+  // intenta comparar el hash hasta que pase esa fecha. Se resetea a 0 en
+  // cuanto entra bien. Vive en la fila del usuario (no en memoria del
+  // proceso) para que sí importe en serverless, donde cada invocación
+  // puede caer en una instancia distinta.
+  intentosFallidos   Int        @default(0)
+  bloqueadoHasta     DateTime?
 
   serviciosCreados           Servicio[]            @relation("ServicioCreadoPor")
   serviciosEditados          Servicio[]            @relation("ServicioEditadoPor")

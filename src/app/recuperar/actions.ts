@@ -18,7 +18,15 @@ export async function solicitarRecuperacion(formData: FormData) {
 
   const usuario = await prisma.usuario.findUnique({ where: { email } });
 
-  if (usuario && usuario.activo) {
+  // Freno anti abuso: sin esto, este formulario público (sin sesión) se
+  // podía usar para bombardear de correos a cualquier cuenta real con
+  // solo reenviar el POST -- como el token dura 1 hora, si todavía le
+  // queda casi toda su vigencia es que se pidió hace menos de un minuto.
+  const pidioHaceMenosDeUnMinuto =
+    usuario?.resetTokenExpiraEn != null &&
+    usuario.resetTokenExpiraEn.getTime() - Date.now() > 59 * 60 * 1000;
+
+  if (usuario && usuario.activo && !pidioHaceMenosDeUnMinuto) {
     const token = randomBytes(32).toString("hex");
     await prisma.usuario.update({
       where: { id: usuario.id },
