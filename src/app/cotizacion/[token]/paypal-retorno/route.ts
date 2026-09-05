@@ -47,11 +47,19 @@ export async function GET(
     const existente = await prisma.pago.findFirst({ where: { comprobante: referencia } });
     if (!existente) {
       const montoPagado = Number(pago.amount.value);
+      // PayPal puede cobrar en MXN, USD o EUR (ver pagar-paypal/route.ts) --
+      // si no se guarda la moneda real de la captura, este pago queda
+      // "huérfano" al comparar contra el total de la cotización (que
+      // filtra por moneda) y nunca cuenta como pagado aunque sí llegó.
+      const monedaPago: "USD" | "EUR" | "MXN" =
+        pago.amount.currency_code === "USD" || pago.amount.currency_code === "EUR"
+          ? pago.amount.currency_code
+          : "MXN";
       const comisionRaw = pago.seller_receivable_breakdown?.paypal_fee?.value;
       const comision = comisionRaw ? Number(comisionRaw) : null;
       const quedaSaldada = cotizacionQuedaSaldada(cotizacion, [
         ...cotizacion.pagos,
-        { monto: montoPagado, confirmado: true },
+        { monto: montoPagado, confirmado: true, moneda: monedaPago },
       ]);
 
       const nuevoPago = await prisma.$transaction(async (tx) => {
@@ -61,6 +69,7 @@ export async function GET(
             cotizacionId: cotizacion.id,
             metodoPago: "PayPal",
             monto: montoPagado,
+            moneda: monedaPago === "MXN" ? null : monedaPago,
             comision,
             montoIncluyeComision: true,
             confirmado: true,
