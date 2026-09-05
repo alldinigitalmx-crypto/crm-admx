@@ -178,6 +178,14 @@ export async function actualizarPago(
       metodoPago: data.metodoPago,
       monto: data.montoRaw,
       comision: data.comisionRaw || null,
+      // Igual que crearPago: en cuanto una persona edita el monto a mano
+      // en este formulario, se asume que lo que escribió es lo que de
+      // verdad llegó (neto) y la comisión pasa a ser solo informativa.
+      // Si no se forzara aquí, un pago que había quedado con
+      // montoIncluyeComision=true (creado por el webhook de MercadoPago/
+      // PayPal) le volvía a restar la comisión sobre un monto que la
+      // persona ya había corregido a neto -- descontándola dos veces.
+      montoIncluyeComision: false,
       moneda: data.moneda,
       montoMXN: data.montoMXNRaw || null,
       ...(data.cuentaIdProvisto ? { cuentaId: data.cuentaId } : {}),
