@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThemedLogo } from "@/components/themed-logo";
-import { Code2, Mail, Lock, Briefcase, FileText, LifeBuoy } from "lucide-react";
+import { PasswordField } from "@/components/ui/password-field";
+import { Code2, Mail, Briefcase, FileText, LifeBuoy } from "lucide-react";
 
 export default async function PortalLoginPage({
   searchParams,
@@ -136,17 +137,7 @@ export default async function PortalLoginPage({
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    className="pl-9"
-                  />
-                </div>
+                <PasswordField id="password" name="password" required />
               </div>
 
               <Button type="submit" className="mt-2 w-full">

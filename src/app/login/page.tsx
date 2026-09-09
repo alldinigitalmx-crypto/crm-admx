@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThemedLogo } from "@/components/themed-logo";
-import { Code2, Mail, Lock, Briefcase, FileText, CreditCard } from "lucide-react";
+import { PasswordField } from "@/components/ui/password-field";
+import { Code2, Mail, Briefcase, FileText, CreditCard } from "lucide-react";
 
 export default async function LoginPage({
   searchParams,
@@ -155,17 +156,7 @@ export default async function LoginPage({
                     ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    className="pl-9"
-                  />
-                </div>
+                <PasswordField id="password" name="password" required />
               </div>
 
               <div className="flex items-center gap-2">
