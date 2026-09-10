@@ -6,10 +6,12 @@ import { prisma } from "@/lib/prisma";
 import {
   construirRangoFecha,
   rangoEfectivo,
+  rangoComparacion,
   agruparRecaudadoGastos,
   granularidadPeriodo,
   topNConOtros,
   type Granularidad,
+  type ModoComparacion,
   type PuntoPeriodo,
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
@@ -47,6 +49,26 @@ export type ReporteGastoDetalle = {
   monto: number;
 };
 export type PendienteGrupo = { count: number; monto: number };
+
+// Los mismos totales del reporte pero para el rango contra el que se
+// compara (mes/año anterior). Solo cifras agregadas -- ninguna lista de
+// detalle -- para que traer la comparación cueste casi nada.
+export type ReporteComparacion = {
+  modo: ModoComparacion;
+  desde: Date;
+  hasta: Date;
+  totalRecaudado: number;
+  totalGastos: number;
+  utilidadNeta: number;
+  totalGastosPersonales: number;
+  serviciosEntregadosCount: number;
+  serviciosNuevosCount: number;
+  clientesNuevosCount: number;
+  // "recaudado" del rango de comparación, agrupado con la misma
+  // granularidad y alineado por posición con puntosPeriodo -- para la
+  // línea punteada del gráfico de tendencia.
+  recaudadoPorPeriodo: number[];
+};
 // Un servicio "confirmado" (Aprobado/EnProceso) puede deberse a que ya
 // arrancó pero aún no se cobra completo. No se cuenta Cotizado (todavía
 // no es un trato en firme) ni Entregado/Cancelado (si ya se concluyó y el
@@ -90,9 +112,97 @@ export type ReporteData = {
   gastosDetalle: ReporteGastoDetalle[];
   gastosPersonalesDetalle: ReporteGastoDetalle[];
   pendientePorRecibir: PendientePorRecibirMoneda[];
+  comparacion?: ReporteComparacion;
 };
 
-export async function obtenerDatosReportes(desde?: string, hasta?: string): Promise<ReporteData> {
+// Totales agregados de un rango cualquiera -- se usa para el bloque de
+// comparación (mes/año anterior) sin duplicar la lógica de cómo se cuenta
+// cada cosa. Usa montoNetoEnMXN igual que el reporte principal.
+async function totalesDeRango(rango: { gte: Date; lte: Date }) {
+  const [pagos, gastosSum, gastosPersonalesSum, serviciosNuevos, serviciosEntregadosCount, clientesNuevosCount] =
+    await Promise.all([
+      prisma.pago.findMany({
+        where: { confirmado: true, fecha: rango },
+        select: { fecha: true, monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
+      }),
+      prisma.gasto.aggregate({ _sum: { monto: true }, where: { ambito: "Empresa", fecha: rango } }),
+      prisma.gasto.aggregate({ _sum: { monto: true }, where: { ambito: "Personal", fecha: rango } }),
+      prisma.servicio.count({ where: { fechaInicio: rango } }),
+      prisma.servicio.count({ where: { status: "Entregado", fechaFin: rango } }),
+      prisma.cliente.count({ where: { creadoEn: rango } }),
+    ]);
+  const totalRecaudado = pagos.reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
+  const totalGastos = Number(gastosSum._sum.monto ?? 0);
+  return {
+    pagos,
+    totalRecaudado,
+    totalGastos,
+    utilidadNeta: totalRecaudado - totalGastos,
+    totalGastosPersonales: Number(gastosPersonalesSum._sum.monto ?? 0),
+    serviciosNuevosCount: serviciosNuevos,
+    serviciosEntregadosCount,
+    clientesNuevosCount,
+  };
+}
+
+export function etiquetaComparacion(modo: ModoComparacion): string {
+  return modo === "año" ? "año pasado" : "periodo anterior";
+}
+
+/** Filas de la tabla "Comparativa" que se muestra en pantalla y se
+ * repite igual en el PDF y el Excel -- una sola definición del qué se
+ * compara para que los tres cuadren. `null` si no hay comparación. */
+export type FilaComparativa = {
+  metrica: string;
+  actual: number;
+  previo: number;
+  esDinero: boolean;
+  buenoCuando: "up" | "down";
+};
+
+export function filasComparativa(datos: ReporteData): FilaComparativa[] | null {
+  const c = datos.comparacion;
+  if (!c) return null;
+  return [
+    { metrica: "Total recaudado", actual: datos.totalRecaudado, previo: c.totalRecaudado, esDinero: true, buenoCuando: "up" },
+    { metrica: "Gastos (empresa)", actual: datos.totalGastos, previo: c.totalGastos, esDinero: true, buenoCuando: "down" },
+    { metrica: "Utilidad neta", actual: datos.utilidadNeta, previo: c.utilidadNeta, esDinero: true, buenoCuando: "up" },
+    {
+      metrica: "Gastos personales",
+      actual: datos.totalGastosPersonales,
+      previo: c.totalGastosPersonales,
+      esDinero: true,
+      buenoCuando: "down",
+    },
+    {
+      metrica: "Servicios nuevos",
+      actual: datos.serviciosNuevosCount,
+      previo: c.serviciosNuevosCount,
+      esDinero: false,
+      buenoCuando: "up",
+    },
+    {
+      metrica: "Servicios entregados",
+      actual: datos.serviciosEntregadosCount,
+      previo: c.serviciosEntregadosCount,
+      esDinero: false,
+      buenoCuando: "up",
+    },
+    {
+      metrica: "Clientes nuevos",
+      actual: datos.clientesNuevosCount,
+      previo: c.clientesNuevosCount,
+      esDinero: false,
+      buenoCuando: "up",
+    },
+  ];
+}
+
+export async function obtenerDatosReportes(
+  desde?: string,
+  hasta?: string,
+  comparar?: ModoComparacion
+): Promise<ReporteData> {
   const rango = construirRangoFecha(desde, hasta);
 
   const [minPago, minGasto, minServicio] = await Promise.all([
@@ -288,6 +398,31 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     a.moneda === "MXN" ? -1 : b.moneda === "MXN" ? 1 : a.moneda.localeCompare(b.moneda)
   );
 
+  let comparacion: ReporteComparacion | undefined;
+  if (comparar) {
+    const rc = rangoComparacion(desdeEfectivo, hastaEfectivo, comparar);
+    const t = await totalesDeRango({ gte: rc.desde, lte: rc.hasta });
+    const puntosComp = agruparRecaudadoGastos(
+      t.pagos.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
+      [],
+      rc.desde,
+      rc.hasta
+    );
+    comparacion = {
+      modo: comparar,
+      desde: rc.desde,
+      hasta: rc.hasta,
+      totalRecaudado: t.totalRecaudado,
+      totalGastos: t.totalGastos,
+      utilidadNeta: t.utilidadNeta,
+      totalGastosPersonales: t.totalGastosPersonales,
+      serviciosEntregadosCount: t.serviciosEntregadosCount,
+      serviciosNuevosCount: t.serviciosNuevosCount,
+      clientesNuevosCount: t.clientesNuevosCount,
+      recaudadoPorPeriodo: puntosComp.map((p) => p.recaudado),
+    };
+  }
+
   return {
     desde,
     hasta,
@@ -311,6 +446,7 @@ export async function obtenerDatosReportes(desde?: string, hasta?: string): Prom
     gastosPersonalesItems,
     topClientes,
     pendientePorRecibir,
+    comparacion,
     pagosDetalle: pagos.map((p) => ({
       fecha: p.fecha,
       servicio: p.servicio.descripcion,

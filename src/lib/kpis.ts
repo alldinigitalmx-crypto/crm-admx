@@ -22,14 +22,94 @@ export function mediana(valores: number[]): number {
     : (ordenados[mitad - 1] + ordenados[mitad]) / 2;
 }
 
-export type TicketTipico = { mediana: number; count: number };
+export type ResumenTicket = {
+  mediana: number;
+  promedio: number;
+  min: number;
+  max: number;
+  count: number;
+};
 
-/** Ticket típico = valor mediano de lo que de verdad se ha pagado por
- * cada servicio nuevo del rango (suma de sus pagos confirmados, ya en
- * MXN -- ver montoEnMXN). Mediana en vez de promedio a propósito: un
- * solo contrato grande no debe disparar la cifra de todo el mes. */
-export function calcularTicketTipico(montosMXN: number[]): TicketTipico {
-  return { mediana: mediana(montosMXN), count: montosMXN.length };
+/** Ticket típico = lo que de verdad se ha pagado por cada servicio nuevo
+ * del rango (suma de sus pagos confirmados, ya en MXN -- ver montoEnMXN).
+ * Devuelve mediana Y promedio Y rango en una sola pasada: la mediana es
+ * la cifra "de un trato normal" (un contrato gigante no la dispara), el
+ * promedio dice cuánto entra en promedio por trato, y min/max muestran
+ * qué tan disparejos son. */
+export function resumenTicket(montosMXN: number[]): ResumenTicket {
+  return {
+    mediana: mediana(montosMXN),
+    promedio: promedio(montosMXN),
+    min: montosMXN.length ? Math.min(...montosMXN) : 0,
+    max: montosMXN.length ? Math.max(...montosMXN) : 0,
+    count: montosMXN.length,
+  };
+}
+
+export type ResumenPromedioMediana = { promedio: number; mediana: number; count: number };
+
+/** De "cuánto pagó cada cliente en el rango", su promedio y su mediana --
+ * "cuánto deja un cliente". El promedio se infla con un cliente enorme;
+ * la mediana dice el caso típico. */
+export function calcularIngresoPorCliente(montosPorClienteMXN: number[]): ResumenPromedioMediana {
+  return {
+    promedio: promedio(montosPorClienteMXN),
+    mediana: mediana(montosPorClienteMXN),
+    count: montosPorClienteMXN.length,
+  };
+}
+
+export type Concentracion = { topPct: number; top3Pct: number; total: number };
+
+/** Qué tan concentrado está el ingreso del rango: % que viene del cliente
+ * más grande y de los 3 más grandes. Un topPct alto = mucha dependencia
+ * de un solo cliente (riesgo si ese cliente se va). */
+export function calcularConcentracion(montosPorClienteMXN: number[]): Concentracion {
+  const total = montosPorClienteMXN.reduce((acc, v) => acc + v, 0);
+  if (total <= 0) return { topPct: 0, top3Pct: 0, total: 0 };
+  const ordenados = [...montosPorClienteMXN].sort((a, b) => b - a);
+  const top = ordenados[0] ?? 0;
+  const top3 = ordenados.slice(0, 3).reduce((acc, v) => acc + v, 0);
+  return { topPct: (top / total) * 100, top3Pct: (top3 / total) * 100, total };
+}
+
+/** "Run rate": recaudado del rango dividido entre los meses que abarca
+ * (mínimo 1), para tener una cifra mensual comparable aunque el rango sea
+ * de 10 días o de 8 meses. */
+export function calcularIngresoMensualPromedio(totalMXN: number, desde: Date, hasta: Date): number {
+  const meses =
+    (hasta.getFullYear() - desde.getFullYear()) * 12 +
+    (hasta.getMonth() - desde.getMonth()) +
+    // fracción del mes en curso, para que "1–9 sep" no cuente como 0 meses
+    (hasta.getDate() - desde.getDate() + 1) / 30;
+  return totalMXN / Math.max(1, meses);
+}
+
+/** Margen: qué fracción de lo recaudado queda como utilidad después de
+ * los gastos de empresa. 0 si no se recaudó nada. */
+export function calcularMargen(recaudadoMXN: number, gastosEmpresaMXN: number): number {
+  if (recaudadoMXN <= 0) return 0;
+  return ((recaudadoMXN - gastosEmpresaMXN) / recaudadoMXN) * 100;
+}
+
+const CUBETAS_TICKET: { label: string; max: number }[] = [
+  { label: "< $5k", max: 5_000 },
+  { label: "$5k–15k", max: 15_000 },
+  { label: "$15k–30k", max: 30_000 },
+  { label: "$30k–60k", max: 60_000 },
+  { label: "> $60k", max: Infinity },
+];
+
+/** Histograma del tamaño de los servicios nuevos del rango -- para ver de
+ * un vistazo si son parejos o si hay de todo (lo que el promedio y la
+ * mediana solo resumen en un número). */
+export function bucketsTicket(montosMXN: number[]): { label: string; count: number }[] {
+  const conteo = CUBETAS_TICKET.map((c) => ({ label: c.label, count: 0 }));
+  for (const m of montosMXN) {
+    const idx = CUBETAS_TICKET.findIndex((c) => m < c.max);
+    conteo[idx === -1 ? conteo.length - 1 : idx].count++;
+  }
+  return conteo;
 }
 
 export type TasaConversion = { ganadas: number; total: number; pct: number };

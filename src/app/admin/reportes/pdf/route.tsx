@@ -14,8 +14,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
+  const compararRaw = searchParams.get("comparar");
+  const comparar =
+    compararRaw === "anterior" || compararRaw === "año" ? compararRaw : undefined;
 
-  const datos = await obtenerDatosReportes(desde, hasta);
+  const datos = await obtenerDatosReportes(desde, hasta, comparar);
 
   const buffer = await renderToBuffer(
     createElement(ReportesPdfDocument, { datos }) as ReactElement<DocumentProps>

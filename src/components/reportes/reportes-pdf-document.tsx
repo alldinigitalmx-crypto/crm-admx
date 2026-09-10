@@ -3,7 +3,8 @@ import path from "path";
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 
 import { businessInfo } from "@/lib/business-info";
-import type { ReporteData } from "@/lib/reportes-data";
+import { filasComparativa, etiquetaComparacion, type ReporteData } from "@/lib/reportes-data";
+import { calcularDelta } from "@/lib/reportes";
 
 const logoDataUri = `data:image/png;base64,${fs
   .readFileSync(path.join(process.cwd(), "public", "admx-logo-ink.png"))
@@ -77,6 +78,9 @@ const styles = StyleSheet.create({
   colPeriodo: { width: "34%" },
   colValorTrend: { width: "33%", textAlign: "right" },
 
+  colComparaMetrica: { width: "34%" },
+  colComparaValor: { width: "22%", textAlign: "right" },
+
   footer: { marginTop: 24, textAlign: "center", fontSize: 8, color: MUTED },
 });
 
@@ -141,6 +145,8 @@ export function ReportesPdfDocument({ datos }: { datos: ReporteData }) {
     timeZone: "UTC",
   }).format(new Date());
 
+  const filasComp = filasComparativa(datos);
+
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -199,6 +205,38 @@ export function ReportesPdfDocument({ datos }: { datos: ReporteData }) {
             <Text style={styles.kpiValue}>{datos.clientesNuevosCount}</Text>
           </View>
         </View>
+
+        {filasComp && datos.comparacion && (
+          <View wrap={false}>
+            <Text style={styles.sectionTitle}>
+              Comparativa vs. {etiquetaComparacion(datos.comparacion.modo)} (
+              {fechaCorta(datos.comparacion.desde)} — {fechaCorta(datos.comparacion.hasta)})
+            </Text>
+            <View style={styles.tableHeaderRow}>
+              <Text style={[styles.tableHeaderCell, styles.colComparaMetrica]}>Métrica</Text>
+              <Text style={[styles.tableHeaderCell, styles.colComparaValor]}>Actual</Text>
+              <Text style={[styles.tableHeaderCell, styles.colComparaValor]}>Antes</Text>
+              <Text style={[styles.tableHeaderCell, styles.colComparaValor]}>Variación</Text>
+            </View>
+            {filasComp.map((f) => {
+              const d = calcularDelta(f.actual, f.previo);
+              const fmt = (n: number) => (f.esDinero ? currency(n) : String(n));
+              const variacion = d.pct === null ? "nuevo" : `${d.pct > 0 ? "+" : ""}${d.pct.toFixed(1)}%`;
+              const color =
+                d.dir === "flat" ? MUTED : d.dir === f.buenoCuando ? GOOD : BAD;
+              return (
+                <View style={styles.tableRow} key={f.metrica}>
+                  <Text style={[styles.cellText, styles.colComparaMetrica]}>{f.metrica}</Text>
+                  <Text style={[styles.cellText, styles.colComparaValor]}>{fmt(f.actual)}</Text>
+                  <Text style={[styles.cellText, styles.colComparaValor, { color: MUTED }]}>
+                    {fmt(f.previo)}
+                  </Text>
+                  <Text style={[styles.cellText, styles.colComparaValor, { color }]}>{variacion}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         <Tabla titulo="Servicios por status" filas={datos.statusItems} vacio="Sin servicios en este rango." formatoValor="numero" />
         <Tabla titulo="Pagos por método" filas={datos.metodoItems} vacio="Sin pagos confirmados en este rango." />

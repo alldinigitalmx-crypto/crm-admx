@@ -77,7 +77,18 @@ function EtiquetaValor({
   );
 }
 
-export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
+export function RecaudadoGastosChart({
+  datos,
+  comparacionRecaudado,
+  comparacionLabel,
+}: {
+  datos: PuntoPeriodo[];
+  // "Recaudado" del periodo de comparación (mes/año anterior), alineado
+  // por posición con `datos`. Solo esta serie -- comparar también gastos
+  // amontonaría el gráfico.
+  comparacionRecaudado?: number[];
+  comparacionLabel?: string;
+}) {
   const gradientId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -123,6 +134,8 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   // comparar de un vistazo contra lo recaudado. Sin unificar: cada uno por
   // su lado, para no perder de vista qué es del negocio y qué es propio.
   const gastosCombinados = datos.map((d) => d.gastos + d.gastosPersonales);
+  const hayComparacion =
+    Array.isArray(comparacionRecaudado) && comparacionRecaudado.some((v) => v > 0);
 
   const W = width;
   const H = Math.min(H_MAX, Math.max(H_MIN, Math.round(W / ASPECT)));
@@ -135,7 +148,8 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
     1,
     ...datos.map((d, i) =>
       unificado ? Math.max(d.recaudado, gastosCombinados[i]) : Math.max(d.recaudado, d.gastos, d.gastosPersonales)
-    )
+    ),
+    ...(hayComparacion ? (comparacionRecaudado as number[]) : [])
   );
   // Redondea el techo del eje Y a un número "bonito" para que las líneas de
   // referencia no queden en valores arbitrarios como $17,342.
@@ -152,6 +166,15 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
   const puntosRecaudado = datos.map((d, i) => ({ x: x(i), y: y(d.recaudado) }));
   const puntosGastos = datos.map((d, i) => ({ x: x(i), y: y(unificado ? gastosCombinados[i] : d.gastos) }));
   const puntosGastosPersonales = datos.map((d, i) => ({ x: x(i), y: y(d.gastosPersonales) }));
+  const puntosComparacion = hayComparacion
+    ? datos
+        .map((_, i) => {
+          const v = comparacionRecaudado?.[i];
+          return typeof v === "number" ? { x: x(i), y: y(v) } : null;
+        })
+        .filter((p): p is Punto => p !== null)
+    : [];
+  const lineaComparacion = pathSuave(puntosComparacion);
   const lineaRecaudado = pathSuave(puntosRecaudado);
   const lineaGastos = pathSuave(puntosGastos);
   const lineaGastosPersonales = pathSuave(puntosGastosPersonales);
@@ -214,6 +237,14 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
             <span className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-full bg-violet-500 dark:bg-violet-400" />
               <span className="font-medium text-foreground">Gastos personales</span>
+            </span>
+          )}
+          {hayComparacion && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-0 w-4 border-t-2 border-dashed border-muted-foreground/60" />
+              <span className="font-medium text-foreground">
+                Recaudado ({comparacionLabel ?? "comparación"})
+              </span>
             </span>
           )}
         </div>
@@ -300,6 +331,18 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
           )}
 
           <path d={areaRecaudado} fill={`url(#${gradientId})`} stroke="none" />
+
+          {hayComparacion && (
+            <path
+              d={lineaComparacion}
+              fill="none"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="4 4"
+              className="stroke-muted-foreground/60"
+            />
+          )}
 
           {!unificado && hayGastosPersonales && (
             <path
@@ -419,6 +462,17 @@ export function RecaudadoGastosChart({ datos }: { datos: PuntoPeriodo[] }) {
               </span>
               <span className="tabular-nums font-medium">{formatCurrency(hovered.recaudado)}</span>
             </div>
+            {hayComparacion && hoverIndex !== null && typeof comparacionRecaudado?.[hoverIndex] === "number" && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <span className="h-0 w-2.5 border-t-2 border-dashed border-muted-foreground/60" />
+                  {comparacionLabel ?? "Comparación"}
+                </span>
+                <span className="tabular-nums font-medium">
+                  {formatCurrency(comparacionRecaudado[hoverIndex])}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-orange-500 dark:bg-orange-400" />

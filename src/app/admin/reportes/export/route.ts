@@ -1,6 +1,11 @@
 import { requiereAdmin } from "@/lib/alcance";
-import { obtenerDatosReportes } from "@/lib/reportes-data";
-import { buildMultiSheetExcelResponse } from "@/lib/excel";
+import {
+  obtenerDatosReportes,
+  filasComparativa,
+  etiquetaComparacion,
+} from "@/lib/reportes-data";
+import { buildMultiSheetExcelResponse, type ExcelSheet } from "@/lib/excel";
+import { calcularDelta } from "@/lib/reportes";
 
 // Un solo Excel con dos pestañas (Ingresos / Gastos) para el mismo rango
 // de fechas — antes eran dos descargas sueltas.
@@ -12,10 +17,39 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
+  const compararRaw = searchParams.get("comparar");
+  const comparar =
+    compararRaw === "anterior" || compararRaw === "año" ? compararRaw : undefined;
 
-  const datos = await obtenerDatosReportes(desde, hasta);
+  const datos = await obtenerDatosReportes(desde, hasta, comparar);
+
+  const filasComp = filasComparativa(datos);
+  const hojaComparativa: ExcelSheet[] =
+    filasComp && datos.comparacion
+      ? [
+          {
+            name: "Comparativa",
+            columns: [
+              { header: "Métrica", key: "metrica", width: 24 },
+              { header: "Actual", key: "actual", width: 16 },
+              { header: etiquetaComparacion(datos.comparacion.modo), key: "previo", width: 18 },
+              { header: "Variación %", key: "variacion", width: 14 },
+            ],
+            rows: filasComp.map((f) => {
+              const d = calcularDelta(f.actual, f.previo);
+              return {
+                metrica: f.metrica,
+                actual: f.actual,
+                previo: f.previo,
+                variacion: d.pct === null ? "nuevo" : `${d.pct > 0 ? "+" : ""}${d.pct.toFixed(1)}%`,
+              };
+            }),
+          },
+        ]
+      : [];
 
   return buildMultiSheetExcelResponse("reportes.xlsx", [
+    ...hojaComparativa,
     {
       name: "Ingresos",
       columns: [

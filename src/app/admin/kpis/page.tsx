@@ -1,6 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Ticket, Percent, Clock, Hammer, Repeat, Target } from "lucide-react";
+import {
+  Ticket,
+  Percent,
+  Clock,
+  Hammer,
+  Repeat,
+  Target,
+  Coins,
+  ChartPie,
+  CalendarClock,
+  PiggyBank,
+} from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
 import { prisma } from "@/lib/prisma";
@@ -8,11 +19,16 @@ import { hoyEnMexico } from "@/lib/fecha";
 import { construirRangoFecha, rangoEfectivo } from "@/lib/reportes";
 import { montoNetoEnMXN, montoEnMXN } from "@/lib/pago-monto";
 import {
-  calcularTicketTipico,
+  resumenTicket,
   calcularTasaConversion,
   calcularTiempoCierrePromedio,
   calcularTiempoDesarrolloPromedio,
   calcularClientesRecurrentes,
+  calcularIngresoPorCliente,
+  calcularConcentracion,
+  calcularIngresoMensualPromedio,
+  calcularMargen,
+  bucketsTicket,
   agruparIngresoPorOrigen,
   agruparTicketTipicoPorMes,
 } from "@/lib/kpis";
@@ -125,6 +141,7 @@ export default async function KpisPage({
     clientes,
     pagosConOrigen,
     prospectosActivos,
+    gastosEmpresaSum,
   ] = await Promise.all([
     prisma.servicio.findMany({
       where: whereServiciosNuevos,
@@ -158,7 +175,9 @@ export default async function KpisPage({
         montoMXN: true,
         comision: true,
         montoIncluyeComision: true,
-        servicio: { select: { cliente: { select: { medioCaptacion: true } } } },
+        // `id` del cliente para poder agrupar el ingreso por cliente
+        // (ingreso por cliente + concentración) sin una query aparte.
+        servicio: { select: { cliente: { select: { id: true, medioCaptacion: true } } } },
       },
     }),
     prisma.cliente.count({
@@ -170,6 +189,10 @@ export default async function KpisPage({
         ],
       },
     }),
+    prisma.gasto.aggregate({
+      _sum: { monto: true },
+      where: { ambito: "Empresa", ...(rango ? { fecha: rango } : {}) },
+    }),
   ]);
 
   // Ticket promedio usa siempre lo que de verdad se ha cobrado (suma de
@@ -180,13 +203,34 @@ export default async function KpisPage({
   const montoServicioAMXN = (s: { pagos: { monto: unknown; moneda: string | null; montoMXN: unknown }[] }) =>
     s.pagos.reduce((acc, p) => acc + montoEnMXN(p as Parameters<typeof montoEnMXN>[0]), 0);
 
-  const ticket = calcularTicketTipico(serviciosNuevos.map(montoServicioAMXN));
+  // Solo servicios que ya cobraron algo -- un servicio nuevo sin ningún
+  // pago todavía no es un "ticket" y metía $0 que bajaba artificialmente
+  // la mediana y el promedio.
+  const montosServiciosPagados = serviciosNuevos.map(montoServicioAMXN).filter((m) => m > 0);
+  const ticket = resumenTicket(montosServiciosPagados);
   const conversion = calcularTasaConversion(cotizacionesEmitidas.map((c) => c.status));
   const cierre = calcularTiempoCierrePromedio(cotizacionesCerradas);
   const desarrollo = calcularTiempoDesarrolloPromedio(
     serviciosEntregados.filter((s): s is { fechaInicio: Date; fechaFin: Date } => s.fechaFin !== null)
   );
   const recurrentes = calcularClientesRecurrentes(clientes.map((c) => c._count.servicios));
+
+  // Recaudado neto (MXN) del rango agrupado por cliente -- base para
+  // "ingreso por cliente" y "concentración".
+  const recaudadoPorCliente = new Map<number, number>();
+  for (const p of pagosConOrigen) {
+    const id = p.servicio.cliente.id;
+    recaudadoPorCliente.set(id, (recaudadoPorCliente.get(id) ?? 0) + montoNetoEnMXN(p));
+  }
+  const montosPorCliente = Array.from(recaudadoPorCliente.values());
+  const totalRecaudadoRango = montosPorCliente.reduce((acc, v) => acc + v, 0);
+  const gastosEmpresaRango = Number(gastosEmpresaSum._sum.monto ?? 0);
+
+  const ingresoPorCliente = calcularIngresoPorCliente(montosPorCliente);
+  const concentracion = calcularConcentracion(montosPorCliente);
+  const ingresoMensual = calcularIngresoMensualPromedio(totalRecaudadoRango, desdeEfectivo, hastaEfectivo);
+  const margen = calcularMargen(totalRecaudadoRango, gastosEmpresaRango);
+  const distribucionTicket = bucketsTicket(montosServiciosPagados);
 
   const ingresoPorOrigen = agruparIngresoPorOrigen(
     pagosConOrigen.map((p) => ({
@@ -195,7 +239,9 @@ export default async function KpisPage({
     }))
   );
   const ticketPorMes = agruparTicketTipicoPorMes(
-    serviciosNuevos.map((s) => ({ fecha: s.fechaInicio, montoMXN: montoServicioAMXN(s) })),
+    serviciosNuevos
+      .map((s) => ({ fecha: s.fechaInicio, montoMXN: montoServicioAMXN(s) }))
+      .filter((x) => x.montoMXN > 0),
     desdeEfectivo,
     hastaEfectivo
   );
@@ -217,6 +263,13 @@ export default async function KpisPage({
     label: m.label,
     valor: m.mediana,
     detalle: m.count > 0 ? `${m.count} servicio${m.count === 1 ? "" : "s"}` : "Sin servicios nuevos",
+    colorClass: "bg-primary",
+  }));
+
+  const distribucionItems: ItemBarra[] = distribucionTicket.map((b) => ({
+    label: b.label,
+    valor: b.count,
+    detalle: `${b.count} servicio${b.count === 1 ? "" : "s"}`,
     colorClass: "bg-primary",
   }));
 
@@ -296,8 +349,50 @@ export default async function KpisPage({
         <KpiCard
           title="Ticket típico"
           value={formatCurrency(ticket.mediana)}
-          sub={`Mediana de ${ticket.count} servicios nuevos — un contrato grande no la dispara`}
+          sub={
+            ticket.count > 0
+              ? `Mediana · promedio ${formatCurrency(ticket.promedio)} · de ${formatCurrency(
+                  ticket.min
+                )} a ${formatCurrency(ticket.max)} · ${ticket.count} servicio${
+                  ticket.count === 1 ? "" : "s"
+                } con pagos`
+              : "Sin servicios nuevos con pagos en el rango"
+          }
           icon={Ticket}
+        />
+        <KpiCard
+          title="Ingreso por cliente"
+          value={formatCurrency(ingresoPorCliente.promedio)}
+          sub={
+            ingresoPorCliente.count > 0
+              ? `Promedio · mediana ${formatCurrency(ingresoPorCliente.mediana)} · ${
+                  ingresoPorCliente.count
+                } cliente${ingresoPorCliente.count === 1 ? "" : "s"} pagaron`
+              : "Ningún cliente pagó en el rango"
+          }
+          icon={Coins}
+        />
+        <KpiCard
+          title="Concentración de clientes"
+          value={`${concentracion.topPct.toFixed(0)}%`}
+          sub={
+            concentracion.total > 0
+              ? `del ingreso viene de tu cliente más grande · top 3 = ${concentracion.top3Pct.toFixed(0)}%`
+              : "Sin ingreso en el rango"
+          }
+          icon={ChartPie}
+        />
+        <KpiCard
+          title="Ingreso mensual promedio"
+          value={formatCurrency(ingresoMensual)}
+          sub="Recaudado ÷ meses del rango (run rate)"
+          icon={CalendarClock}
+        />
+        <KpiCard
+          title="Margen de utilidad"
+          value={`${margen.toFixed(0)}%`}
+          sub="Utilidad neta ÷ recaudado (solo empresa)"
+          icon={PiggyBank}
         />
         <KpiCard
           title="Tasa de conversión"
@@ -370,6 +465,23 @@ export default async function KpisPage({
           </CardHeader>
           <CardContent>
             <DesgloseBarras items={ticketMesItems} vacio="No hay servicios nuevos en este rango." />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Distribución de tickets</CardTitle>
+            <CardDescription className="text-xs">
+              Cuántos servicios nuevos del rango cayeron en cada rango de tamaño — para ver si
+              son parejos o hay de todo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DesgloseBarras
+              items={distribucionItems}
+              formato="numero"
+              vacio="No hay servicios nuevos en este rango."
+            />
           </CardContent>
         </Card>
       </div>

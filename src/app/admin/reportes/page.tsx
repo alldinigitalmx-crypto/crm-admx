@@ -10,11 +10,15 @@ import {
   Download,
   FileDown,
   User,
+  ArrowUp,
+  ArrowDown,
+  Minus,
 } from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { obtenerDatosReportes } from "@/lib/reportes-data";
+import { calcularDelta, type Delta, type ModoComparacion } from "@/lib/reportes";
 import { hoyEnMexico } from "@/lib/fecha";
 import { DetalleDialog } from "@/components/reportes/detalle-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +85,37 @@ function isoDate(d: Date) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
+// Línea de variación vs. el periodo de comparación. Verde cuando el
+// cambio va en la dirección buena de ESA métrica (para gastos, bajar es
+// bueno), rojo cuando no, gris cuando prácticamente no se movió.
+function DeltaLinea({
+  delta,
+  previo,
+  buenoCuando,
+}: {
+  delta: Delta;
+  previo: string;
+  buenoCuando: "up" | "down";
+}) {
+  const bueno = delta.dir === "flat" || delta.dir === buenoCuando;
+  const color =
+    delta.dir === "flat" ? "text-muted-foreground" : bueno ? "text-success" : "text-destructive";
+  const Icono = delta.dir === "up" ? ArrowUp : delta.dir === "down" ? ArrowDown : Minus;
+  const texto =
+    delta.pct === null
+      ? delta.dir === "flat"
+        ? "igual"
+        : "nuevo"
+      : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(1)}%`;
+  return (
+    <p className={`flex items-center gap-1 truncate text-xs ${color}`}>
+      <Icono className="size-3 shrink-0" />
+      <span className="font-medium">{texto}</span>
+      <span className="truncate text-muted-foreground">· {previo} antes</span>
+    </p>
+  );
+}
+
 function KpiCard({
   title,
   value,
@@ -88,6 +123,7 @@ function KpiCard({
   tone = "default",
   sub,
   detalle,
+  delta,
 }: {
   title: string;
   value: string;
@@ -100,6 +136,7 @@ function KpiCard({
   // registros exactos. Se omite en tarjetas sin una lista propia detrás
   // (ej. Utilidad neta, que es una resta, no un conjunto de registros).
   detalle?: { tipo: string; exportHref: string; rangoQS: string };
+  delta?: { delta: Delta; previo: string; buenoCuando: "up" | "down" };
 }) {
   const toneClass =
     tone === "good"
@@ -117,7 +154,11 @@ function KpiCard({
           <div className="min-w-0">
             <p className="truncate text-xs text-muted-foreground">{title}</p>
             <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
-            {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+            {delta ? (
+              <DeltaLinea delta={delta.delta} previo={delta.previo} buenoCuando={delta.buenoCuando} />
+            ) : (
+              sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>
+            )}
           </div>
         </div>
         {detalle && (
@@ -136,11 +177,13 @@ function KpiCard({
 export default async function ReportesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string; hasta?: string; todo?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; todo?: string; comparar?: string }>;
 }) {
   if (!(await requiereAdmin())) redirect("/admin");
 
-  const { desde, hasta, todo } = await searchParams;
+  const { desde, hasta, todo, comparar: compararRaw } = await searchParams;
+  const comparar: ModoComparacion | undefined =
+    compararRaw === "anterior" || compararRaw === "año" ? compararRaw : undefined;
 
   // Sin filtro en la URL, antes se veía "Todo" por default -- ahora se
   // manda derecho a "Este mes" (el caso que de verdad se usa a diario).
@@ -156,7 +199,11 @@ export default async function ReportesPage({
     );
   }
 
-  const datos = await obtenerDatosReportes(todo === "1" ? undefined : desde, todo === "1" ? undefined : hasta);
+  const datos = await obtenerDatosReportes(
+    todo === "1" ? undefined : desde,
+    todo === "1" ? undefined : hasta,
+    comparar
+  );
   const {
     desdeEfectivo,
     hastaEfectivo,
@@ -178,7 +225,23 @@ export default async function ReportesPage({
     gastosPersonalesItems: gastosPersonalesFilas,
     topClientes,
     pendientePorRecibir,
+    comparacion,
   } = datos;
+
+  // Helper: arma el `delta` que espera KpiCard a partir del bloque de
+  // comparación (si no hay comparación activa, devuelve undefined y la
+  // tarjeta se ve igual que siempre).
+  function deltaDe(
+    actual: number,
+    previo: number | undefined,
+    buenoCuando: "up" | "down",
+    formato: (n: number) => string = formatCurrency
+  ) {
+    if (comparacion === undefined || previo === undefined) return undefined;
+    return { delta: calcularDelta(actual, previo), previo: formato(previo), buenoCuando };
+  }
+  const comparaLabel =
+    comparacion?.modo === "año" ? "año pasado" : comparacion ? "periodo anterior" : "";
 
   const statusItems: ItemBarra[] = statusFilas.map((f) => ({
     label: f.label,
@@ -238,7 +301,26 @@ export default async function ReportesPage({
     if (desde) exportParams.set("desde", desde);
     if (hasta) exportParams.set("hasta", hasta);
   }
+  if (comparar) exportParams.set("comparar", comparar);
   const exportQuery = exportParams.toString();
+
+  // Arma un href a /admin/reportes conservando el rango actual y
+  // cambiando solo `comparar` (o quitándolo para "Sin comparar").
+  function hrefComparar(modo: ModoComparacion | null) {
+    const p = new URLSearchParams();
+    if (todo === "1") p.set("todo", "1");
+    else {
+      if (desde) p.set("desde", desde);
+      if (hasta) p.set("hasta", hasta);
+    }
+    if (modo) p.set("comparar", modo);
+    return `/admin/reportes?${p}`;
+  }
+  const opcionesComparar: { label: string; modo: ModoComparacion | null }[] = [
+    { label: "Sin comparar", modo: null },
+    { label: "Periodo anterior", modo: "anterior" },
+    { label: "Año pasado", modo: "año" },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -279,6 +361,7 @@ export default async function ReportesPage({
                 if (p.desde) params.set("desde", p.desde);
                 if (p.hasta) params.set("hasta", p.hasta);
               }
+              if (comparar) params.set("comparar", comparar);
               const href = `/admin/reportes?${params}`;
               const activo = presetActivo?.label === p.label;
               return (
@@ -288,7 +371,26 @@ export default async function ReportesPage({
               );
             })}
           </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">Comparar con</span>
+            <div className="flex flex-wrap gap-2">
+              {opcionesComparar.map((o) => {
+                const activo = (comparar ?? null) === o.modo;
+                return (
+                  <Button
+                    key={o.label}
+                    asChild
+                    size="sm"
+                    variant={activo ? "default" : "outline"}
+                  >
+                    <Link href={hrefComparar(o.modo)}>{o.label}</Link>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
           <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            {comparar && <input type="hidden" name="comparar" value={comparar} />}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="desde" className="text-xs text-muted-foreground">
                 Desde
@@ -313,82 +415,100 @@ export default async function ReportesPage({
         // entrado sin filtro/con "Todo") -- así "Ver detalles" siempre
         // trae exactamente lo que la tarjeta contó, ni un registro de más.
         const rangoQS = `desde=${isoDate(desdeEfectivo)}&hasta=${isoDate(hastaEfectivo)}`;
+        const cuenta = (n: number) => String(n);
         return (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-            <KpiCard
-              title="Total recaudado"
-              value={formatCurrency(totalRecaudado)}
-              icon={TrendingUp}
-              tone="good"
-              sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`}
-              detalle={{
-                tipo: "pagos",
-                rangoQS,
-                exportHref: `/admin/pagos/export?confirmado=true&${rangoQS}`,
-              }}
-            />
-            <KpiCard
-              title="Gastos (empresa)"
-              value={formatCurrency(totalGastos)}
-              icon={TrendingDown}
-              tone="bad"
-              sub={`${gastosCount} movimientos`}
-              detalle={{
-                tipo: "gastos-empresa",
-                rangoQS,
-                exportHref: `/admin/gastos/export?ambito=Empresa&${rangoQS}`,
-              }}
-            />
-            <KpiCard
-              title="Utilidad neta"
-              value={formatCurrency(utilidadNeta)}
-              icon={Wallet}
-              tone={utilidadNeta >= 0 ? "good" : "bad"}
-              sub="Recaudado − gastos (solo empresa)"
-            />
-            <KpiCard
-              title="Gastos personales"
-              value={formatCurrency(totalGastosPersonales)}
-              icon={User}
-              sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
-              detalle={{
-                tipo: "gastos-personal",
-                rangoQS,
-                exportHref: `/admin/gastos/export?ambito=Personal&${rangoQS}`,
-              }}
-            />
-            <KpiCard
-              title="Servicios entregados"
-              value={String(serviciosEntregadosCount)}
-              icon={CheckCircle2}
-              sub="Por fecha de fin"
-              detalle={{
-                tipo: "servicios-entregados",
-                rangoQS,
-                exportHref: `/admin/servicios/export?status=Entregado&${rangoQS}`,
-              }}
-            />
-            <KpiCard
-              title="Servicios nuevos"
-              value={String(serviciosNuevosCount)}
-              icon={Briefcase}
-              sub="Por fecha de inicio"
-              detalle={{
-                tipo: "servicios-nuevos",
-                rangoQS,
-                exportHref: `/admin/servicios/export?${rangoQS}`,
-              }}
-            />
-            <KpiCard
-              title="Clientes nuevos"
-              value={String(clientesNuevosCount)}
-              icon={Users}
-              detalle={{
-                tipo: "clientes-nuevos",
-                rangoQS,
-                exportHref: `/admin/clientes/export?${rangoQS}`,
-              }}
-            />
+          <div className="flex flex-col gap-3">
+            {comparacion && (
+              <p className="text-xs text-muted-foreground">
+                Comparando contra el {comparaLabel}:{" "}
+                <span className="font-medium text-foreground">
+                  {formatDate(comparacion.desde)} — {formatDate(comparacion.hasta)}
+                </span>
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+              <KpiCard
+                title="Total recaudado"
+                value={formatCurrency(totalRecaudado)}
+                icon={TrendingUp}
+                tone="good"
+                sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`}
+                delta={deltaDe(totalRecaudado, comparacion?.totalRecaudado, "up")}
+                detalle={{
+                  tipo: "pagos",
+                  rangoQS,
+                  exportHref: `/admin/pagos/export?confirmado=true&${rangoQS}`,
+                }}
+              />
+              <KpiCard
+                title="Gastos (empresa)"
+                value={formatCurrency(totalGastos)}
+                icon={TrendingDown}
+                tone="bad"
+                sub={`${gastosCount} movimientos`}
+                delta={deltaDe(totalGastos, comparacion?.totalGastos, "down")}
+                detalle={{
+                  tipo: "gastos-empresa",
+                  rangoQS,
+                  exportHref: `/admin/gastos/export?ambito=Empresa&${rangoQS}`,
+                }}
+              />
+              <KpiCard
+                title="Utilidad neta"
+                value={formatCurrency(utilidadNeta)}
+                icon={Wallet}
+                tone={utilidadNeta >= 0 ? "good" : "bad"}
+                sub="Recaudado − gastos (solo empresa)"
+                delta={deltaDe(utilidadNeta, comparacion?.utilidadNeta, "up")}
+              />
+              <KpiCard
+                title="Gastos personales"
+                value={formatCurrency(totalGastosPersonales)}
+                icon={User}
+                sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
+                delta={deltaDe(totalGastosPersonales, comparacion?.totalGastosPersonales, "down")}
+                detalle={{
+                  tipo: "gastos-personal",
+                  rangoQS,
+                  exportHref: `/admin/gastos/export?ambito=Personal&${rangoQS}`,
+                }}
+              />
+              <KpiCard
+                title="Servicios entregados"
+                value={String(serviciosEntregadosCount)}
+                icon={CheckCircle2}
+                sub="Por fecha de fin"
+                delta={deltaDe(serviciosEntregadosCount, comparacion?.serviciosEntregadosCount, "up", cuenta)}
+                detalle={{
+                  tipo: "servicios-entregados",
+                  rangoQS,
+                  exportHref: `/admin/servicios/export?status=Entregado&${rangoQS}`,
+                }}
+              />
+              <KpiCard
+                title="Servicios nuevos"
+                value={String(serviciosNuevosCount)}
+                icon={Briefcase}
+                sub="Por fecha de inicio"
+                delta={deltaDe(serviciosNuevosCount, comparacion?.serviciosNuevosCount, "up", cuenta)}
+                detalle={{
+                  tipo: "servicios-nuevos",
+                  rangoQS,
+                  exportHref: `/admin/servicios/export?${rangoQS}`,
+                }}
+              />
+              <KpiCard
+                title="Clientes nuevos"
+                value={String(clientesNuevosCount)}
+                icon={Users}
+                delta={deltaDe(clientesNuevosCount, comparacion?.clientesNuevosCount, "up", cuenta)}
+                detalle={{
+                  tipo: "clientes-nuevos",
+                  rangoQS,
+                  exportHref: `/admin/clientes/export?${rangoQS}`,
+                }}
+              />
+            </div>
           </div>
         );
       })()}
@@ -450,10 +570,15 @@ export default async function ReportesPage({
             {granularidadPeriodo === "mes"
               ? "Un punto por mes — así se ve la tendencia de meses anteriores."
               : "Un punto por día."}
+            {comparacion && ` Línea punteada: recaudado del ${comparaLabel}.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RecaudadoGastosChart datos={puntosPeriodo} />
+          <RecaudadoGastosChart
+            datos={puntosPeriodo}
+            comparacionRecaudado={comparacion?.recaudadoPorPeriodo}
+            comparacionLabel={comparaLabel || undefined}
+          />
         </CardContent>
       </Card>
 

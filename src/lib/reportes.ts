@@ -31,6 +31,43 @@ export function rangoEfectivo(
   return { desde: desdeDate, hasta: hastaDate };
 }
 
+export type ModoComparacion = "anterior" | "año";
+
+/** Rango contra el cual comparar el periodo que se está viendo.
+ * - "anterior": una ventana del mismo largo que termina justo antes de
+ *   `desde` (así "Este mes" 1–9 sep se compara contra 1–9 ago, mismo
+ *   número de días, no todo agosto).
+ * - "año": las mismas fechas de calendario un año atrás. */
+export function rangoComparacion(
+  desde: Date,
+  hasta: Date,
+  modo: ModoComparacion
+): { desde: Date; hasta: Date } {
+  if (modo === "año") {
+    const d = new Date(desde);
+    d.setFullYear(d.getFullYear() - 1);
+    const h = new Date(hasta);
+    h.setFullYear(h.getFullYear() - 1);
+    return { desde: d, hasta: h };
+  }
+  const compHasta = new Date(desde.getTime() - 1);
+  const compDesde = new Date(compHasta.getTime() - (hasta.getTime() - desde.getTime()));
+  return { desde: compDesde, hasta: compHasta };
+}
+
+export type Delta = { pct: number | null; dir: "up" | "down" | "flat" };
+
+/** Variación de `actual` respecto de `previo`. `pct` es null cuando no
+ * había nada antes (no se puede sacar un % desde cero — la UI lo muestra
+ * como "nuevo"). El denominador usa el valor absoluto para que una
+ * utilidad que pasa de -100 a -20 se lea como mejora ("up"). */
+export function calcularDelta(actual: number, previo: number): Delta {
+  const diff = actual - previo;
+  const dir = Math.abs(diff) < 0.005 ? "flat" : diff > 0 ? "up" : "down";
+  const pct = previo === 0 ? null : (diff / Math.abs(previo)) * 100;
+  return { pct, dir };
+}
+
 export type PuntoPeriodo = {
   key: string;
   label: string;
