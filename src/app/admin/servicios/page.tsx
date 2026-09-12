@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Plus, ChevronRight, Download, FileText } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { montoTotalServicio } from "@/lib/servicio";
+import { montoTotalServicio, montoPendienteServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
@@ -91,7 +91,14 @@ export default async function ServiciosPage({
     prisma.servicio.count({ where }),
     prisma.servicio.findMany({
       where,
-      include: { cliente: true, intermediario: true, ordenesCambio: true },
+      include: {
+        cliente: true,
+        intermediario: true,
+        ordenesCambio: true,
+        // Solo lo necesario para calcular el pendiente por pagar de cada
+        // fila (ver montoPendienteServicio) -- nada de detalle del pago.
+        pagos: { select: { monto: true, confirmado: true, moneda: true } },
+      },
       orderBy: { creadoEn: "desc" },
       skip: paginationSkip(page),
       take: PAGE_SIZE,
@@ -232,18 +239,20 @@ export default async function ServiciosPage({
               <Table className="hidden table-fixed md:table">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-4/12">Descripción</TableHead>
+                    <TableHead className="w-3/12">Descripción</TableHead>
                     <TableHead className="w-2/12">Cliente</TableHead>
                     <TableHead className="w-2/12">Status</TableHead>
                     <TableHead className="w-2/12">Intermediario</TableHead>
                     <TableHead className="w-1/12">Inicio</TableHead>
                     <TableHead className="w-1/12 text-right">Monto</TableHead>
+                    <TableHead className="w-1/12 text-right">Pendiente</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {servicios.map((s) => {
                     const Icono = STATUS_ICON[s.status] ?? FileText;
+                    const pendiente = montoPendienteServicio(s, s.pagos);
                     return (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
@@ -276,6 +285,11 @@ export default async function ServiciosPage({
                       <TableCell className="text-right">
                         {formatCurrency(montoTotalServicio(s), s.moneda)}
                       </TableCell>
+                      <TableCell
+                        className={`text-right ${pendiente > 0.01 ? "font-medium text-destructive" : "text-success"}`}
+                      >
+                        {pendiente > 0.01 ? formatCurrency(pendiente, s.moneda) : "Liquidado"}
+                      </TableCell>
                       <TableCell>
                         <Link
                           href={`/admin/servicios/${s.id}`}
@@ -294,6 +308,7 @@ export default async function ServiciosPage({
               <div className="flex flex-col gap-2 md:hidden">
                 {servicios.map((s) => {
                   const Icono = STATUS_ICON[s.status] ?? FileText;
+                  const pendiente = montoPendienteServicio(s, s.pagos);
                   return (
                     <MobileRecordCard
                       key={s.id}
@@ -302,7 +317,9 @@ export default async function ServiciosPage({
                       avatarClassName={STATUS_COLOR[s.status]}
                       title={s.descripcion}
                       subtitle={s.cliente.nombre}
-                      meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s), s.moneda)}`}
+                      meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s), s.moneda)} · ${
+                        pendiente > 0.01 ? `pendiente ${formatCurrency(pendiente, s.moneda)}` : "liquidado"
+                      }`}
                       badge={
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLOR[s.status]}`}

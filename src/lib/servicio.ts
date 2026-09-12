@@ -25,11 +25,21 @@ export function montoPendienteServicio(
   servicio: ServicioConOrdenes & { moneda?: string | null },
   pagos: PagoParaMonto[]
 ): number {
+  return Math.max(montoTotalServicio(servicio) - montoPagadoServicio(servicio, pagos), 0);
+}
+
+// Cuánto se ha cobrado ya de este servicio -- mismo criterio de moneda
+// que montoPendienteServicio (un pago en otra moneda no cuenta aquí). Sin
+// el Math.max de arriba a propósito: si el cliente pagó de más, aquí sí
+// se ve el número real pagado, no uno recortado al total.
+export function montoPagadoServicio(
+  servicio: { moneda?: string | null },
+  pagos: PagoParaMonto[]
+): number {
   const monedaServicio = servicio.moneda ?? "MXN";
-  const pagado = pagos
+  return pagos
     .filter((p) => p.confirmado && (p.moneda ?? "MXN") === monedaServicio)
     .reduce((acc, p) => acc + Number(p.monto), 0);
-  return Math.max(montoTotalServicio(servicio) - pagado, 0);
 }
 
 export function comisionIntermediario(

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { montoTotalServicio, comisionIntermediario } from "@/lib/servicio";
+import { montoTotalServicio, montoPagadoServicio, montoPendienteServicio, comisionIntermediario } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
@@ -57,12 +57,24 @@ import {
   PENDIENTE_COLOR,
 } from "@/lib/status-colors";
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({
+  label,
+  value,
+  tone = "default",
+  sub,
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "good" | "bad";
+  sub?: string;
+}) {
+  const toneClass = tone === "good" ? "text-success" : tone === "bad" ? "text-destructive" : "";
   return (
     <Card>
       <CardContent className="py-2">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-semibold">{value}</p>
+        <p className={`text-xl font-semibold ${toneClass}`}>{value}</p>
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   );
@@ -125,6 +137,8 @@ export default async function ServicioDetallePage({
   const montoTotal = montoTotalServicio(servicio);
   const ordenesAprobadasMonto = montoTotal - Number(servicio.montoInicial);
   const comision = comisionIntermediario(montoTotal, servicio.porcentajeIntermediario);
+  const montoPagado = montoPagadoServicio(servicio, servicio.pagos);
+  const montoPendiente = montoPendienteServicio(servicio, servicio.pagos);
 
   const boundUpdateServicio = updateServicio.bind(null, servicio.id);
   const boundCreateOrdenCambio = createOrdenCambio.bind(null, servicio.id);
@@ -205,10 +219,16 @@ export default async function ServicioDetallePage({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Kpi label="Monto inicial" value={formatCurrency(servicio.montoInicial, servicio.moneda)} />
         <Kpi label="Órdenes aprobadas" value={formatCurrency(ordenesAprobadasMonto, servicio.moneda)} />
         <Kpi label="Monto total" value={formatCurrency(montoTotal, servicio.moneda)} />
+        <Kpi label="Pagado" value={formatCurrency(montoPagado, servicio.moneda)} tone="good" />
+        <Kpi
+          label="Pendiente por pagar"
+          value={montoPendiente > 0.01 ? formatCurrency(montoPendiente, servicio.moneda) : "Liquidado"}
+          tone={montoPendiente > 0.01 ? "bad" : "good"}
+        />
         <Kpi
           label="Comisión intermediario"
           value={servicio.intermediario ? formatCurrency(comision, servicio.moneda) : "—"}
