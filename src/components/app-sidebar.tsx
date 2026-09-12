@@ -21,6 +21,7 @@ import {
   PiggyBank,
   BarChart3,
   Gauge,
+  LineChart,
   LogOut,
 } from "lucide-react";
 
@@ -68,6 +69,15 @@ const navPrincipal = [
     modulo: null,
     grupo: "general",
     // Mismo criterio que Reportes: solo el dueño.
+    soloAdmin: true,
+  },
+  {
+    title: "Proyección",
+    href: "/admin/proyeccion",
+    icon: LineChart,
+    modulo: null,
+    grupo: "general",
+    // Mismo criterio que Reportes/KPIs: solo el dueño.
     soloAdmin: true,
   },
   { title: "Clientes", href: "/admin/clientes", icon: Users, modulo: "Clientes", grupo: "operacion" },
