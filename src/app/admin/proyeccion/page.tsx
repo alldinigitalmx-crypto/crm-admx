@@ -6,7 +6,7 @@ import { requiereAdmin } from "@/lib/alcance";
 import { prisma } from "@/lib/prisma";
 import { hoyEnMexico } from "@/lib/fecha";
 import { montoNetoEnMXN } from "@/lib/pago-monto";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import {
   minimosCuadrados,
   proyectar,
@@ -16,50 +16,63 @@ import {
 import { ProyeccionChart, type PuntoProyeccion } from "@/components/proyeccion/proyeccion-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const HORIZONTE_MESES = 3;
-type Base = "todo" | "12" | "6";
+
+function isoDate(d: Date) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
 
 export default async function ProyeccionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ base?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; todo?: string }>;
 }) {
   if (!(await requiereAdmin())) redirect("/admin");
 
-  const { base: baseRaw } = await searchParams;
-  const base: Base = baseRaw === "12" || baseRaw === "6" ? baseRaw : "todo";
+  const { desde: desdeParam, hasta: hastaParam, todo } = await searchParams;
+  const usaTodo = todo === "1" || (!desdeParam && !hastaParam);
 
   const hoy = hoyEnMexico();
+  const hoyIso = isoDate(hoy);
   const inicioMesActual = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
 
   const [minPago] = await Promise.all([prisma.pago.aggregate({ _min: { fecha: true } })]);
   const primerPago = minPago._min.fecha;
+  const primerPagoMes = primerPago
+    ? new Date(Date.UTC(primerPago.getUTCFullYear(), primerPago.getUTCMonth(), 1))
+    : inicioMesActual;
 
-  let desde: Date;
-  if (base === "todo") {
-    desde = primerPago
-      ? new Date(Date.UTC(primerPago.getUTCFullYear(), primerPago.getUTCMonth(), 1))
+  // Rango efectivo: "Todo" usa desde el primer pago; un rango personalizado
+  // (desde/hasta en la URL, vengan de un preset o del formulario) usa
+  // exactamente lo que se pidió -- "hasta" puede quedar en el pasado si se
+  // quiere ver la tendencia de un tramo ya cerrado, no solo hasta hoy.
+  const desde = usaTodo
+    ? primerPagoMes
+    : desdeParam
+      ? new Date(`${desdeParam}T00:00:00`)
+      : primerPagoMes;
+  const hasta = usaTodo
+    ? inicioMesActual
+    : hastaParam
+      ? new Date(`${hastaParam}T00:00:00`)
       : inicioMesActual;
-  } else {
-    const meses = Number(base);
-    desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - (meses - 1), 1));
-  }
 
   const pagos = await prisma.pago.findMany({
-    where: { confirmado: true, fecha: { gte: desde } },
+    where: { confirmado: true, fecha: { gte: desde, lte: new Date(hasta.getTime() + 31 * 86_400_000) } },
     select: { fecha: true, monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
   });
 
   const puntosMensuales = agruparRecaudadoMensual(
     pagos.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
     desde,
-    inicioMesActual
+    hasta
   );
 
   const regresion = minimosCuadrados(puntosMensuales.map((p, i) => ({ x: i, y: p.recaudado })));
 
-  const ultimo = puntosMensuales[puntosMensuales.length - 1] ?? { anio: hoy.getUTCFullYear(), mes: hoy.getUTCMonth() };
+  const ultimo = puntosMensuales[puntosMensuales.length - 1] ?? { anio: hasta.getUTCFullYear(), mes: hasta.getUTCMonth() };
   const proyeccionMeses: PuntoProyeccion[] = [
     ...puntosMensuales.map((p, i) => ({
       key: p.key,
@@ -91,11 +104,21 @@ export default async function ProyeccionPage({
 
   const confiable = regresion.r2 >= 0.3 && regresion.n >= 3;
 
-  const presets: { label: string; base: Base }[] = [
-    { label: "Todo el histórico", base: "todo" },
-    { label: "Últimos 12 meses", base: "12" },
-    { label: "Últimos 6 meses", base: "6" },
+  const hace6 = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 5, 1));
+  const hace12 = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 11, 1));
+  const hace24 = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 23, 1));
+  const inicioAno = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
+
+  const presets = [
+    { label: "Este año", desde: isoDate(inicioAno), hasta: hoyIso, todo: false },
+    { label: "Últimos 6 meses", desde: isoDate(hace6), hasta: hoyIso, todo: false },
+    { label: "Últimos 12 meses", desde: isoDate(hace12), hasta: hoyIso, todo: false },
+    { label: "Últimos 2 años", desde: isoDate(hace24), hasta: hoyIso, todo: false },
+    { label: "Todo el histórico", desde: undefined, hasta: undefined, todo: true },
   ];
+  const presetActivo = usaTodo
+    ? presets[4]
+    : (presets.find((p) => !p.todo && p.desde === desdeParam && p.hasta === hastaParam) ?? null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -104,6 +127,9 @@ export default async function ProyeccionPage({
         <p className="text-sm text-muted-foreground">
           Tendencia del recaudado neto mes a mes, calculada por mínimos cuadrados — para ver hacia dónde va el
           negocio, no solo dónde está hoy.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Base: {formatDate(desde)} — {formatDate(hasta)}
         </p>
       </div>
 
@@ -115,14 +141,40 @@ export default async function ProyeccionPage({
             refleja mejor cómo va el negocio ahora mismo.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
-            {presets.map((p) => (
-              <Button key={p.base} asChild size="sm" variant={base === p.base ? "default" : "outline"}>
-                <Link href={`/admin/proyeccion?base=${p.base}`}>{p.label}</Link>
-              </Button>
-            ))}
+            {presets.map((p) => {
+              const params = new URLSearchParams();
+              if (p.todo) params.set("todo", "1");
+              else {
+                if (p.desde) params.set("desde", p.desde);
+                if (p.hasta) params.set("hasta", p.hasta);
+              }
+              const activo = presetActivo?.label === p.label;
+              return (
+                <Button key={p.label} asChild size="sm" variant={activo ? "default" : "outline"}>
+                  <Link href={`/admin/proyeccion?${params}`}>{p.label}</Link>
+                </Button>
+              );
+            })}
           </div>
+          <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="desde" className="text-xs text-muted-foreground">
+                Desde
+              </label>
+              <Input id="desde" type="date" name="desde" defaultValue={desdeParam ?? ""} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="hasta" className="text-xs text-muted-foreground">
+                Hasta
+              </label>
+              <Input id="hasta" type="date" name="hasta" defaultValue={hastaParam ?? ""} />
+            </div>
+            <Button type="submit" className="self-end">
+              Filtrar
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
