@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { requiereNivel, requiereNivelServicio } from "@/lib/alcance";
 import { hoyEnMexico } from "@/lib/fecha";
-import { Prisma, type StatusServicio } from "@/generated/prisma/client";
+import { Prisma, type Moneda, type StatusServicio } from "@/generated/prisma/client";
 
 export type ServicioFormState = { error?: string } | undefined;
 export type OrdenCambioFormState = { error?: string; success?: boolean } | undefined;
@@ -28,6 +28,11 @@ function parseServicioForm(formData: FormData) {
   const intermediarioIdRaw = String(formData.get("intermediarioId") ?? "");
   const porcentajeRaw = String(formData.get("porcentajeIntermediario") ?? "");
   const responsableIdRaw = String(formData.get("responsableId") ?? "");
+  const monedaRaw = String(formData.get("moneda") ?? "");
+  const moneda = monedaRaw && monedaRaw !== "MXN" ? (monedaRaw as Moneda) : null;
+  // Igual que en Pagos: el campo ni se manda si moneda es MXN/nula
+  // (el formulario lo esconde), así que aquí se ignora lo que traiga.
+  const montoInicialMXNRaw = moneda ? String(formData.get("montoInicialMXN") ?? "") : "";
 
   const tieneIntermediario = intermediarioIdRaw && intermediarioIdRaw !== "none";
 
@@ -38,6 +43,8 @@ function parseServicioForm(formData: FormData) {
     fechaInicio: fechaInicioRaw ? new Date(fechaInicioRaw) : null,
     fechaFin: fechaFinRaw ? new Date(fechaFinRaw) : null,
     montoInicial: montoInicialRaw,
+    moneda,
+    montoInicialMXNRaw,
     status: statusRaw as StatusServicio,
     intermediarioId: tieneIntermediario ? Number(intermediarioIdRaw) : null,
     porcentajeIntermediario: tieneIntermediario && porcentajeRaw ? porcentajeRaw : null,
@@ -51,6 +58,12 @@ function validateServicioForm(data: ReturnType<typeof parseServicioForm>) {
   if (!data.fechaInicio) return "La fecha de inicio es obligatoria.";
   if (!data.montoInicial || Number.isNaN(Number(data.montoInicial)) || Number(data.montoInicial) < 0) {
     return "El monto inicial debe ser un número válido.";
+  }
+  if (
+    data.moneda &&
+    (!data.montoInicialMXNRaw || Number.isNaN(Number(data.montoInicialMXNRaw)) || Number(data.montoInicialMXNRaw) <= 0)
+  ) {
+    return "Captura el equivalente en pesos (MXN) de este servicio.";
   }
   return null;
 }
@@ -79,6 +92,8 @@ export async function createServicio(
         fechaInicio: data.fechaInicio!,
         fechaFin: data.fechaFin,
         montoInicial: data.montoInicial,
+        moneda: data.moneda,
+        montoInicialMXN: data.montoInicialMXNRaw || null,
         status: data.status,
         intermediarioId: data.intermediarioId,
         porcentajeIntermediario: data.porcentajeIntermediario,
@@ -125,6 +140,8 @@ export async function updateServicio(
         fechaInicio: data.fechaInicio!,
         fechaFin: data.fechaFin,
         montoInicial: data.montoInicial,
+        moneda: data.moneda,
+        montoInicialMXN: data.montoInicialMXNRaw || null,
         status: data.status,
         intermediarioId: data.intermediarioId,
         porcentajeIntermediario: data.porcentajeIntermediario,

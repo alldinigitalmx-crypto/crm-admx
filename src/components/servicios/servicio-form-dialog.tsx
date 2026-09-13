@@ -20,6 +20,8 @@ type ServicioDefaults = {
   fechaInicio: Date;
   fechaFin: Date | null;
   montoInicial: number | string | { toString(): string };
+  moneda: string | null;
+  montoInicialMXN: (number | string | { toString(): string }) | null;
   status: string;
   intermediarioId: number | null;
   porcentajeIntermediario: (number | string | { toString(): string }) | null;

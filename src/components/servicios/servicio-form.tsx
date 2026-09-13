@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
+import { Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -26,6 +28,8 @@ type ServicioDefaults = {
   fechaInicio: Date;
   fechaFin: Date | null;
   montoInicial: number | string | { toString(): string };
+  moneda: string | null;
+  montoInicialMXN: (number | string | { toString(): string }) | null;
   status: string;
   intermediarioId: number | null;
   porcentajeIntermediario: (number | string | { toString(): string }) | null;
@@ -74,6 +78,41 @@ export function ServicioForm({
   // useActionState de ClienteRapidoDialog pierde el estado justo después
   // de crear el cliente, antes de que el auto-select alcance a aplicarse.
   const crearClienteRapidoAction = useMemo(() => crearClienteRapido.bind(null, null), []);
+
+  // Mismo patrón que PagoForm: el servicio arranca en pesos salvo que ya
+  // viniera cotizado en otra moneda (al editar uno existente).
+  const [monedaEsExtranjera, setMonedaEsExtranjera] = useState(
+    Boolean(defaultValues?.moneda && defaultValues.moneda !== "MXN")
+  );
+  const [moneda, setMoneda] = useState(
+    defaultValues?.moneda && defaultValues.moneda !== "MXN" ? defaultValues.moneda : "USD"
+  );
+  const montoRef = useRef<HTMLInputElement>(null);
+  const montoMXNRef = useRef<HTMLInputElement>(null);
+  const [cargandoTipoCambio, setCargandoTipoCambio] = useState(false);
+  const [tipoCambioInfo, setTipoCambioInfo] = useState<{ rate: number; fecha: string | null } | null>(null);
+  const [tipoCambioError, setTipoCambioError] = useState<string | null>(null);
+
+  async function usarTipoCambioDeHoy() {
+    const montoActual = Number(montoRef.current?.value ?? "");
+    if (!montoActual || montoActual <= 0) {
+      setTipoCambioError("Captura primero el monto inicial.");
+      return;
+    }
+    setCargandoTipoCambio(true);
+    setTipoCambioError(null);
+    try {
+      const res = await fetch(`/api/tipo-cambio?from=${moneda}&monto=${montoActual}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "No se pudo obtener el tipo de cambio.");
+      if (montoMXNRef.current) montoMXNRef.current.value = Number(data.mxn).toFixed(2);
+      setTipoCambioInfo({ rate: data.rate, fecha: data.fecha });
+    } catch (err) {
+      setTipoCambioError(err instanceof Error ? err.message : "No se pudo obtener el tipo de cambio.");
+    } finally {
+      setCargandoTipoCambio(false);
+    }
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -177,6 +216,7 @@ export function ServicioForm({
           <Input
             id="montoInicial"
             name="montoInicial"
+            ref={montoRef}
             type="number"
             step="0.01"
             min="0"
@@ -186,6 +226,96 @@ export function ServicioForm({
             }
             placeholder="0.00"
           />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-input p-3 sm:col-span-2">
+          <input type="hidden" name="moneda" value={monedaEsExtranjera ? moneda : "MXN"} />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="monedaEsExtranjera"
+              checked={monedaEsExtranjera}
+              onCheckedChange={(v) => setMonedaEsExtranjera(v === true)}
+            />
+            <Label htmlFor="monedaEsExtranjera" className="font-normal">
+              Este servicio se cotizó en otra moneda (no pesos)
+            </Label>
+          </div>
+
+          {monedaEsExtranjera && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <Label htmlFor="monedaSelect">Moneda</Label>
+                <Select value={moneda} onValueChange={setMoneda}>
+                  <SelectTrigger id="monedaSelect" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="COP">COP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-2">
+                <Label htmlFor="montoInicialMXN">Equivalente en pesos (MXN) *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="montoInicialMXN"
+                    name="montoInicialMXN"
+                    ref={montoMXNRef}
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    defaultValue={
+                      defaultValues?.montoInicialMXN ? String(defaultValues.montoInicialMXN) : ""
+                    }
+                    placeholder="0.00"
+                    onChange={() => setTipoCambioInfo(null)}
+                  />
+                  {(moneda === "USD" || moneda === "EUR") && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Sugerir con el tipo de cambio de hoy"
+                      disabled={cargandoTipoCambio}
+                      onClick={usarTipoCambioDeHoy}
+                    >
+                      <Wand2 className={cargandoTipoCambio ? "animate-pulse" : undefined} />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground sm:col-span-2">
+                <p>
+                  El campo &quot;Monto inicial&quot; de arriba queda en {moneda}. Aquí captura el
+                  equivalente aproximado en pesos al momento de cotizar — es solo de referencia
+                  (no se recalcula solo con el tiempo, como el tipo de cambio real de cada pago).
+                </p>
+                {(moneda === "USD" || moneda === "EUR") && (
+                  <p className="mt-1">
+                    {tipoCambioError ? (
+                      <span className="text-destructive">{tipoCambioError}</span>
+                    ) : tipoCambioInfo ? (
+                      <>
+                        Sugerido con 1 {moneda} ≈ {tipoCambioInfo.rate.toFixed(2)} MXN (
+                        {tipoCambioInfo.fecha ?? "hoy"}) — ajústalo si cotizaste con otro tipo de
+                        cambio.
+                      </>
+                    ) : (
+                      <>
+                        Usa <Wand2 className="inline size-3" /> para partir del tipo de cambio de
+                        hoy y ajústalo si cotizaste distinto.
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

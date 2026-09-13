@@ -57,6 +57,11 @@ model Servicio {
   detalles                String?
   montoInicial            Decimal        @db.Decimal(12, 2)
   moneda                  Moneda?
+  // Equivalente aproximado en pesos de montoInicial cuando moneda no es
+  // MXN -- se captura a mano al cotizar (como el tipo de cambio del
+  // momento), igual que Pago.montoMXN. Es una referencia, no recalcula
+  // solo con el tiempo.
+  montoInicialMXN         Decimal?       @db.Decimal(12, 2)
   intermediarioId         Int?
   intermediario           Intermediario? @relation(fields: [intermediarioId], references: [id])
   porcentajeIntermediario Decimal?       @db.Decimal(5, 2)

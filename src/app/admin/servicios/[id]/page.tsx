@@ -204,6 +204,8 @@ export default async function ServicioDetallePage({
                 fechaInicio: servicio.fechaInicio,
                 fechaFin: servicio.fechaFin,
                 montoInicial: Number(servicio.montoInicial),
+                moneda: servicio.moneda,
+                montoInicialMXN: servicio.montoInicialMXN ? Number(servicio.montoInicialMXN) : null,
                 status: servicio.status,
                 intermediarioId: servicio.intermediarioId,
                 porcentajeIntermediario: servicio.porcentajeIntermediario
@@ -224,7 +226,15 @@ export default async function ServicioDetallePage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Kpi label="Monto inicial" value={formatCurrency(servicio.montoInicial, servicio.moneda)} />
+        <Kpi
+          label="Monto inicial"
+          value={formatCurrency(servicio.montoInicial, servicio.moneda)}
+          sub={
+            servicio.moneda && servicio.moneda !== "MXN" && servicio.montoInicialMXN
+              ? `≈ ${formatCurrency(servicio.montoInicialMXN)} MXN`
+              : undefined
+          }
+        />
         <Kpi label="Órdenes aprobadas" value={formatCurrency(ordenesAprobadasMonto, servicio.moneda)} />
         <Kpi label="Monto total" value={formatCurrency(montoTotal, servicio.moneda)} />
         <Kpi label="Pagado" value={formatCurrency(montoPagado, servicio.moneda)} tone="good" />
