@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { CheckCircle2, Circle, Film, ImageIcon } from "lucide-react";
+import { CheckCircle2, Circle, Film, ImageIcon, CircleCheck, Receipt } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/format";
-import { calcularAvance } from "@/lib/servicio";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { calcularAvance, montoTotalServicio, montoPagadoServicio, montoPendienteServicio } from "@/lib/servicio";
+import { METODO_LABEL } from "@/lib/metodo-pago";
 import { SERVICIO_STATUS_COLOR, PRIORIDAD_BAR } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,10 +42,31 @@ export default async function ServicioPublicoPage({
     include: {
       cliente: true,
       tareas: true,
+      ordenesCambio: { select: { status: true, monto: true } },
+      // Solo lo que le importa al cliente (fecha, método, cuánto pagó) --
+      // nada de comisión de pasarela, cuenta bancaria ni comprobantes
+      // internos. Y solo pagos ya confirmados: uno reportado pero sin
+      // confirmar todavía no cuenta como "ya pagaste esto".
+      pagos: {
+        where: { confirmado: true },
+        orderBy: { fecha: "desc" },
+        select: { fecha: true, monto: true, moneda: true, metodoPago: true, confirmado: true },
+      },
     },
   });
 
   if (!servicio) notFound();
+
+  const montoTotal = montoTotalServicio(servicio);
+  const montoPagado = montoPagadoServicio(servicio, servicio.pagos);
+  const montoPendiente = montoPendienteServicio(servicio, servicio.pagos);
+  const saldado = montoPendiente <= 0.01;
+  const avancePago = montoTotal > 0 ? Math.min(100, Math.round((montoPagado / montoTotal) * 100)) : 0;
+  // Mismo criterio de moneda que montoPagadoServicio -- si por algún
+  // motivo hubiera un pago confirmado en otra moneda, no se lista aquí
+  // para que la suma de la lista siempre cuadre con "Pagado" de arriba.
+  const monedaServicio = servicio.moneda ?? "MXN";
+  const pagosDelServicio = servicio.pagos.filter((p) => (p.moneda ?? "MXN") === monedaServicio);
 
   const evidencias = await prisma.archivo.findMany({
     where: { entidadTipo: "Servicio", entidadId: servicio.id },
@@ -114,6 +136,58 @@ export default async function ServicioPublicoPage({
                 <p className="font-medium">{formatDate(servicio.fechaFin)}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Estado de cuenta</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 text-sm">
+            {saldado ? (
+              <div className="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 text-success">
+                <CircleCheck className="size-5 shrink-0" />
+                <p className="font-medium">Servicio saldado — no debes nada de este proyecto.</p>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-muted-foreground">Pagado</span>
+                  <span className="font-semibold">
+                    {formatCurrency(montoPagado, servicio.moneda)} de {formatCurrency(montoTotal, servicio.moneda)}
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${avancePago}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Te falta por saldar:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(montoPendiente, servicio.moneda)}
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {pagosDelServicio.length > 0 && (
+              <div className={saldado ? undefined : "border-t border-input pt-4"}>
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Receipt className="size-3.5" /> Pagos registrados ({pagosDelServicio.length})
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {pagosDelServicio.map((p, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">
+                        {formatDate(p.fecha)} · {METODO_LABEL[p.metodoPago] ?? p.metodoPago}
+                      </span>
+                      <span className="shrink-0 font-medium tabular-nums">
+                        {formatCurrency(p.monto, p.moneda)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
 
