@@ -21,7 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
-import { createServicio } from "@/app/admin/servicios/actions";
+import { StatusQuickSelect } from "@/components/servicios/status-quick-select";
+import { createServicio, cambiarStatusServicio } from "@/app/admin/servicios/actions";
 import { Pagination } from "@/components/ui/pagination";
 import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
@@ -278,7 +279,11 @@ export default async function ServiciosPage({
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge className={STATUS_COLOR[s.status]}>{s.status}</Badge>
+                        {permisos.puedeEditar ? (
+                          <StatusQuickSelect servicioId={s.id} status={s.status} action={cambiarStatusServicio} />
+                        ) : (
+                          <Badge className={STATUS_COLOR[s.status]}>{s.status}</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="truncate">{s.intermediario?.nombre ?? "—"}</TableCell>
                       <TableCell className="truncate">{formatDate(s.fechaInicio)}</TableCell>

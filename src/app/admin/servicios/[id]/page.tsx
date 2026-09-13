@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { DeleteServicioButton } from "@/components/servicios/delete-servicio-button";
+import { StatusQuickSelect } from "@/components/servicios/status-quick-select";
 import { OrdenCambioFormDialog } from "@/components/servicios/orden-cambio-form-dialog";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
@@ -32,6 +33,7 @@ import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import {
   aprobarOrdenCambio,
+  cambiarStatusServicio,
   createOrdenCambio,
   eliminarEvidencia,
   eliminarServicio,
@@ -165,9 +167,11 @@ export default async function ServicioDetallePage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold">{servicio.descripcion}</h1>
-            <Badge className={SERVICIO_STATUS_COLOR[servicio.status]}>
-              {servicio.status}
-            </Badge>
+            {permisos.puedeEditar ? (
+              <StatusQuickSelect servicioId={servicio.id} status={servicio.status} action={cambiarStatusServicio} />
+            ) : (
+              <Badge className={SERVICIO_STATUS_COLOR[servicio.status]}>{servicio.status}</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Cliente:{" "}

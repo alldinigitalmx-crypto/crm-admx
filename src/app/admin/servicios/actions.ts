@@ -6,6 +6,7 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { requiereNivel, requiereNivelServicio } from "@/lib/alcance";
+import { hoyEnMexico } from "@/lib/fecha";
 import { Prisma, type StatusServicio } from "@/generated/prisma/client";
 
 export type ServicioFormState = { error?: string } | undefined;
@@ -196,6 +197,37 @@ export async function rechazarOrdenCambio(ordenId: number, servicioId: number) {
 
   revalidatePath(`/admin/servicios/${servicioId}`);
   revalidatePath("/admin");
+}
+
+// Cambio de estatus sin pasar por el formulario completo -- para el
+// selector rápido de la lista y del detalle (ver StatusQuickSelect).
+export async function cambiarStatusServicio(id: number, nuevoStatus: StatusServicio) {
+  if (!(await requiereNivelServicio(id, "Editar"))) return;
+
+  const servicio = await prisma.servicio.findUnique({ where: { id }, select: { fechaFin: true } });
+  if (!servicio) return;
+
+  const userId = await currentUserId();
+
+  await prisma.servicio.update({
+    where: { id },
+    data: {
+      status: nuevoStatus,
+      // Reportes/KPIs cuentan "Servicios entregados" por fechaFin, no por
+      // status a secas -- si se marca Entregado desde aquí (el atajo
+      // rápido) y todavía no tiene fecha de fin, se rellena con hoy para
+      // que sí cuente en el mes correcto, en vez de quedar invisible
+      // hasta que alguien la ponga a mano desde Editar.
+      ...(nuevoStatus === "Entregado" && !servicio.fechaFin ? { fechaFin: hoyEnMexico() } : {}),
+      editadoPorId: userId,
+    },
+  });
+
+  revalidatePath("/admin/servicios");
+  revalidatePath(`/admin/servicios/${id}`);
+  revalidatePath("/admin");
+  revalidatePath("/admin/reportes");
+  revalidatePath("/admin/kpis");
 }
 
 export type EvidenciaFormState = { error?: string } | undefined;
