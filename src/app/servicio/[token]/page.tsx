@@ -58,6 +58,12 @@ export default async function ServicioPublicoPage({
   if (!servicio) notFound();
 
   const montoTotal = montoTotalServicio(servicio);
+  // Cuánto sumaron las órdenes de cambio ya aprobadas -- el "extra" que
+  // no estaba en el valor inicial. Solo se muestra si hay alguna, para
+  // que el cliente entienda por qué el total puede ser mayor a lo que
+  // se cotizó originalmente (nunca se le muestra el % del intermediario,
+  // ver comisionIntermediario -- eso es exclusivo del panel interno).
+  const ordenesAprobadasMonto = montoTotal - Number(servicio.montoInicial);
   const montoPagado = montoPagadoServicio(servicio, servicio.pagos);
   const montoPendiente = montoPendienteServicio(servicio, servicio.pagos);
   const saldado = montoPendiente <= 0.01;
@@ -144,6 +150,23 @@ export default async function ServicioPublicoPage({
             <CardTitle className="text-sm font-medium">Estado de cuenta</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
+            {ordenesAprobadasMonto > 0.01 && (
+              <div className="flex flex-col gap-1.5 rounded-lg border border-input p-3">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Valor inicial</span>
+                  <span>{formatCurrency(servicio.montoInicial, servicio.moneda)}</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Órdenes de cambio</span>
+                  <span>{formatCurrency(ordenesAprobadasMonto, servicio.moneda)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-input pt-1.5 font-semibold">
+                  <span>Total del servicio</span>
+                  <span>{formatCurrency(montoTotal, servicio.moneda)}</span>
+                </div>
+              </div>
+            )}
+
             {saldado ? (
               <div className="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 text-success">
                 <CircleCheck className="size-5 shrink-0" />
