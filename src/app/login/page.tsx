@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { auth, signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
@@ -7,9 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ThemedLogo } from "@/components/themed-logo";
 import { PasswordField } from "@/components/ui/password-field";
-import { Code2, Mail, Briefcase, FileText, CreditCard } from "lucide-react";
+import {
+  Mail,
+  Briefcase,
+  FileText,
+  CreditCard,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
 
 export default async function LoginPage({
   searchParams,
@@ -45,77 +52,86 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Panel de marca (izquierda) */}
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-slate-950 p-10 lg:flex xl:p-14">
+    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      {/* Panel de marca (izquierda) — siempre oscuro, sin importar el tema
+          que el usuario elija para el resto del sitio; el toggle de tema
+          solo afecta el panel del formulario, a la derecha. */}
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-[oklch(0.13_0.012_260)] p-12 lg:flex xl:px-14">
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          className="pointer-events-none absolute inset-0 opacity-35"
           style={{
             backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
+              "linear-gradient(to right, oklch(0.96 0.006 260 / 0.06) 1px, transparent 1px)",
+            backgroundSize: "72px 100%",
           }}
         />
-        <div className="pointer-events-none absolute -left-24 -top-24 size-80 rounded-full bg-primary/25 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 right-0 size-96 rounded-full bg-violet-600/20 blur-3xl" />
-        <div className="pointer-events-none absolute right-10 top-1/3 size-56 rounded-full bg-teal-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -left-36 size-[520px] rounded-full bg-primary/15 blur-[90px]" />
 
-        <div className="relative flex items-center gap-2 text-white">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Code2 className="size-4.5 text-primary-foreground" />
-          </div>
-          <span className="text-sm font-semibold tracking-wide">ADMX DEV</span>
+        <div className="relative flex items-center justify-between gap-4">
+          <Image
+            src="/admx-logo-gold.png"
+            alt="Admx Dev"
+            width={1037}
+            height={608}
+            priority
+            className="h-11 w-auto"
+          />
+          <span className="font-mono text-[11px] tracking-[0.12em] text-white/35">
+            PANEL INTERNO
+          </span>
         </div>
 
-        <div className="relative max-w-md">
-          <h1 className="text-3xl font-semibold text-white xl:text-4xl">
+        <div className="relative max-w-[520px]">
+          <h1 className="text-4xl leading-tight font-semibold tracking-tight text-pretty text-white">
             Toda tu operación, en un solo panel.
           </h1>
-          <p className="mt-3 text-slate-400">
+          <p className="mt-4 text-[15px] leading-relaxed text-white/60">
             Servicios, cotizaciones, pagos y clientes centralizados para Admx
             Dev.
           </p>
 
-          <ul className="mt-9 space-y-4">
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
-                <Briefcase className="size-3.5 text-primary" />
+          <div className="mt-10 border-t border-white/10">
+            <div className="flex items-center gap-3.5 border-b border-white/10 py-4">
+              <Briefcase className="size-4 shrink-0 text-primary" />
+              <span className="flex-1 text-sm text-white/85">
+                Servicios y cotizaciones en un solo lugar
               </span>
-              Servicios y cotizaciones en un solo lugar
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
-                <FileText className="size-3.5 text-violet-400" />
+            </div>
+            <div className="flex items-center gap-3.5 border-b border-white/10 py-4">
+              <FileText className="size-4 shrink-0 text-primary" />
+              <span className="flex-1 text-sm text-white/85">
+                Portal de clientes con seguimiento de avance
               </span>
-              Portal de clientes con seguimiento de avance
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
-                <CreditCard className="size-3.5 text-teal-400" />
+            </div>
+            <div className="flex items-center gap-3.5 border-b border-white/10 py-4">
+              <CreditCard className="size-4 shrink-0 text-primary" />
+              <span className="flex-1 text-sm text-white/85">
+                Cobros con Mercado Pago, PayPal y transferencia
               </span>
-              Cobros con Mercado Pago, PayPal y transferencia
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
 
-        <p className="relative text-xs text-slate-500">
-          © {new Date().getFullYear()} Admx Dev · Panel interno
+        <p className="relative text-xs text-white/35">
+          © {new Date().getFullYear()} Admx Dev · Acceso restringido a
+          personal autorizado
         </p>
       </div>
 
-      {/* Panel de formulario (derecha) */}
+      {/* Panel de formulario (derecha) — este sí sigue el tema claro/oscuro
+          del sitio a través de los tokens (bg-background, bg-card, etc.). */}
       <div className="relative flex flex-col bg-background">
-        <div className="flex items-center justify-end p-6">
+        <div className="flex items-center justify-end gap-2 p-6">
           <ThemeToggle />
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-6 pb-16 lg:px-12 xl:px-16">
+        <div className="flex flex-1 items-center justify-center px-6 pb-16 sm:px-10 lg:px-14">
           <div className="w-full max-w-sm">
-            <ThemedLogo className="mb-6 h-14 w-auto" />
-
-            <h2 className="text-2xl font-semibold">Bienvenido de vuelta</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Entra con tu cuenta para continuar
+            <h2 className="text-[26px] leading-tight font-semibold tracking-tight">
+              Bienvenido de vuelta
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Entra con tu cuenta para continuar al panel.
             </p>
 
             {error && (
@@ -130,46 +146,74 @@ export default async function LoginPage({
               </p>
             )}
 
-            <form action={login} className="mt-7 flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email">Correo</Label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
+            <div className="mt-7 rounded-2xl border bg-card p-6 shadow-sm">
+              <form action={login} className="flex flex-col gap-[18px]">
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="email"
+                    className="text-[12.5px] font-medium text-muted-foreground"
+                  >
+                    Correo
+                  </Label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      placeholder="tucorreo@admxdev.com"
+                      className="h-[42px] pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label
+                      htmlFor="password"
+                      className="text-[12.5px] font-medium text-muted-foreground"
+                    >
+                      Contraseña
+                    </Label>
+                    <Link
+                      href="/recuperar"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </Link>
+                  </div>
+                  <PasswordField
+                    id="password"
+                    name="password"
                     required
-                    placeholder="tucorreo@empresa.com"
-                    className="pl-9"
+                    className="h-[42px] pl-10"
                   />
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Link
-                    href="/recuperar"
-                    className="text-xs text-primary hover:underline"
+                <div className="flex items-start gap-2.5">
+                  <Checkbox id="remember" name="remember" defaultChecked className="mt-0.5" />
+                  <Label
+                    htmlFor="remember"
+                    className="flex-col items-start gap-0.5 text-[13px] leading-snug font-normal text-muted-foreground"
                   >
-                    ¿Olvidaste tu contraseña?
-                  </Link>
+                    <span>Mantener sesión iniciada en este dispositivo</span>
+                    <span className="text-[11.5px] text-muted-foreground/75">
+                      Hasta 90 días. No la uses en equipos compartidos.
+                    </span>
+                  </Label>
                 </div>
-                <PasswordField id="password" name="password" required />
-              </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox id="remember" name="remember" defaultChecked />
-                <Label htmlFor="remember" className="font-normal text-muted-foreground">
-                  Mantener sesión iniciada en este dispositivo
-                </Label>
-              </div>
+                <Button type="submit" className="mt-1 h-[42px] w-full gap-2 text-[14px] font-semibold">
+                  Entrar al panel <ArrowRight className="size-4" />
+                </Button>
+              </form>
+            </div>
 
-              <Button type="submit" className="mt-2 w-full">
-                Entrar
-              </Button>
-            </form>
+            <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="size-3.5 text-success" />
+              Conexión cifrada · los accesos quedan registrados
+            </p>
           </div>
         </div>
       </div>
