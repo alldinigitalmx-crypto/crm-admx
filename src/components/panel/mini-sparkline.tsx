@@ -7,6 +7,13 @@ const W = 120;
 const H = 36;
 const PAD = 3;
 
+// Misma curva pero a todo el ancho de su contenedor (viewBox más ancho,
+// preserveAspectRatio="none") -- para la tarjeta principal del Panel, que
+// necesita el sparkline ocupando toda la columna en vez de un tamaño fijo.
+const WF = 300;
+const HF = 54;
+const PADF = 4;
+
 function pathSuave(puntos: { x: number; y: number }[]): string {
   if (puntos.length === 0) return "";
   if (puntos.length < 3) {
@@ -27,25 +34,25 @@ function pathSuave(puntos: { x: number; y: number }[]): string {
   return d;
 }
 
+function calcularPuntos(valores: number[], w: number, h: number, pad: number) {
+  const max = Math.max(1, ...valores);
+  const min = Math.min(0, ...valores);
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+  const step = innerW / (valores.length - 1);
+  return valores.map((v, i) => ({
+    x: pad + i * step,
+    y: pad + innerH - ((v - min) / (max - min || 1)) * innerH,
+  }));
+}
+
 export function MiniSparkline({ valores }: { valores: number[] }) {
   if (valores.length < 2) return null;
 
-  const max = Math.max(1, ...valores);
-  const min = Math.min(0, ...valores);
-  const innerW = W - PAD * 2;
-  const innerH = H - PAD * 2;
-  const step = innerW / (valores.length - 1);
-
-  const puntos = valores.map((v, i) => ({
-    x: PAD + i * step,
-    y: PAD + innerH - ((v - min) / (max - min || 1)) * innerH,
-  }));
+  const puntos = calcularPuntos(valores, W, H, PAD);
   const linea = pathSuave(puntos);
   const baseline = H - PAD;
-  const area =
-    puntos.length > 0
-      ? `${linea} L ${puntos[puntos.length - 1].x.toFixed(1)},${baseline} L ${puntos[0].x.toFixed(1)},${baseline} Z`
-      : "";
+  const area = `${linea} L ${puntos[puntos.length - 1].x.toFixed(1)},${baseline} L ${puntos[0].x.toFixed(1)},${baseline} Z`;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="shrink-0 overflow-visible">
@@ -53,5 +60,32 @@ export function MiniSparkline({ valores }: { valores: number[] }) {
       <path d={linea} fill="none" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="stroke-primary" />
       <circle cx={puntos[puntos.length - 1].x} cy={puntos[puntos.length - 1].y} r={2.25} className="fill-primary" />
     </svg>
+  );
+}
+
+// Misma curva a todo el ancho -- para la columna "Cobrado este mes" de la
+// franja de KPIs del Panel. Recibe las etiquetas de mes (de
+// agruparRecaudadoMensual) para dibujarlas debajo, alineadas con la curva.
+export function MiniSparklineFull({ valores, etiquetas }: { valores: number[]; etiquetas: string[] }) {
+  if (valores.length < 2) return null;
+
+  const puntos = calcularPuntos(valores, WF, HF, PADF);
+  const linea = pathSuave(puntos);
+  const baseline = HF - PADF;
+  const area = `${linea} L ${puntos[puntos.length - 1].x.toFixed(1)},${baseline} L ${puntos[0].x.toFixed(1)},${baseline} Z`;
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${WF} ${HF}`} width="100%" height={HF} preserveAspectRatio="none" className="block overflow-visible">
+        <path d={area} fill="var(--primary)" fillOpacity={0.12} stroke="none" />
+        <path d={linea} fill="none" strokeWidth={2} strokeLinecap="round" className="stroke-primary" />
+        <circle cx={puntos[puntos.length - 1].x} cy={puntos[puntos.length - 1].y} r={3} className="fill-primary" />
+      </svg>
+      <div className="mt-1 flex justify-between text-[10px] tracking-wide text-muted-foreground/70 uppercase">
+        {etiquetas.map((e, i) => (
+          <span key={i}>{e}</span>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -38,6 +38,16 @@ export const SERVICIO_STATUS_COLOR: Record<string, string> = {
   Entregado: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   Cancelado: "bg-red-500/15 text-red-700 dark:text-red-400",
 };
+// Mismos colores que SERVICIO_STATUS_COLOR pero sólidos (sin /15) -- para
+// la barra proporcional del Panel, donde un fondo semitransparente no se
+// distingue bien en un segmento angosto (mismo criterio que PRIORIDAD_BAR).
+export const SERVICIO_STATUS_BAR: Record<string, string> = {
+  Cotizado: "bg-slate-400 dark:bg-slate-500",
+  Aprobado: "bg-blue-500",
+  EnProceso: "bg-amber-500",
+  Entregado: "bg-emerald-500",
+  Cancelado: "bg-red-500",
+};
 export const SERVICIO_STATUS_ICON: IconMap = {
   Cotizado: FileText,
   Aprobado: CheckCircle2,
