@@ -72,6 +72,12 @@ function capitalizarPrimera(texto: string) {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+// Mismo formato que isoDate() en /admin/reportes -- para armar los links
+// de "Trimestre"/"Año" del Panel hacia allá con el rango correcto.
+function isoDate(d: Date) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 // Línea de variación bajo una cifra ("↑ 18.4% vs. agosto") -- mismo criterio
 // que la comparación de Reportes: verde cuando el cambio va en la dirección
 // buena de esa métrica, rojo cuando no.
@@ -700,6 +706,17 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
   const diasTranscurridos = hoy.getUTCDate();
   const mesPasadoRangoTexto = `1–${diasTranscurridos} de ${mesPasadoLabel}`;
 
+  // "Trimestre"/"Año" del selector de arriba: el Panel en sí siempre
+  // calcula todo para "este mes" (cambiar eso implicaría rehacer cada
+  // tarjeta para un rango arbitrario, igual que ya hace /admin/reportes),
+  // así que en vez de fingir un filtro que no filtra nada, mandan ahí con
+  // el rango correspondiente ya armado.
+  const inicioTrimestre = new Date(Date.UTC(hoy.getUTCFullYear(), Math.floor(hoy.getUTCMonth() / 3) * 3, 1));
+  const inicioAno = new Date(Date.UTC(hoy.getUTCFullYear(), 0, 1));
+  const hoyIso = isoDate(hoy);
+  const hrefTrimestre = `/admin/reportes?desde=${isoDate(inicioTrimestre)}&hasta=${hoyIso}`;
+  const hrefAno = `/admin/reportes?desde=${isoDate(inicioAno)}&hasta=${hoyIso}`;
+
   const gastosEmpresaMensual = agruparRecaudadoMensual(
     gastosEmpresaUltimosMeses.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
     inicioSparkline,
@@ -740,14 +757,29 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
             {capitalizarPrimera(MES_LARGO.format(hoy))} · {diasTranscurridos} día{diasTranscurridos === 1 ? "" : "s"} transcurridos
           </p>
         </div>
-        {/* Solo "Este mes" está vivo (es lo único que este panel calcula) --
-            Trimestre/Año quedan como contexto visual, no como filtro real,
-            para no prometer un cambio de periodo que no está implementado
-            aquí (para eso ya existe /admin/reportes). */}
+        {/* El Panel en sí siempre calcula "este mes" -- cambiar eso de
+            verdad implicaría rehacer cada tarjeta para un rango
+            arbitrario, igual que ya hace /admin/reportes. En vez de un
+            filtro que aparente funcionar y no haga nada, Trimestre/Año
+            llevan ahí con el rango correspondiente ya armado. */}
         <div className="flex items-center gap-1 rounded-lg bg-muted p-1 text-sm">
-          <span className="rounded-md bg-card px-3 py-1.5 font-medium shadow-sm">Este mes</span>
-          <span className="px-3 py-1.5 text-muted-foreground/60">Trimestre</span>
-          <span className="px-3 py-1.5 text-muted-foreground/60">Año</span>
+          <span className="rounded-md bg-card px-3 py-1.5 font-medium shadow-sm" title="El Panel siempre muestra este mes">
+            Este mes
+          </span>
+          <Link
+            href={hrefTrimestre}
+            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-card hover:text-foreground hover:shadow-sm"
+            title="Ver el trimestre en Reportes"
+          >
+            Trimestre
+          </Link>
+          <Link
+            href={hrefAno}
+            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-card hover:text-foreground hover:shadow-sm"
+            title="Ver el año en Reportes"
+          >
+            Año
+          </Link>
         </div>
       </div>
 
