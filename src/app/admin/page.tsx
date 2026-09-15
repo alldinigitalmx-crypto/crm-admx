@@ -16,6 +16,8 @@ import {
   ArrowDown,
   Minus,
   PiggyBank,
+  ChevronRight,
+  Handshake,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
@@ -24,17 +26,16 @@ import { montoPendienteServicio } from "@/lib/servicio";
 import { calcularMargen } from "@/lib/kpis";
 import { agruparRecaudadoMensual } from "@/lib/regresion";
 import { calcularDelta, type Delta } from "@/lib/reportes";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
+import { SERVICIO_STATUS_COLOR, SERVICIO_STATUS_BAR } from "@/lib/status-colors";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
 import { obtenerTasasAMXN, resumirMontoMulti, type ResumenMontoMulti } from "@/lib/tipo-cambio";
 import { montoNetoEnMXN } from "@/lib/pago-monto";
 import { hoyEnMexico } from "@/lib/fecha";
 import { formatCurrency } from "@/lib/format";
-import { MiniSparkline } from "@/components/panel/mini-sparkline";
+import { MiniSparklineFull } from "@/components/panel/mini-sparkline";
 import type { Usuario } from "@/generated/prisma/client";
 
 // Para los totales "de un vistazo" (KPIs, embudo, ventas por origen) los
@@ -47,6 +48,15 @@ const currencyCorta = new Intl.NumberFormat("es-MX", {
   maximumFractionDigits: 0,
 });
 
+// Para "vs. 1-14 de agosto ($155.6 mil)" en la franja de KPIs -- una cifra
+// de referencia, no necesita los pesos exactos.
+const currencyCompacta = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
 const fecha = new Intl.DateTimeFormat("es-MX", {
   day: "2-digit",
   month: "short",
@@ -54,6 +64,13 @@ const fecha = new Intl.DateTimeFormat("es-MX", {
 });
 
 const MES_LARGO = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric", timeZone: "UTC" });
+
+// text-transform:capitalize (que se usaba antes) pone en mayúscula la
+// primera letra de CADA palabra -- por eso salía "Septiembre De 2026" en
+// vez de "Septiembre de 2026". Esto solo toca la primera letra del texto.
+function capitalizarPrimera(texto: string) {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
 
 // Línea de variación bajo una cifra ("↑ 18.4% vs. agosto") -- mismo criterio
 // que la comparación de Reportes: verde cuando el cambio va en la dirección
@@ -70,6 +87,23 @@ function DeltaLinea({ delta, contra, buenoCuando }: { delta: Delta; contra: stri
       <span className="font-medium">{texto}</span>
       <span className="text-muted-foreground">vs. {contra}</span>
     </p>
+  );
+}
+
+// Misma idea que DeltaLinea pero como pastilla (fondo de color en vez de
+// solo texto) -- para la franja de KPIs grande del Panel, donde la
+// comparación va aparte en texto normal y el chip solo lleva el %.
+function DeltaBadge({ delta, buenoCuando }: { delta: Delta; buenoCuando: "up" | "down" }) {
+  const bueno = delta.dir === "flat" || delta.dir === buenoCuando;
+  const cls = delta.dir === "flat" ? "bg-muted text-muted-foreground" : bueno ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive";
+  const Icono = delta.dir === "up" ? ArrowUp : delta.dir === "down" ? ArrowDown : Minus;
+  const texto =
+    delta.pct === null ? (delta.dir === "flat" ? "igual" : "nuevo") : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(1)}%`;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold ${cls}`}>
+      <Icono className="size-3" />
+      {texto}
+    </span>
   );
 }
 
@@ -158,13 +192,28 @@ type Pendiente = {
   vencida: boolean;
 };
 
-const TIPO_META: Record<TipoPendiente, { label: string; icon: React.ComponentType<{ className?: string }>; colorClass: string }> = {
-  cotizacion: { label: "Cotizaciones", icon: FileText, colorClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400" },
-  pago: { label: "Pagos", icon: Landmark, colorClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
-  queja: { label: "Quejas", icon: LifeBuoy, colorClass: "bg-red-500/15 text-red-700 dark:text-red-400" },
-  ticket: { label: "Accesos", icon: KeyRound, colorClass: "bg-violet-500/15 text-violet-700 dark:text-violet-400" },
-  tarea: { label: "Tareas", icon: ListTodo, colorClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
-  orden: { label: "Órdenes de cambio", icon: Briefcase, colorClass: "bg-sky-500/15 text-sky-700 dark:text-sky-400" },
+// Orden fijo (no el que devuelva groupBy) para que la barra proporcional y
+// la lista de abajo siempre listen los status en el mismo orden del flujo
+// de un servicio, con o sin datos en alguno.
+const STATUS_SERVICIO_ORDEN = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"] as const;
+const STATUS_SERVICIO_LABEL: Record<string, string> = {
+  Cotizado: "Cotizado",
+  Aprobado: "Aprobado",
+  EnProceso: "En proceso",
+  Entregado: "Entregado",
+  Cancelado: "Cancelado",
+};
+
+const TIPO_META: Record<
+  TipoPendiente,
+  { label: string; icon: React.ComponentType<{ className?: string }>; colorClass: string; barClass: string }
+> = {
+  cotizacion: { label: "Cotizaciones", icon: FileText, colorClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400", barClass: "border-l-blue-500" },
+  pago: { label: "Pagos", icon: Landmark, colorClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", barClass: "border-l-emerald-500" },
+  queja: { label: "Quejas", icon: LifeBuoy, colorClass: "bg-red-500/15 text-red-700 dark:text-red-400", barClass: "border-l-red-500" },
+  ticket: { label: "Accesos", icon: KeyRound, colorClass: "bg-violet-500/15 text-violet-700 dark:text-violet-400", barClass: "border-l-violet-500" },
+  tarea: { label: "Tareas", icon: ListTodo, colorClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400", barClass: "border-l-amber-500" },
+  orden: { label: "Órdenes de cambio", icon: Briefcase, colorClass: "bg-sky-500/15 text-sky-700 dark:text-sky-400", barClass: "border-l-sky-500" },
 };
 
 type DatosPendientes = {
@@ -323,33 +372,78 @@ function normalizarPendientes(datos: DatosPendientes): Pendiente[] {
   });
 }
 
+function FiltroPendientesTab({
+  href,
+  active,
+  disabled,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  if (disabled) {
+    return (
+      <span className="inline-flex h-7 cursor-not-allowed items-center rounded-md px-2.5 text-xs text-muted-foreground/40">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className={`inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium transition-colors ${
+        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function ListaPendientes({ pendientes, filtro }: { pendientes: Pendiente[]; filtro?: string }) {
   const vencidasCount = pendientes.filter((p) => p.vencida).length;
-  const mostrar = filtro === "vencidos" ? pendientes.filter((p) => p.vencida) : pendientes;
+  const mostrar = filtro === "vencidos" ? pendientes.filter((p) => p.vencida) : filtro === "dinero" ? pendientes.filter((p) => p.monto !== null) : pendientes;
   const base = "/admin";
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium">
-          Requiere tu atención {pendientes.length > 0 && <span className="text-muted-foreground">· {pendientes.length}</span>}
-        </CardTitle>
+    <Card className="gap-0">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b">
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm font-medium">Requiere tu atención</CardTitle>
+          {pendientes.length > 0 && (
+            <span className="inline-flex h-5 items-center rounded-md bg-muted px-1.5 font-mono text-[11px] font-semibold">
+              {pendientes.length}
+            </span>
+          )}
+          {vencidasCount > 0 && (
+            <span className="inline-flex h-5 items-center rounded-md bg-destructive/15 px-1.5 text-[11px] font-semibold text-destructive">
+              {vencidasCount} vencido{vencidasCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
         {pendientes.length > 0 && (
-          <div className="flex gap-1.5">
-            <Button asChild size="sm" variant={filtro !== "vencidos" ? "default" : "outline"}>
-              <Link href={base}>Todos</Link>
-            </Button>
-            <Button asChild size="sm" variant={filtro === "vencidos" ? "default" : "outline"} disabled={vencidasCount === 0}>
-              <Link href={`${base}?filtro=vencidos`}>Vencidos{vencidasCount > 0 ? ` (${vencidasCount})` : ""}</Link>
-            </Button>
+          <div className="flex items-center gap-0.5 rounded-lg bg-muted p-1">
+            <FiltroPendientesTab href={base} active={!filtro}>
+              Todos
+            </FiltroPendientesTab>
+            <FiltroPendientesTab href={`${base}?filtro=vencidos`} active={filtro === "vencidos"} disabled={vencidasCount === 0}>
+              Vencidos
+            </FiltroPendientesTab>
+            <FiltroPendientesTab href={`${base}?filtro=dinero`} active={filtro === "dinero"}>
+              Dinero
+            </FiltroPendientesTab>
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0 py-0">
         {pendientes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tienes pendientes en ningún módulo.</p>
+          <p className="p-4 text-sm text-muted-foreground">No tienes pendientes en ningún módulo.</p>
         ) : mostrar.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay nada vencido — buen trabajo.</p>
+          <p className="p-4 text-sm text-muted-foreground">
+            {filtro === "dinero" ? "Nada con monto pendiente por el momento." : "No hay nada vencido — buen trabajo."}
+          </p>
         ) : (
           <div className="flex flex-col">
             {mostrar.map((p) => {
@@ -359,7 +453,9 @@ function ListaPendientes({ pendientes, filtro }: { pendientes: Pendiente[]; filt
                 <Link
                   key={p.id}
                   href={p.href}
-                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
+                  className={`flex items-center gap-3 border-b border-l-[3px] py-2.5 pr-3 pl-3 transition-colors last:border-b-0 hover:bg-muted/50 ${
+                    p.vencida ? "border-l-destructive" : meta.barClass
+                  }`}
                 >
                   <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${meta.colorClass}`}>
                     <Icon className="size-4" />
@@ -372,18 +468,22 @@ function ListaPendientes({ pendientes, filtro }: { pendientes: Pendiente[]; filt
                   </div>
                   <div className="shrink-0 text-right">
                     {p.monto !== null && (
-                      <p className="text-sm font-medium tabular-nums">{formatCurrency(p.monto, p.moneda)}</p>
+                      <p className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(p.monto, p.moneda)}</p>
                     )}
                     <p className={`text-xs ${p.vencida ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-                      {p.fecha ? fecha.format(p.fecha) : "—"}
+                      {p.fecha ? (p.vencida ? `Venció ${fecha.format(p.fecha)}` : fecha.format(p.fecha)) : "—"}
                     </p>
                   </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
                 </Link>
               );
             })}
           </div>
         )}
       </CardContent>
+      {mostrar.length > 0 && (
+        <CardFooter className="text-xs text-muted-foreground">Ordenado por urgencia · vencidos primero</CardFooter>
+      )}
     </Card>
   );
 }
@@ -441,6 +541,7 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
     perdidas,
     ventasPorOrigen,
     gastosPorAmbito,
+    gastosEmpresaUltimosMeses,
     tasas,
   ] = await Promise.all([
     prisma.cliente.count(),
@@ -506,6 +607,12 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
       _sum: { monto: true },
       _count: true,
       where: { fecha: { gte: inicioDeMes } },
+    }),
+    // Mismo tramo de 6 meses que pagosUltimosMeses -- para la mini gráfica
+    // de barras de "Gasto de empresa" en la franja de KPIs.
+    prisma.gasto.findMany({
+      where: { ambito: "Empresa", fecha: { gte: inicioSparkline } },
+      select: { fecha: true, monto: true },
     }),
     obtenerTasasAMXN(),
   ]);
@@ -588,6 +695,33 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
   const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
   const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
 
+  // Derivados solo para la franja de KPIs / "Entradas y salidas" -- nada
+  // de esto pide datos nuevos, son los mismos arriba en otra forma.
+  const diasTranscurridos = hoy.getUTCDate();
+  const mesPasadoRangoTexto = `1–${diasTranscurridos} de ${mesPasadoLabel}`;
+
+  const gastosEmpresaMensual = agruparRecaudadoMensual(
+    gastosEmpresaUltimosMeses.map((g) => ({ fecha: g.fecha, monto: Number(g.monto) })),
+    inicioSparkline,
+    inicioDeMes
+  );
+  const gastosEmpresaMax = Math.max(1, ...gastosEmpresaMensual.map((p) => p.recaudado));
+
+  const embudoTotalCount = embudoItems.reduce((acc, i) => acc + i.resumen.count, 0);
+  const embudoTotalMXN = embudoItems.reduce((acc, i) => acc + i.resumen.montoMXN, 0);
+  // Tasa de cierre histórica (convertidas vs. perdidas) -- a diferencia de
+  // Reportes/KPIs no se acota a un periodo aquí, así que el texto no dice
+  // "últimos N días", solo lo que de verdad se calculó.
+  const cerradas = resumenConvertidasAServicio.count + resumenPerdidas.count;
+  const tasaCierre = cerradas > 0 ? Math.round((resumenConvertidasAServicio.count / cerradas) * 100) : null;
+
+  const ventasTiendaOnlineMXN = Number(ventasTiendaOnline?._sum.total ?? 0);
+  const ventasManualMXN = Number(ventasManual?._sum.total ?? 0);
+  const ventasTotalMXN = ventasTiendaOnlineMXN + ventasManualMXN;
+  const gastosPersonalMXN = Number(gastosPersonal?._sum.monto ?? 0);
+  const gastoTotalMXN = gastosEmpresaMXN + gastosPersonalMXN;
+  const ticketProm = (monto: number, count: number) => (count > 0 ? monto / count : 0);
+
   const pendientes = normalizarPendientes({
     cotizaciones: cotizacionesPendientes,
     pagos: pagosPorConfirmar,
@@ -598,44 +732,136 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Panel</h1>
-        <p className="text-sm capitalize text-muted-foreground">{MES_LARGO.format(hoy)}</p>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-[26px]">Panel</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {capitalizarPrimera(MES_LARGO.format(hoy))} · {diasTranscurridos} día{diasTranscurridos === 1 ? "" : "s"} transcurridos
+          </p>
+        </div>
+        {/* Solo "Este mes" está vivo (es lo único que este panel calcula) --
+            Trimestre/Año quedan como contexto visual, no como filtro real,
+            para no prometer un cambio de periodo que no está implementado
+            aquí (para eso ya existe /admin/reportes). */}
+        <div className="flex items-center gap-1 rounded-lg bg-muted p-1 text-sm">
+          <span className="rounded-md bg-card px-3 py-1.5 font-medium shadow-sm">Este mes</span>
+          <span className="px-3 py-1.5 text-muted-foreground/60">Trimestre</span>
+          <span className="px-3 py-1.5 text-muted-foreground/60">Año</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
-        <KpiCard
-          className="lg:col-span-2"
-          title="Cobrado este mes"
-          value={currencyCorta.format(ingresosMesMXN)}
-          icon={CreditCard}
-          accentClass="bg-success/10 text-success"
-          delta={deltaIngresos}
-          deltaContra={mesPasadoLabel}
-          trailing={<MiniSparkline valores={puntosMensuales.map((p) => p.recaudado)} />}
-        />
-        <KpiCard
-          title="Por cobrar"
-          value={currencyCorta.format(porCobrarResumen.montoMXN)}
-          icon={Landmark}
-          accentClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-          sub={`${clientesConSaldo} cliente${clientesConSaldo === 1 ? "" : "s"} con saldo`}
-        />
-        <KpiCard
-          title="Servicios en curso"
-          value={String(serviciosActivos)}
-          icon={Briefcase}
-          sub={`${aprobadosCount} aprobados · ${enProcesoCount} en proceso`}
-        />
-        <KpiCard
-          title="Utilidad estimada"
-          value={currencyCorta.format(utilidadEstimada)}
-          icon={PiggyBank}
-          accentClass={utilidadEstimada >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}
-          sub={`${margen.toFixed(0)}% de margen este mes`}
-        />
-      </div>
+      <Card className="gap-0 py-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col border-b p-4 last:border-b-0 sm:p-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <CreditCard className="size-3.5 text-success" />
+              Cobrado este mes
+            </div>
+            <div className="mt-2.5 flex items-baseline gap-2">
+              <span className="font-mono text-[28px] leading-none font-semibold tracking-tight tabular-nums sm:text-[32px]">
+                {currencyCorta.format(ingresosMesMXN)}
+              </span>
+              <span className="text-xs text-muted-foreground">MXN</span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <DeltaBadge delta={deltaIngresos} buenoCuando="up" />
+              <span className="text-xs text-muted-foreground">
+                vs. {mesPasadoRangoTexto} ({currencyCompacta.format(ingresosMesPasadoMXN)})
+              </span>
+            </div>
+            <div className="mt-auto pt-4">
+              <MiniSparklineFull
+                valores={puntosMensuales.map((p) => p.recaudado)}
+                etiquetas={puntosMensuales.map((p) => p.label.toUpperCase())}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col border-b p-4 last:border-b-0 sm:p-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <Landmark className="size-3.5 text-warning" />
+              Por cobrar
+            </div>
+            <div className="mt-2.5 font-mono text-[26px] leading-none font-semibold tracking-tight tabular-nums">
+              {currencyCorta.format(porCobrarResumen.montoMXN)}
+            </div>
+            <p className="mt-2.5 text-xs text-muted-foreground">
+              {clientesConSaldo} cliente{clientesConSaldo === 1 ? "" : "s"} con saldo · {serviciosActivos} servicio
+              {serviciosActivos === 1 ? "" : "s"} activo{serviciosActivos === 1 ? "" : "s"}
+            </p>
+            <p className="mt-auto pt-4 text-xs text-muted-foreground">
+              {aprobadosCount} aprobado{aprobadosCount === 1 ? "" : "s"} · {enProcesoCount} en proceso
+            </p>
+          </div>
+
+          <div className="flex flex-col border-b p-4 last:border-b-0 sm:p-5 lg:border-r lg:border-b-0 lg:last:border-r-0">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <Wallet className="size-3.5 text-primary" />
+              Gasto de empresa
+            </div>
+            <div className="mt-2.5 font-mono text-[26px] leading-none font-semibold tracking-tight tabular-nums">
+              {currencyCorta.format(gastosEmpresaMXN)}
+            </div>
+            <p className="mt-2.5 text-xs text-muted-foreground">
+              {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"} registrado
+              {(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"}
+            </p>
+            <div className="mt-auto flex h-12 items-end gap-1.5 pt-4">
+              {gastosEmpresaMensual.map((p, i) => (
+                <div
+                  key={p.key}
+                  className={`flex-1 rounded-t-sm ${i === gastosEmpresaMensual.length - 1 ? "bg-primary" : "bg-primary/25"}`}
+                  style={{ height: `${Math.max(6, (p.recaudado / gastosEmpresaMax) * 100)}%` }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col p-4 sm:p-5">
+            <div className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <PiggyBank className="size-3.5 text-success" />
+              Utilidad estimada
+            </div>
+            <div
+              className={`mt-2.5 font-mono text-[26px] leading-none font-semibold tracking-tight tabular-nums ${
+                utilidadEstimada >= 0 ? "text-success" : "text-destructive"
+              }`}
+            >
+              {currencyCorta.format(utilidadEstimada)}
+            </div>
+            <p className="mt-2.5 text-xs text-muted-foreground">Cobrado menos gasto de empresa</p>
+            <div className="mt-auto pt-4">
+              <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+                <span>Margen del mes</span>
+                <span className="font-mono text-sm font-semibold text-foreground">{margen.toFixed(0)}%</span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full ${utilidadEstimada >= 0 ? "bg-success" : "bg-destructive"}`}
+                  style={{ width: `${Math.min(100, Math.max(0, Math.abs(margen)))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <CardFooter className="flex-col items-start gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Montos convertidos a MXN con el tipo de cambio de hoy
+            {tasas.USD != null && tasas.EUR != null && (
+              <>
+                {" "}
+                · USD {tasas.USD.toFixed(2)} · EUR {tasas.EUR.toFixed(2)}
+              </>
+            )}
+          </span>
+          <span className="flex items-center gap-1.5">
+            Gasto personal del mes <span className="font-mono text-foreground">{currencyCorta.format(gastosPersonalMXN)}</span>
+            <span className="text-muted-foreground/70">(fuera del margen)</span>
+          </span>
+        </CardFooter>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         <div className="lg:col-span-2">
@@ -643,33 +869,39 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
+          <Card className="gap-0">
+            <CardHeader className="border-b">
               <CardTitle className="text-sm font-medium">Embudo de venta</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {embudoTotalCount} cotización{embudoTotalCount === 1 ? "" : "es"} · {currencyCorta.format(embudoTotalMXN)} en juego
+              </p>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex flex-col divide-y py-0">
               {embudoItems.map((item) => {
                 const contenido = (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5 py-3">
                     <div className="flex items-baseline justify-between gap-2 text-sm">
                       <span className="flex min-w-0 items-center gap-1.5 truncate font-medium">
                         <span className={`size-2 shrink-0 rounded-full ${item.colorClass}`} />
                         <span className="truncate">{item.label}</span>
                       </span>
-                      <span className="shrink-0 text-right text-xs text-muted-foreground">
-                        {item.resumen.count} · <MontoFunnel resumen={item.resumen} />
+                      <span className="shrink-0 font-mono text-sm font-semibold">
+                        <MontoFunnel resumen={item.resumen} />
                       </span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full ${item.colorClass} transition-all duration-500`}
-                        style={{ width: `${Math.max(2, (item.resumen.count / embudoMax) * 100)}%` }}
-                      />
+                    <div className="flex items-center gap-2">
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${item.colorClass} transition-all duration-500`}
+                          style={{ width: `${Math.max(2, (item.resumen.count / embudoMax) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{item.resumen.count}</span>
                     </div>
                   </div>
                 );
                 return item.href ? (
-                  <Link key={item.label} href={item.href} className="-m-1 rounded-lg p-1 transition-colors hover:bg-muted/40">
+                  <Link key={item.label} href={item.href} className="-mx-1 rounded-lg px-1 transition-colors hover:bg-muted/40">
                     {contenido}
                   </Link>
                 ) : (
@@ -677,116 +909,151 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
                 );
               })}
             </CardContent>
+            {tasaCierre !== null && (
+              <CardFooter className="text-xs text-muted-foreground">
+                {/* CardFooter es flex -- un texto+span+texto sueltos como hijos
+                    directos de un flex container pierden los espacios en los
+                    bordes de cada nodo (cada uno se vuelve su propio flex
+                    item). Envolverlo en un span normal evita ese recorte. */}
+                <span>
+                  Tasa de cierre <span className="font-mono text-foreground">{tasaCierre}%</span> (convertidas vs. perdidas)
+                </span>
+              </CardFooter>
+            )}
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="gap-0">
+            <CardHeader className="border-b">
               <CardTitle className="text-sm font-medium">Servicios por status</CardTitle>
+              <p className="text-xs text-muted-foreground">{totalServicios} servicios registrados</p>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
+            <CardContent className="flex flex-col gap-3">
               {serviciosPorStatus.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aún no hay servicios registrados.</p>
               ) : (
-                serviciosPorStatus.map((s) => (
-                  <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
-                    <Badge className={SERVICIO_STATUS_COLOR[s.status] ?? ""}>
-                      {s.status}: {s._count}
-                    </Badge>
-                  </Link>
-                ))
+                <>
+                  <div className="flex h-2 gap-0.5 overflow-hidden rounded-full">
+                    {STATUS_SERVICIO_ORDEN.filter((status) => (serviciosPorStatus.find((s) => s.status === status)?._count ?? 0) > 0).map(
+                      (status) => (
+                        <div
+                          key={status}
+                          className={SERVICIO_STATUS_BAR[status] ?? "bg-muted-foreground"}
+                          style={{
+                            width: `${((serviciosPorStatus.find((s) => s.status === status)?._count ?? 0) / totalServicios) * 100}%`,
+                          }}
+                        />
+                      )
+                    )}
+                  </div>
+                  <div className="flex flex-col divide-y">
+                    {STATUS_SERVICIO_ORDEN.map((status) => {
+                      const count = serviciosPorStatus.find((s) => s.status === status)?._count ?? 0;
+                      return (
+                        <Link
+                          key={status}
+                          href={`/admin/servicios?status=${status}`}
+                          className="-mx-1 flex items-center gap-2 rounded-lg px-1 py-1.5 text-xs transition-colors hover:bg-muted/40"
+                        >
+                          <span className={`size-2 rounded-sm ${SERVICIO_STATUS_BAR[status] ?? "bg-muted-foreground"}`} />
+                          <span className="flex-1">{STATUS_SERVICIO_LABEL[status] ?? status}</span>
+                          <span className="font-mono font-semibold">{count}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <h2 className="text-lg font-semibold">Ventas del mes</h2>
-          <p className="mb-3 text-sm text-muted-foreground">Por origen</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/admin/ventas?origen=TiendaOnline">
-              <Card className="transition-colors hover:bg-muted/40">
-                <CardContent className="flex items-center gap-3 py-2">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <ShoppingBag className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs text-muted-foreground">Tienda Online</p>
-                    <p className="truncate text-lg font-semibold">
-                      {currencyCorta.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {ventasTiendaOnline?._count ?? 0} venta{(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/admin/ventas?origen=Manual">
-              <Card className="transition-colors hover:bg-muted/40">
-                <CardContent className="flex items-center gap-3 py-2">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <ShoppingBag className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs text-muted-foreground">Manual (otros medios)</p>
-                    <p className="truncate text-lg font-semibold">
-                      {currencyCorta.format(Number(ventasManual?._sum.total ?? 0))}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {ventasManual?._count ?? 0} venta{(ventasManual?._count ?? 0) === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+      <Card className="gap-0">
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b">
+          <div>
+            <CardTitle className="text-sm font-medium">Entradas y salidas del mes</CardTitle>
+            <p className="text-xs text-muted-foreground">Ventas por origen y gastos por ámbito</p>
           </div>
+          <Link href="/admin/reportes" className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline">
+            Abrir reportes <ChevronRight className="size-3.5" />
+          </Link>
+        </CardHeader>
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
+          <Link href="/admin/ventas?origen=TiendaOnline" className="flex flex-col p-4 transition-colors hover:bg-muted/30 sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <ShoppingBag className="size-3.5" />
+              </span>
+              <span className="text-xs text-muted-foreground">Tienda online</span>
+            </div>
+            <div className="mt-3 font-mono text-xl font-semibold tabular-nums">{currencyCorta.format(ventasTiendaOnlineMXN)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {ventasTiendaOnline?._count ?? 0} venta{(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"} · ticket prom.{" "}
+              {currencyCorta.format(ticketProm(ventasTiendaOnlineMXN, ventasTiendaOnline?._count ?? 0))}
+            </p>
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${ventasTotalMXN > 0 ? (ventasTiendaOnlineMXN / ventasTotalMXN) * 100 : 0}%` }} />
+            </div>
+          </Link>
+          <Link href="/admin/ventas?origen=Manual" className="flex flex-col p-4 transition-colors hover:bg-muted/30 sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                <Handshake className="size-3.5" />
+              </span>
+              <span className="text-xs text-muted-foreground">Manual / otros medios</span>
+            </div>
+            <div className="mt-3 font-mono text-xl font-semibold tabular-nums">{currencyCorta.format(ventasManualMXN)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {ventasManual?._count ?? 0} venta{(ventasManual?._count ?? 0) === 1 ? "" : "s"} · ticket prom.{" "}
+              {currencyCorta.format(ticketProm(ventasManualMXN, ventasManual?._count ?? 0))}
+            </p>
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-violet-500"
+                style={{ width: `${ventasTotalMXN > 0 ? (ventasManualMXN / ventasTotalMXN) * 100 : 0}%` }}
+              />
+            </div>
+          </Link>
+          <Link href="/admin/gastos?ambito=Empresa" className="flex flex-col p-4 transition-colors hover:bg-muted/30 sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Wallet className="size-3.5" />
+              </span>
+              <span className="text-xs text-muted-foreground">Gasto de empresa</span>
+            </div>
+            <div className="mt-3 font-mono text-xl font-semibold tabular-nums">{currencyCorta.format(gastosEmpresaMXN)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"} · sí afecta margen
+            </p>
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-blue-500" style={{ width: `${gastoTotalMXN > 0 ? (gastosEmpresaMXN / gastoTotalMXN) * 100 : 0}%` }} />
+            </div>
+          </Link>
+          <Link href="/admin/gastos?ambito=Personal" className="flex flex-col p-4 transition-colors hover:bg-muted/30 sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <User className="size-3.5" />
+              </span>
+              <span className="text-xs text-muted-foreground">Gasto personal</span>
+            </div>
+            <div className="mt-3 font-mono text-xl font-semibold tabular-nums">{currencyCorta.format(gastosPersonalMXN)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {gastosPersonal?._count ?? 0} gasto{(gastosPersonal?._count ?? 0) === 1 ? "" : "s"} · no afecta margen
+            </p>
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-orange-500"
+                style={{ width: `${gastoTotalMXN > 0 ? (gastosPersonalMXN / gastoTotalMXN) * 100 : 0}%` }}
+              />
+            </div>
+          </Link>
         </div>
+      </Card>
 
-        <div>
-          <h2 className="text-lg font-semibold">Gastos del mes</h2>
-          <p className="mb-3 text-sm text-muted-foreground">Personal vs. empresa</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/admin/gastos?ambito=Empresa">
-              <Card className="transition-colors hover:bg-muted/40">
-                <CardContent className="flex items-center gap-3 py-2">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Wallet className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs text-muted-foreground">Empresa</p>
-                    <p className="truncate text-lg font-semibold">{currencyCorta.format(gastosEmpresaMXN)}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/admin/gastos?ambito=Personal">
-              <Card className="transition-colors hover:bg-muted/40">
-                <CardContent className="flex items-center gap-3 py-2">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                    <User className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs text-muted-foreground">Personal</p>
-                    <p className="truncate text-lg font-semibold">
-                      {currencyCorta.format(Number(gastosPersonal?._sum.monto ?? 0))}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {gastosPersonal?._count ?? 0} gasto{(gastosPersonal?._count ?? 0) === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground">Total de servicios registrados: {totalServicios} · Clientes: {totalClientes}</p>
+      <p className="text-xs text-muted-foreground">
+        {totalServicios} servicios registrados · {totalClientes} clientes · {pendientes.length} pendiente{pendientes.length === 1 ? "" : "s"} abierto
+        {pendientes.length === 1 ? "" : "s"}
+      </p>
     </div>
   );
 }
