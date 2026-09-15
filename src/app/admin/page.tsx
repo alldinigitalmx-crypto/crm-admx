@@ -83,6 +83,7 @@ function KpiCard({
   deltaBuenoCuando = "up",
   trailing,
   accentClass = "bg-primary/10 text-primary",
+  className,
 }: {
   title: string;
   value: string;
@@ -93,9 +94,10 @@ function KpiCard({
   deltaBuenoCuando?: "up" | "down";
   trailing?: React.ReactNode;
   accentClass?: string;
+  className?: string;
 }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
         <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${accentClass}`}>
           <Icon className="size-4 sm:size-5" />
@@ -109,7 +111,12 @@ function KpiCard({
             sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>
           )}
         </div>
-        {trailing}
+        {/* El sparkline es decorativo y necesita ~120px de ancho propio --
+            en el grid de 2 columnas (móvil/tablet) no hay ese espacio sin
+            truncar el título/cifra de al lado, así que solo aparece desde
+            lg, que es también donde esta tarjeta pasa a ocupar 2 columnas
+            (ver lg:col-span-2 en el call site). */}
+        {trailing && <div className="hidden shrink-0 lg:block">{trailing}</div>}
       </CardContent>
     </Card>
   );
@@ -597,8 +604,9 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
         <p className="text-sm capitalize text-muted-foreground">{MES_LARGO.format(hoy)}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <KpiCard
+          className="lg:col-span-2"
           title="Cobrado este mes"
           value={currencyCorta.format(ingresosMesMXN)}
           icon={CreditCard}
@@ -629,7 +637,7 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         <div className="lg:col-span-2">
           <ListaPendientes pendientes={pendientes} filtro={filtro} />
         </div>
@@ -692,7 +700,7 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <h2 className="text-lg font-semibold">Ventas del mes</h2>
           <p className="mb-3 text-sm text-muted-foreground">Por origen</p>
