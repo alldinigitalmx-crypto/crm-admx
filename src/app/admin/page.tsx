@@ -4,22 +4,29 @@ import {
   Users,
   Briefcase,
   CreditCard,
-  LayoutDashboard,
   FileText,
   Landmark,
   LifeBuoy,
   KeyRound,
   ListTodo,
   ShoppingBag,
-  CheckCircle2,
   Wallet,
   User,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  PiggyBank,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { nombreClienteCotizacion } from "@/lib/cotizacion";
+import { montoPendienteServicio } from "@/lib/servicio";
+import { calcularMargen } from "@/lib/kpis";
+import { agruparRecaudadoMensual } from "@/lib/regresion";
+import { calcularDelta, type Delta } from "@/lib/reportes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
@@ -27,12 +34,8 @@ import { obtenerTasasAMXN, resumirMontoMulti, type ResumenMontoMulti } from "@/l
 import { montoNetoEnMXN } from "@/lib/pago-monto";
 import { hoyEnMexico } from "@/lib/fecha";
 import { formatCurrency } from "@/lib/format";
+import { MiniSparkline } from "@/components/panel/mini-sparkline";
 import type { Usuario } from "@/generated/prisma/client";
-
-const currency = new Intl.NumberFormat("es-MX", {
-  style: "currency",
-  currency: "MXN",
-});
 
 // Para los totales "de un vistazo" (KPIs, embudo, ventas por origen) los
 // centavos no aportan nada y sí le quitan espacio a la tarjeta en móvil —
@@ -50,25 +53,63 @@ const fecha = new Intl.DateTimeFormat("es-MX", {
   timeZone: "UTC",
 });
 
+const MES_LARGO = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric", timeZone: "UTC" });
+
+// Línea de variación bajo una cifra ("↑ 18.4% vs. agosto") -- mismo criterio
+// que la comparación de Reportes: verde cuando el cambio va en la dirección
+// buena de esa métrica, rojo cuando no.
+function DeltaLinea({ delta, contra, buenoCuando }: { delta: Delta; contra: string; buenoCuando: "up" | "down" }) {
+  const bueno = delta.dir === "flat" || delta.dir === buenoCuando;
+  const color = delta.dir === "flat" ? "text-muted-foreground" : bueno ? "text-success" : "text-destructive";
+  const Icono = delta.dir === "up" ? ArrowUp : delta.dir === "down" ? ArrowDown : Minus;
+  const texto =
+    delta.pct === null ? (delta.dir === "flat" ? "igual" : "nuevo") : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(1)}%`;
+  return (
+    <p className={`flex items-center gap-1 text-xs ${color}`}>
+      <Icono className="size-3 shrink-0" />
+      <span className="font-medium">{texto}</span>
+      <span className="text-muted-foreground">vs. {contra}</span>
+    </p>
+  );
+}
+
 function KpiCard({
   title,
   value,
   icon: Icon,
+  sub,
+  delta,
+  deltaContra,
+  deltaBuenoCuando = "up",
+  trailing,
+  accentClass = "bg-primary/10 text-primary",
 }: {
   title: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
+  sub?: string;
+  delta?: Delta;
+  deltaContra?: string;
+  deltaBuenoCuando?: "up" | "down";
+  trailing?: React.ReactNode;
+  accentClass?: string;
 }) {
   return (
     <Card>
       <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
+        <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${accentClass}`}>
           <Icon className="size-4 sm:size-5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{title}</p>
           <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
+          {delta && deltaContra ? (
+            <DeltaLinea delta={delta} contra={deltaContra} buenoCuando={deltaBuenoCuando} />
+          ) : (
+            sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>
+          )}
         </div>
+        {trailing}
       </CardContent>
     </Card>
   );
@@ -80,110 +121,306 @@ function KpiCard({
 function MontoFunnel({ resumen }: { resumen: ResumenMontoMulti }) {
   return (
     <>
-      <p className="truncate text-xs text-muted-foreground">
-        {currencyCorta.format(resumen.montoMXN)}
-      </p>
+      <span className="truncate">{currencyCorta.format(resumen.montoMXN)}</span>
       {resumen.sinConvertir.map((s) => (
-        <p key={s.moneda} className="truncate text-xs text-muted-foreground">
+        <span key={s.moneda} className="truncate">
+          {" "}
           + {formatCurrency(s.monto, s.moneda)}
-        </p>
+        </span>
       ))}
     </>
   );
 }
 
-function PendienteCard({
-  title,
-  icon: Icon,
-  count,
-  emptyText,
-  children,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  count: number;
-  emptyText: string;
-  children: React.ReactNode;
-}) {
+// ---------- "Requiere tu atención": lista unificada ----------
+// Antes eran hasta 6 tarjetas repetidas (una por módulo, cada una con su
+// propio "no hay nada pendiente"). Se combinan en una sola lista ordenada
+// por urgencia, sin pedir ningún dato nuevo -- los 6 arrays ya se traían.
+
+type TipoPendiente = "cotizacion" | "pago" | "queja" | "ticket" | "tarea" | "orden";
+
+type Pendiente = {
+  id: string;
+  tipo: TipoPendiente;
+  label: string;
+  sub: string;
+  href: string;
+  fecha: Date | null;
+  monto: number | null;
+  moneda: string | null;
+  vencida: boolean;
+};
+
+const TIPO_META: Record<TipoPendiente, { label: string; icon: React.ComponentType<{ className?: string }>; colorClass: string }> = {
+  cotizacion: { label: "Cotizaciones", icon: FileText, colorClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400" },
+  pago: { label: "Pagos", icon: Landmark, colorClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  queja: { label: "Quejas", icon: LifeBuoy, colorClass: "bg-red-500/15 text-red-700 dark:text-red-400" },
+  ticket: { label: "Accesos", icon: KeyRound, colorClass: "bg-violet-500/15 text-violet-700 dark:text-violet-400" },
+  tarea: { label: "Tareas", icon: ListTodo, colorClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  orden: { label: "Órdenes de cambio", icon: Briefcase, colorClass: "bg-sky-500/15 text-sky-700 dark:text-sky-400" },
+};
+
+type DatosPendientes = {
+  cotizaciones: Awaited<ReturnType<typeof cargarCotizacionesPendientes>>;
+  pagos: Awaited<ReturnType<typeof cargarPagosPorConfirmar>>;
+  quejas: Awaited<ReturnType<typeof cargarQuejasNuevas>>;
+  tickets: Awaited<ReturnType<typeof cargarTicketsPendientes>>;
+  tareas: Awaited<ReturnType<typeof cargarTareasPendientes>>;
+  ordenes: Awaited<ReturnType<typeof cargarOrdenesCambioPendientes>>;
+};
+
+function cargarCotizacionesPendientes(where: Record<string, unknown>) {
+  return prisma.cotizacion.findMany({
+    where: { status: "Enviada", ...where },
+    orderBy: { fechaVencimiento: "asc" },
+    take: 10,
+    include: { cliente: true, servicio: true },
+  });
+}
+function cargarPagosPorConfirmar(where: Record<string, unknown>) {
+  return prisma.pago.findMany({
+    where: { confirmado: false, ...where },
+    orderBy: { fecha: "asc" },
+    take: 10,
+    include: { servicio: { include: { cliente: true } } },
+  });
+}
+function cargarQuejasNuevas(where: Record<string, unknown>) {
+  return prisma.queja.findMany({
+    where: { status: "Nueva", ...where },
+    orderBy: { creadoEn: "asc" },
+    take: 10,
+    include: { cliente: true },
+  });
+}
+function cargarTicketsPendientes() {
+  return prisma.ticketAcceso.findMany({
+    where: { status: "Pendiente" },
+    orderBy: { fechaSolicitud: "asc" },
+    take: 10,
+    include: { usuarioSolicitante: true },
+  });
+}
+function cargarTareasPendientes(where: Record<string, unknown>) {
+  return prisma.tarea.findMany({
+    where: { completada: false, ...where },
+    orderBy: [{ fechaLimite: "asc" }, { creadoEn: "asc" }],
+    take: 10,
+    include: { servicio: true, cotizacion: { include: { cliente: true } } },
+  });
+}
+function cargarOrdenesCambioPendientes(where: Record<string, unknown>) {
+  return prisma.ordenCambio.findMany({
+    where: { status: "Pendiente", ...where },
+    orderBy: { creadoEn: "asc" },
+    take: 10,
+    include: { servicio: { include: { cliente: true } } },
+  });
+}
+
+const hoyUTC = () => new Date();
+
+function normalizarPendientes(datos: DatosPendientes): Pendiente[] {
+  const ahora = hoyUTC();
+  const lista: Pendiente[] = [];
+
+  for (const c of datos.cotizaciones) {
+    lista.push({
+      id: `cot-${c.id}`,
+      tipo: "cotizacion",
+      label: `${nombreClienteCotizacion(c)} — ${c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}`,
+      sub: "Por firmar/pagar",
+      href: `/admin/cotizaciones/${c.id}`,
+      fecha: c.fechaVencimiento,
+      monto: Number(c.montoTotal),
+      moneda: c.moneda,
+      vencida: Boolean(c.fechaVencimiento && c.fechaVencimiento < ahora),
+    });
+  }
+  for (const p of datos.pagos) {
+    lista.push({
+      id: `pag-${p.id}`,
+      tipo: "pago",
+      label: `${p.servicio.cliente.nombre} — ${p.servicio.descripcion}`,
+      sub: "Por confirmar",
+      href: p.cotizacionId ? `/admin/cotizaciones/${p.cotizacionId}` : `/admin/servicios/${p.servicio.id}`,
+      fecha: p.fecha,
+      monto: Number(p.monto),
+      moneda: p.moneda,
+      vencida: false,
+    });
+  }
+  for (const q of datos.quejas) {
+    lista.push({
+      id: `que-${q.id}`,
+      tipo: "queja",
+      label: `${q.cliente.nombre} — ${q.categoria}`,
+      sub: "Nueva",
+      href: "/admin/quejas",
+      fecha: q.creadoEn,
+      monto: null,
+      moneda: null,
+      vencida: false,
+    });
+  }
+  for (const t of datos.tickets) {
+    lista.push({
+      id: `tic-${t.id}`,
+      tipo: "ticket",
+      label: `${t.usuarioSolicitante.nombre} — ${t.moduloSolicitado}`,
+      sub: "Ticket de acceso",
+      href: "/admin/usuarios",
+      fecha: t.fechaSolicitud,
+      monto: null,
+      moneda: null,
+      vencida: false,
+    });
+  }
+  for (const t of datos.tareas) {
+    const proyecto = t.servicio?.descripcion ?? (t.cotizacion ? nombreClienteCotizacion(t.cotizacion) : null);
+    lista.push({
+      id: `tar-${t.id}`,
+      tipo: "tarea",
+      label: t.titulo + (proyecto ? ` — ${proyecto}` : ""),
+      sub: t.prioridad === "Alta" ? "Prioridad alta" : "Tarea pendiente",
+      href: t.servicioId
+        ? `/admin/servicios/${t.servicioId}`
+        : t.cotizacionId
+          ? `/admin/cotizaciones/${t.cotizacionId}`
+          : "/admin/tareas",
+      fecha: t.fechaLimite,
+      monto: null,
+      moneda: null,
+      vencida: Boolean(t.fechaLimite && t.fechaLimite < ahora),
+    });
+  }
+  for (const o of datos.ordenes) {
+    lista.push({
+      id: `ord-${o.id}`,
+      tipo: "orden",
+      label: `${o.servicio.cliente.nombre} — ${o.descripcion}`,
+      sub: "Por aprobar",
+      href: `/admin/servicios/${o.servicio.id}`,
+      fecha: o.creadoEn,
+      monto: Number(o.monto),
+      moneda: null,
+      vencida: false,
+    });
+  }
+
+  return lista.sort((a, b) => {
+    if (a.vencida !== b.vencida) return a.vencida ? -1 : 1;
+    const fa = a.fecha?.getTime() ?? Infinity;
+    const fb = b.fecha?.getTime() ?? Infinity;
+    return fa - fb;
+  });
+}
+
+function ListaPendientes({ pendientes, filtro }: { pendientes: Pendiente[]; filtro?: string }) {
+  const vencidasCount = pendientes.filter((p) => p.vencida).length;
+  const mostrar = filtro === "vencidos" ? pendientes.filter((p) => p.vencida) : pendientes;
+  const base = "/admin";
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Icon className="size-4 text-muted-foreground" />
-          {title}
+        <CardTitle className="text-sm font-medium">
+          Requiere tu atención {pendientes.length > 0 && <span className="text-muted-foreground">· {pendientes.length}</span>}
         </CardTitle>
-        {count > 0 && <Badge variant="secondary">{count}</Badge>}
+        {pendientes.length > 0 && (
+          <div className="flex gap-1.5">
+            <Button asChild size="sm" variant={filtro !== "vencidos" ? "default" : "outline"}>
+              <Link href={base}>Todos</Link>
+            </Button>
+            <Button asChild size="sm" variant={filtro === "vencidos" ? "default" : "outline"} disabled={vencidasCount === 0}>
+              <Link href={`${base}?filtro=vencidos`}>Vencidos{vencidasCount > 0 ? ` (${vencidasCount})` : ""}</Link>
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
-        {count === 0 ? (
-          <p className="text-sm text-muted-foreground">{emptyText}</p>
+        {pendientes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No tienes pendientes en ningún módulo.</p>
+        ) : mostrar.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No hay nada vencido — buen trabajo.</p>
         ) : (
-          <ul className="flex flex-col gap-2">{children}</ul>
+          <div className="flex flex-col">
+            {mostrar.map((p) => {
+              const meta = TIPO_META[p.tipo];
+              const Icon = meta.icon;
+              return (
+                <Link
+                  key={p.id}
+                  href={p.href}
+                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60"
+                >
+                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${meta.colorClass}`}>
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {meta.label} · {p.sub}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {p.monto !== null && (
+                      <p className="text-sm font-medium tabular-nums">{formatCurrency(p.monto, p.moneda)}</p>
+                    )}
+                    <p className={`text-xs ${p.vencida ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                      {p.fecha ? fecha.format(p.fecha) : "—"}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-// Tarjeta compacta reutilizada por ambos paneles cuando no queda ningún
-// pendiente por mostrar en esa vista.
-function TodoAlDiaCard({ texto }: { texto: string }) {
-  return (
-    <Card className="mb-4">
-      <CardContent className="flex items-center gap-3 py-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
-          <CheckCircle2 className="size-5" />
-        </div>
-        <div>
-          <p className="font-medium">¡Todo al día!</p>
-          <p className="text-sm text-muted-foreground">{texto}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SinPendientesCard({ items }: { items: { key: string; title: string }[] }) {
-  return (
-    <Card className="mt-4">
-      <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5 font-medium text-foreground">
-          <CheckCircle2 className="size-3.5 text-success" />
-          Sin pendientes:
-        </span>
-        {items.map((p) => (
-          <span key={p.key}>{p.title}</span>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filtro?: string }>;
+}) {
   const usuario = await currentUsuario();
   if (!usuario) redirect("/login");
+
+  const { filtro } = await searchParams;
 
   // El panel del dueño (Admin) es un resumen financiero de todo el
   // negocio; el de un usuario interno normal es solo lo que le toca a
   // él — nunca ingresos, embudo de venta ni ventas por origen de la
   // empresa completa.
-  if (!esAdmin(usuario)) return <PanelUsuario usuario={usuario} />;
-  return <PanelAdmin />;
+  if (!esAdmin(usuario)) return <PanelUsuario usuario={usuario} filtro={filtro} />;
+  return <PanelAdmin filtro={filtro} />;
 }
 
-async function PanelAdmin() {
+async function PanelAdmin({ filtro }: { filtro?: string }) {
   // hoyEnMexico() en vez de new Date(): el servidor corre en UTC, y
   // new Date().setDate(1) se adelanta al mes siguiente desde la tarde del
   // último día de cada mes (hora de México) -- justo cuando "Ingresos del
   // mes" más importa que no se vacíe de golpe.
-  const inicioDeMes = hoyEnMexico();
+  const hoy = hoyEnMexico();
+  const inicioDeMes = new Date(hoy);
   inicioDeMes.setUTCDate(1);
+  // 6 meses atrás (incluyendo el actual) -- para el sparkline y para poder
+  // comparar "lo que va del mes" contra el mismo tramo del mes pasado, sin
+  // pedir los pagos dos veces.
+  const inicioSparkline = new Date(Date.UTC(inicioDeMes.getUTCFullYear(), inicioDeMes.getUTCMonth() - 5, 1));
+  const mesPasadoInicio = new Date(Date.UTC(inicioDeMes.getUTCFullYear(), inicioDeMes.getUTCMonth() - 1, 1));
+  // Mismo día del mes que hoy, para comparar manzanas con manzanas (1-14 de
+  // septiembre vs. 1-14 de agosto, no contra todo agosto).
+  const mesPasadoHasta = new Date(Date.UTC(inicioDeMes.getUTCFullYear(), inicioDeMes.getUTCMonth() - 1, hoy.getUTCDate() + 1));
 
   const [
     totalClientes,
-    serviciosActivos,
+    serviciosActivosDetalle,
     totalServicios,
-    ingresosMes,
+    pagosUltimosMeses,
     serviciosPorStatus,
     cotizacionesPendientes,
     pagosPorConfirmar,
@@ -200,52 +437,34 @@ async function PanelAdmin() {
     tasas,
   ] = await Promise.all([
     prisma.cliente.count(),
-    prisma.servicio.count({ where: { status: { in: ["Aprobado", "EnProceso"] } } }),
+    // Detalle (no solo count) -- hace falta para calcular "Por cobrar" con
+    // montoPendienteServicio() por cada uno, ver más abajo.
+    prisma.servicio.findMany({
+      where: { status: { in: ["Aprobado", "EnProceso"] } },
+      select: {
+        clienteId: true,
+        montoInicial: true,
+        moneda: true,
+        ordenesCambio: { select: { status: true, monto: true } },
+        pagos: { select: { monto: true, confirmado: true, moneda: true } },
+      },
+    }),
     prisma.servicio.count(),
-    // No es un aggregate() de Prisma porque hay que restar la comisión de
-    // la pasarela y convertir a MXN registro por registro (ver
-    // montoNetoEnMXN) -- son pocos pagos al mes, no pesa nada.
+    // Un solo fetch cubre "ingresos del mes", "vs. mes pasado" y el
+    // sparkline de 6 meses -- no es un aggregate() porque hay que restar
+    // la comisión de la pasarela y convertir a MXN registro por registro
+    // (ver montoNetoEnMXN); son pocos pagos al mes, no pesa nada.
     prisma.pago.findMany({
-      where: { fecha: { gte: inicioDeMes }, confirmado: true },
-      select: { monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
+      where: { fecha: { gte: inicioSparkline }, confirmado: true },
+      select: { fecha: true, monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
     }),
     prisma.servicio.groupBy({ by: ["status"], _count: true }),
-    prisma.cotizacion.findMany({
-      where: { status: "Enviada" },
-      orderBy: { fechaVencimiento: "asc" },
-      take: 10,
-      include: { cliente: true, servicio: true },
-    }),
-    prisma.pago.findMany({
-      where: { confirmado: false },
-      orderBy: { fecha: "asc" },
-      take: 10,
-      include: { servicio: { include: { cliente: true } } },
-    }),
-    prisma.queja.findMany({
-      where: { status: "Nueva" },
-      orderBy: { creadoEn: "asc" },
-      take: 10,
-      include: { cliente: true },
-    }),
-    prisma.ticketAcceso.findMany({
-      where: { status: "Pendiente" },
-      orderBy: { fechaSolicitud: "asc" },
-      take: 10,
-      include: { usuarioSolicitante: true },
-    }),
-    prisma.ordenCambio.findMany({
-      where: { status: "Pendiente" },
-      orderBy: { creadoEn: "asc" },
-      take: 10,
-      include: { servicio: { include: { cliente: true } } },
-    }),
-    prisma.tarea.findMany({
-      where: { completada: false },
-      orderBy: [{ fechaLimite: "asc" }, { creadoEn: "asc" }],
-      take: 10,
-      include: { servicio: true, cotizacion: { include: { cliente: true } } },
-    }),
+    cargarCotizacionesPendientes({}),
+    cargarPagosPorConfirmar({}),
+    cargarQuejasNuevas({}),
+    cargarTicketsPendientes(),
+    cargarOrdenesCambioPendientes({}),
+    cargarTareasPendientes({}),
     // findMany + moneda en vez de aggregate(_sum) -- una cotización en
     // USD/EUR no se puede sumar en crudo junto con una en MXN (ver
     // resumirMontoMulti más abajo, mismo criterio que ya se usa en
@@ -284,6 +503,47 @@ async function PanelAdmin() {
     obtenerTasasAMXN(),
   ]);
 
+  const serviciosActivos = serviciosActivosDetalle.length;
+  const aprobadosCount = serviciosPorStatus.find((s) => s.status === "Aprobado")?._count ?? 0;
+  const enProcesoCount = serviciosPorStatus.find((s) => s.status === "EnProceso")?._count ?? 0;
+
+  // "Por cobrar": lo que falta de cobrar en cada servicio activo (mismo
+  // criterio de montoPendienteServicio que ya usa Servicios/Reportes),
+  // sumado en MXN y contando clientes distintos con saldo.
+  const pendientesPorServicio = serviciosActivosDetalle.map((s) => ({
+    clienteId: s.clienteId,
+    pendiente: montoPendienteServicio(s, s.pagos),
+    moneda: s.moneda,
+  }));
+  const conSaldo = pendientesPorServicio.filter((s) => s.pendiente > 0.01);
+  const porCobrarResumen = resumirMontoMulti(
+    conSaldo.map((s) => ({ monto: s.pendiente, moneda: s.moneda })),
+    tasas
+  );
+  const clientesConSaldo = new Set(conSaldo.map((s) => s.clienteId)).size;
+
+  // Ingresos: este mes, mes pasado (mismo tramo de días) y los 6 meses
+  // para el sparkline -- todo del mismo fetch de arriba.
+  const puntosMensuales = agruparRecaudadoMensual(
+    pagosUltimosMeses.map((p) => ({ fecha: p.fecha, monto: montoNetoEnMXN(p) })),
+    inicioSparkline,
+    inicioDeMes
+  );
+  const ingresosMesMXN = pagosUltimosMeses
+    .filter((p) => p.fecha >= inicioDeMes)
+    .reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
+  const ingresosMesPasadoMXN = pagosUltimosMeses
+    .filter((p) => p.fecha >= mesPasadoInicio && p.fecha < mesPasadoHasta)
+    .reduce((acc, p) => acc + montoNetoEnMXN(p), 0);
+  const deltaIngresos = calcularDelta(ingresosMesMXN, ingresosMesPasadoMXN);
+  const mesPasadoLabel = MES_LARGO.format(mesPasadoInicio).split(" de ")[0];
+
+  const gastosEmpresa = gastosPorAmbito.find((g) => g.ambito === "Empresa");
+  const gastosPersonal = gastosPorAmbito.find((g) => g.ambito === "Personal");
+  const gastosEmpresaMXN = Number(gastosEmpresa?._sum.monto ?? 0);
+  const utilidadEstimada = ingresosMesMXN - gastosEmpresaMXN;
+  const margen = calcularMargen(ingresosMesMXN, gastosEmpresaMXN);
+
   const resumenEnNegociacion = resumirMontoMulti(
     enNegociacion.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
     tasas
@@ -300,370 +560,225 @@ async function PanelAdmin() {
     perdidas.map((c) => ({ monto: Number(c.montoTotal), moneda: c.moneda })),
     tasas
   );
+  const embudoItems: {
+    label: string;
+    resumen: ResumenMontoMulti;
+    href?: string;
+    colorClass: string;
+  }[] = [
+    { label: "En negociación", resumen: resumenEnNegociacion, href: "/admin/cotizaciones?status=Enviada", colorClass: "bg-blue-500" },
+    {
+      label: "Ganadas por formalizar",
+      resumen: resumenGanadasPorFormalizar,
+      href: "/admin/cotizaciones?status=Firmada",
+      colorClass: "bg-violet-500",
+    },
+    { label: "Convertidas a servicio", resumen: resumenConvertidasAServicio, colorClass: "bg-emerald-500" },
+    { label: "Perdidas", resumen: resumenPerdidas, href: "/admin/cotizaciones?status=Perdida", colorClass: "bg-red-500" },
+  ];
+  const embudoMax = Math.max(1, ...embudoItems.map((e) => e.resumen.count));
 
   const ventasTiendaOnline = ventasPorOrigen.find((v) => v.origen === "TiendaOnline");
   const ventasManual = ventasPorOrigen.find((v) => v.origen === "Manual");
-  const gastosEmpresa = gastosPorAmbito.find((g) => g.ambito === "Empresa");
-  const gastosPersonal = gastosPorAmbito.find((g) => g.ambito === "Personal");
 
-  // En móvil, seis tarjetas repitiendo "no hay nada pendiente" es puro
-  // scroll sin información — las vacías se colapsan en una sola tarjeta
-  // compacta y solo las que sí tienen algo se ven en detalle.
-  const pendientesResumen = [
-    { key: "cotizaciones", title: "Cotizaciones por firmar/pagar", count: cotizacionesPendientes.length },
-    { key: "pagos", title: "Pagos por confirmar", count: pagosPorConfirmar.length },
-    { key: "quejas", title: "Quejas nuevas", count: quejasNuevas.length },
-    { key: "tickets", title: "Tickets de acceso", count: ticketsPendientes.length },
-    { key: "tareas", title: "Tareas pendientes", count: tareasPendientes.length },
-    { key: "ordenes", title: "Órdenes de cambio por aprobar", count: ordenesCambioPendientes.length },
-  ];
-  const pendientesVacios = pendientesResumen.filter((p) => p.count === 0);
-  const hayPendientesActivos = pendientesResumen.some((p) => p.count > 0);
+  const pendientes = normalizarPendientes({
+    cotizaciones: cotizacionesPendientes,
+    pagos: pagosPorConfirmar,
+    quejas: quejasNuevas,
+    tickets: ticketsPendientes,
+    tareas: tareasPendientes,
+    ordenes: ordenesCambioPendientes,
+  });
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Panel</h1>
-        <p className="text-sm text-muted-foreground">
-          Resumen general del negocio
-        </p>
+        <p className="text-sm capitalize text-muted-foreground">{MES_LARGO.format(hoy)}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <KpiCard title="Clientes" value={String(totalClientes)} icon={Users} />
         <KpiCard
-          title="Servicios activos"
+          title="Cobrado este mes"
+          value={currencyCorta.format(ingresosMesMXN)}
+          icon={CreditCard}
+          accentClass="bg-success/10 text-success"
+          delta={deltaIngresos}
+          deltaContra={mesPasadoLabel}
+          trailing={<MiniSparkline valores={puntosMensuales.map((p) => p.recaudado)} />}
+        />
+        <KpiCard
+          title="Por cobrar"
+          value={currencyCorta.format(porCobrarResumen.montoMXN)}
+          icon={Landmark}
+          accentClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          sub={`${clientesConSaldo} cliente${clientesConSaldo === 1 ? "" : "s"} con saldo`}
+        />
+        <KpiCard
+          title="Servicios en curso"
           value={String(serviciosActivos)}
           icon={Briefcase}
+          sub={`${aprobadosCount} aprobados · ${enProcesoCount} en proceso`}
         />
         <KpiCard
-          title="Ingresos del mes"
-          value={currencyCorta.format(ingresosMes.reduce((acc, p) => acc + montoNetoEnMXN(p), 0))}
-          icon={CreditCard}
-        />
-        <KpiCard
-          title="Servicios totales"
-          value={String(totalServicios)}
-          icon={LayoutDashboard}
+          title="Utilidad estimada"
+          value={currencyCorta.format(utilidadEstimada)}
+          icon={PiggyBank}
+          accentClass={utilidadEstimada >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}
+          sub={`${margen.toFixed(0)}% de margen este mes`}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">
-            Servicios por status
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {serviciosPorStatus.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aún no hay servicios registrados.
-            </p>
-          ) : (
-            serviciosPorStatus.map((s) => (
-              <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
-                <Badge className={SERVICIO_STATUS_COLOR[s.status] ?? ""}>
-                  {s.status}: {s._count}
-                </Badge>
-              </Link>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+        <div className="lg:col-span-2">
+          <ListaPendientes pendientes={pendientes} filtro={filtro} />
+        </div>
 
-      <div>
-        <h2 className="text-lg font-semibold">Embudo de venta</h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          De la negociación al servicio confirmado
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <Link href="/admin/cotizaciones?status=Enviada">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="py-2">
-                <p className="truncate text-xs text-muted-foreground">En negociación</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{resumenEnNegociacion.count}</p>
-                <MontoFunnel resumen={resumenEnNegociacion} />
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/cotizaciones?status=Firmada">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="py-2">
-                <p className="truncate text-xs text-muted-foreground">Ganadas por formalizar</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{resumenGanadasPorFormalizar.count}</p>
-                <MontoFunnel resumen={resumenGanadasPorFormalizar} />
-              </CardContent>
-            </Card>
-          </Link>
+        <div className="flex flex-col gap-4">
           <Card>
-            <CardContent className="py-2">
-              <p className="truncate text-xs text-muted-foreground">Convertidas a servicio</p>
-              <p className="truncate text-lg font-semibold sm:text-xl">{resumenConvertidasAServicio.count}</p>
-              <MontoFunnel resumen={resumenConvertidasAServicio} />
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Embudo de venta</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {embudoItems.map((item) => {
+                const contenido = (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-1.5 truncate font-medium">
+                        <span className={`size-2 shrink-0 rounded-full ${item.colorClass}`} />
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      <span className="shrink-0 text-right text-xs text-muted-foreground">
+                        {item.resumen.count} · <MontoFunnel resumen={item.resumen} />
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${item.colorClass} transition-all duration-500`}
+                        style={{ width: `${Math.max(2, (item.resumen.count / embudoMax) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+                return item.href ? (
+                  <Link key={item.label} href={item.href} className="-m-1 rounded-lg p-1 transition-colors hover:bg-muted/40">
+                    {contenido}
+                  </Link>
+                ) : (
+                  <div key={item.label}>{contenido}</div>
+                );
+              })}
             </CardContent>
           </Card>
-          <Link href="/admin/cotizaciones?status=Perdida">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="py-2">
-                <p className="truncate text-xs text-muted-foreground">Perdidas</p>
-                <p className="truncate text-lg font-semibold sm:text-xl">{resumenPerdidas.count}</p>
-                <MontoFunnel resumen={resumenPerdidas} />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </div>
 
-      <div>
-        <h2 className="text-lg font-semibold">Ventas por origen</h2>
-        <p className="mb-3 text-sm text-muted-foreground">Mes actual</p>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Link href="/admin/ventas?origen=TiendaOnline">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
-                  <ShoppingBag className="size-4 sm:size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">Tienda Online</p>
-                  <p className="truncate text-lg font-semibold sm:text-xl">
-                    {currencyCorta.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {ventasTiendaOnline?._count ?? 0} venta
-                    {(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/ventas?origen=Manual">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
-                  <ShoppingBag className="size-4 sm:size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">Manual (otros medios)</p>
-                  <p className="truncate text-lg font-semibold sm:text-xl">
-                    {currencyCorta.format(Number(ventasManual?._sum.total ?? 0))}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {ventasManual?._count ?? 0} venta
-                    {(ventasManual?._count ?? 0) === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-lg font-semibold">Gastos del mes</h2>
-        <p className="mb-3 text-sm text-muted-foreground">Personal vs. empresa</p>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Link href="/admin/gastos?ambito=Empresa">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10">
-                  <Wallet className="size-4 sm:size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">Empresa</p>
-                  <p className="truncate text-lg font-semibold sm:text-xl">
-                    {currencyCorta.format(Number(gastosEmpresa?._sum.monto ?? 0))}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/gastos?ambito=Personal">
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-2 sm:gap-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 sm:size-10 dark:text-orange-400">
-                  <User className="size-4 sm:size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">Personal</p>
-                  <p className="truncate text-lg font-semibold sm:text-xl">
-                    {currencyCorta.format(Number(gastosPersonal?._sum.monto ?? 0))}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {gastosPersonal?._count ?? 0} gasto{(gastosPersonal?._count ?? 0) === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-lg font-semibold">Mis pendientes</h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Cosas que requieren tu atención
-        </p>
-
-        {!hayPendientesActivos && <TodoAlDiaCard texto="No tienes pendientes en ningún módulo." />}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {cotizacionesPendientes.length > 0 && (
-          <PendienteCard
-            title="Cotizaciones por firmar/pagar"
-            icon={FileText}
-            count={cotizacionesPendientes.length}
-            emptyText="No hay cotizaciones pendientes."
-          >
-            {cotizacionesPendientes.map((c) => (
-              <li key={c.id} className="flex items-center justify-between text-sm">
-                <Link
-                  href={`/admin/cotizaciones/${c.id}`}
-                  className="truncate hover:underline"
-                >
-                  {nombreClienteCotizacion(c)} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
-                </Link>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
-                </span>
-              </li>
-            ))}
-          </PendienteCard>
-          )}
-
-          {pagosPorConfirmar.length > 0 && (
-          <PendienteCard
-            title="Pagos por confirmar"
-            icon={Landmark}
-            count={pagosPorConfirmar.length}
-            emptyText="No hay pagos pendientes de confirmar."
-          >
-            {pagosPorConfirmar.map((p) => (
-              <li key={p.id} className="flex items-center justify-between text-sm">
-                <Link
-                  href={
-                    p.cotizacionId
-                      ? `/admin/cotizaciones/${p.cotizacionId}`
-                      : `/admin/servicios/${p.servicio.id}`
-                  }
-                  className="truncate hover:underline"
-                >
-                  {p.servicio.cliente.nombre} — {p.servicio.descripcion}
-                </Link>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {currency.format(Number(p.monto))}
-                </span>
-              </li>
-            ))}
-          </PendienteCard>
-          )}
-
-          {quejasNuevas.length > 0 && (
-          <PendienteCard
-            title="Quejas nuevas"
-            icon={LifeBuoy}
-            count={quejasNuevas.length}
-            emptyText="No hay quejas nuevas."
-          >
-            {quejasNuevas.map((q) => (
-              <li key={q.id} className="flex items-center justify-between text-sm">
-                <Link href="/admin/quejas" className="truncate hover:underline">
-                  {q.cliente.nombre} — {q.categoria}
-                </Link>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {fecha.format(q.creadoEn)}
-                </span>
-              </li>
-            ))}
-          </PendienteCard>
-          )}
-
-          {ticketsPendientes.length > 0 && (
-          <PendienteCard
-            title="Tickets de acceso"
-            icon={KeyRound}
-            count={ticketsPendientes.length}
-            emptyText="No hay tickets de acceso pendientes."
-          >
-            {ticketsPendientes.map((t) => (
-              <li key={t.id} className="flex items-center justify-between text-sm">
-                <Link href="/admin/usuarios" className="truncate hover:underline">
-                  {t.usuarioSolicitante.nombre} — {t.moduloSolicitado}
-                </Link>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {fecha.format(t.fechaSolicitud)}
-                </span>
-              </li>
-            ))}
-          </PendienteCard>
-          )}
-
-          {tareasPendientes.length > 0 && (
-          <PendienteCard
-            title="Tareas pendientes"
-            icon={ListTodo}
-            count={tareasPendientes.length}
-            emptyText="No tienes tareas pendientes."
-          >
-            {tareasPendientes.map((t) => {
-              const proyecto =
-                t.servicio?.descripcion ?? (t.cotizacion ? nombreClienteCotizacion(t.cotizacion) : null);
-              const vencida = t.fechaLimite && t.fechaLimite < new Date();
-              const href = t.servicioId
-                ? `/admin/servicios/${t.servicioId}`
-                : t.cotizacionId
-                  ? `/admin/cotizaciones/${t.cotizacionId}`
-                  : "/admin/tareas";
-              return (
-                <li key={t.id} className="flex items-center justify-between text-sm">
-                  <Link href={href} className="truncate hover:underline">
-                    {t.titulo}
-                    {proyecto ? ` — ${proyecto}` : ""}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Servicios por status</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {serviciosPorStatus.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aún no hay servicios registrados.</p>
+              ) : (
+                serviciosPorStatus.map((s) => (
+                  <Link key={s.status} href={`/admin/servicios?status=${s.status}`}>
+                    <Badge className={SERVICIO_STATUS_COLOR[s.status] ?? ""}>
+                      {s.status}: {s._count}
+                    </Badge>
                   </Link>
-                  <span
-                    className={`shrink-0 text-xs ${vencida ? "text-destructive" : "text-muted-foreground"}`}
-                  >
-                    {t.fechaLimite ? fecha.format(t.fechaLimite) : t.prioridad}
-                  </span>
-                </li>
-              );
-            })}
-          </PendienteCard>
-          )}
-
-          {ordenesCambioPendientes.length > 0 && (
-          <PendienteCard
-            title="Órdenes de cambio por aprobar"
-            icon={Briefcase}
-            count={ordenesCambioPendientes.length}
-            emptyText="No hay órdenes de cambio pendientes."
-          >
-            {ordenesCambioPendientes.map((o) => (
-              <li key={o.id} className="flex items-center justify-between text-sm">
-                <Link
-                  href={`/admin/servicios/${o.servicio.id}`}
-                  className="truncate hover:underline"
-                >
-                  {o.servicio.cliente.nombre} — {o.descripcion}
-                </Link>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {currency.format(Number(o.monto))}
-                </span>
-              </li>
-            ))}
-          </PendienteCard>
-          )}
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
-
-        {hayPendientesActivos && pendientesVacios.length > 0 && <SinPendientesCard items={pendientesVacios} />}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Todos los módulos de Fase 1 están disponibles.
-      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <h2 className="text-lg font-semibold">Ventas del mes</h2>
+          <p className="mb-3 text-sm text-muted-foreground">Por origen</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/admin/ventas?origen=TiendaOnline">
+              <Card className="transition-colors hover:bg-muted/40">
+                <CardContent className="flex items-center gap-3 py-2">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ShoppingBag className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs text-muted-foreground">Tienda Online</p>
+                    <p className="truncate text-lg font-semibold">
+                      {currencyCorta.format(Number(ventasTiendaOnline?._sum.total ?? 0))}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {ventasTiendaOnline?._count ?? 0} venta{(ventasTiendaOnline?._count ?? 0) === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/admin/ventas?origen=Manual">
+              <Card className="transition-colors hover:bg-muted/40">
+                <CardContent className="flex items-center gap-3 py-2">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ShoppingBag className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs text-muted-foreground">Manual (otros medios)</p>
+                    <p className="truncate text-lg font-semibold">
+                      {currencyCorta.format(Number(ventasManual?._sum.total ?? 0))}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {ventasManual?._count ?? 0} venta{(ventasManual?._count ?? 0) === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold">Gastos del mes</h2>
+          <p className="mb-3 text-sm text-muted-foreground">Personal vs. empresa</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/admin/gastos?ambito=Empresa">
+              <Card className="transition-colors hover:bg-muted/40">
+                <CardContent className="flex items-center gap-3 py-2">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Wallet className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs text-muted-foreground">Empresa</p>
+                    <p className="truncate text-lg font-semibold">{currencyCorta.format(gastosEmpresaMXN)}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {gastosEmpresa?._count ?? 0} gasto{(gastosEmpresa?._count ?? 0) === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/admin/gastos?ambito=Personal">
+              <Card className="transition-colors hover:bg-muted/40">
+                <CardContent className="flex items-center gap-3 py-2">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                    <User className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs text-muted-foreground">Personal</p>
+                    <p className="truncate text-lg font-semibold">
+                      {currencyCorta.format(Number(gastosPersonal?._sum.monto ?? 0))}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {gastosPersonal?._count ?? 0} gasto{(gastosPersonal?._count ?? 0) === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">Total de servicios registrados: {totalServicios} · Clientes: {totalClientes}</p>
     </div>
   );
 }
@@ -675,7 +790,7 @@ async function PanelAdmin() {
 // real de ese módulo (responsableId del servicio, asignadoAId, o quién
 // creó el registro), así que si más adelante se le da alcance "Todo" en
 // algún módulo, este panel automáticamente le muestra todo ahí también.
-async function PanelUsuario({ usuario }: { usuario: Usuario }) {
+async function PanelUsuario({ usuario, filtro }: { usuario: Usuario; filtro?: string }) {
   const [permisosClientes, permisosServicios, permisosCotizaciones, permisosPagos, permisosQuejas, permisosTareas] =
     await Promise.all([
       permisosModulo(usuario, "Clientes"),
@@ -692,6 +807,9 @@ async function PanelUsuario({ usuario }: { usuario: Usuario }) {
   const quejaPropiaWhere = permisosQuejas.verTodo
     ? {}
     : { OR: [{ asignadoAId: usuario.id }, { servicio: { responsableId: usuario.id } }] };
+  const pagoPropioWhere = permisosPagos.verTodo ? {} : { servicio: { responsableId: usuario.id } };
+  const tareaPropiaWhere = permisosTareas.verTodo ? {} : { asignadoAId: usuario.id };
+  const ordenPropiaWhere = permisosServicios.verTodo ? {} : { servicio: { responsableId: usuario.id } };
 
   const [
     misClientesCount,
@@ -733,52 +851,11 @@ async function PanelUsuario({ usuario }: { usuario: Usuario }) {
           where: permisosServicios.verTodo ? {} : { responsableId: usuario.id },
         })
       : Promise.resolve([]),
-    permisosCotizaciones.puedeVer
-      ? prisma.cotizacion.findMany({
-          where: { status: "Enviada", ...cotizacionPropiaWhere },
-          orderBy: { fechaVencimiento: "asc" },
-          take: 10,
-          include: { cliente: true, servicio: true },
-        })
-      : Promise.resolve([]),
-    permisosPagos.puedeVer
-      ? prisma.pago.findMany({
-          where: {
-            confirmado: false,
-            ...(permisosPagos.verTodo ? {} : { servicio: { responsableId: usuario.id } }),
-          },
-          orderBy: { fecha: "asc" },
-          take: 10,
-          include: { servicio: { include: { cliente: true } } },
-        })
-      : Promise.resolve([]),
-    permisosQuejas.puedeVer
-      ? prisma.queja.findMany({
-          where: { status: "Nueva", ...quejaPropiaWhere },
-          orderBy: { creadoEn: "asc" },
-          take: 10,
-          include: { cliente: true },
-        })
-      : Promise.resolve([]),
-    permisosTareas.puedeVer
-      ? prisma.tarea.findMany({
-          where: { completada: false, ...(permisosTareas.verTodo ? {} : { asignadoAId: usuario.id }) },
-          orderBy: [{ fechaLimite: "asc" }, { creadoEn: "desc" }],
-          take: 10,
-          include: { servicio: true, cotizacion: { include: { cliente: true } } },
-        })
-      : Promise.resolve([]),
-    permisosServicios.puedeVer
-      ? prisma.ordenCambio.findMany({
-          where: {
-            status: "Pendiente",
-            ...(permisosServicios.verTodo ? {} : { servicio: { responsableId: usuario.id } }),
-          },
-          orderBy: { creadoEn: "asc" },
-          take: 10,
-          include: { servicio: { include: { cliente: true } } },
-        })
-      : Promise.resolve([]),
+    permisosCotizaciones.puedeVer ? cargarCotizacionesPendientes(cotizacionPropiaWhere) : Promise.resolve([]),
+    permisosPagos.puedeVer ? cargarPagosPorConfirmar(pagoPropioWhere) : Promise.resolve([]),
+    permisosQuejas.puedeVer ? cargarQuejasNuevas(quejaPropiaWhere) : Promise.resolve([]),
+    permisosTareas.puedeVer ? cargarTareasPendientes(tareaPropiaWhere) : Promise.resolve([]),
+    permisosServicios.puedeVer ? cargarOrdenesCambioPendientes(ordenPropiaWhere) : Promise.resolve([]),
   ]);
 
   const kpis: { title: string; value: string; icon: React.ComponentType<{ className?: string }> }[] = [];
@@ -794,29 +871,21 @@ async function PanelUsuario({ usuario }: { usuario: Usuario }) {
   if (permisosTareas.puedeVer)
     kpis.push({ title: "Mis tareas pendientes", value: String(misTareasPendientesCount), icon: ListTodo });
 
-  const pendientesResumen: { key: string; title: string; count: number }[] = [];
-  if (permisosCotizaciones.puedeVer)
-    pendientesResumen.push({
-      key: "cotizaciones",
-      title: "Cotizaciones por firmar/pagar",
-      count: cotizacionesPendientes.length,
-    });
-  if (permisosPagos.puedeVer)
-    pendientesResumen.push({ key: "pagos", title: "Pagos por confirmar", count: pagosPorConfirmar.length });
-  if (permisosQuejas.puedeVer)
-    pendientesResumen.push({ key: "quejas", title: "Quejas nuevas", count: quejasNuevas.length });
-  if (permisosTareas.puedeVer)
-    pendientesResumen.push({ key: "tareas", title: "Tareas pendientes", count: tareasPendientes.length });
-  if (permisosServicios.puedeVer)
-    pendientesResumen.push({
-      key: "ordenes",
-      title: "Órdenes de cambio por aprobar",
-      count: ordenesCambioPendientes.length,
-    });
+  const tieneAlgunModulo =
+    permisosCotizaciones.puedeVer ||
+    permisosPagos.puedeVer ||
+    permisosQuejas.puedeVer ||
+    permisosTareas.puedeVer ||
+    permisosServicios.puedeVer;
 
-  const pendientesVacios = pendientesResumen.filter((p) => p.count === 0);
-  const hayPendientesActivos = pendientesResumen.some((p) => p.count > 0);
-  const tieneAlgunModulo = pendientesResumen.length > 0;
+  const pendientes = normalizarPendientes({
+    cotizaciones: permisosCotizaciones.puedeVer ? cotizacionesPendientes : [],
+    pagos: permisosPagos.puedeVer ? pagosPorConfirmar : [],
+    quejas: permisosQuejas.puedeVer ? quejasNuevas : [],
+    tickets: [],
+    tareas: permisosTareas.puedeVer ? tareasPendientes : [],
+    ordenes: permisosServicios.puedeVer ? ordenesCambioPendientes : [],
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -854,136 +923,7 @@ async function PanelUsuario({ usuario }: { usuario: Usuario }) {
         </Card>
       )}
 
-      {tieneAlgunModulo && (
-        <div>
-          <h2 className="text-lg font-semibold">Mis pendientes</h2>
-          <p className="mb-3 text-sm text-muted-foreground">Cosas que requieren tu atención</p>
-
-          {!hayPendientesActivos && <TodoAlDiaCard texto="No tienes pendientes en lo que te toca." />}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {permisosCotizaciones.puedeVer && cotizacionesPendientes.length > 0 && (
-              <PendienteCard
-                title="Cotizaciones por firmar/pagar"
-                icon={FileText}
-                count={cotizacionesPendientes.length}
-                emptyText="No hay cotizaciones pendientes."
-              >
-                {cotizacionesPendientes.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between text-sm">
-                    <Link href={`/admin/cotizaciones/${c.id}`} className="truncate hover:underline">
-                      {nombreClienteCotizacion(c)} — {c.servicio?.descripcion ?? c.descripcion ?? "Negociación"}
-                    </Link>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {c.fechaVencimiento ? fecha.format(c.fechaVencimiento) : "sin vencimiento"}
-                    </span>
-                  </li>
-                ))}
-              </PendienteCard>
-            )}
-
-            {permisosPagos.puedeVer && pagosPorConfirmar.length > 0 && (
-              <PendienteCard
-                title="Pagos por confirmar"
-                icon={Landmark}
-                count={pagosPorConfirmar.length}
-                emptyText="No hay pagos pendientes de confirmar."
-              >
-                {pagosPorConfirmar.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between text-sm">
-                    <Link
-                      href={
-                        p.cotizacionId
-                          ? `/admin/cotizaciones/${p.cotizacionId}`
-                          : `/admin/servicios/${p.servicio.id}`
-                      }
-                      className="truncate hover:underline"
-                    >
-                      {p.servicio.cliente.nombre} — {p.servicio.descripcion}
-                    </Link>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {currency.format(Number(p.monto))}
-                    </span>
-                  </li>
-                ))}
-              </PendienteCard>
-            )}
-
-            {permisosQuejas.puedeVer && quejasNuevas.length > 0 && (
-              <PendienteCard
-                title="Quejas nuevas"
-                icon={LifeBuoy}
-                count={quejasNuevas.length}
-                emptyText="No hay quejas nuevas."
-              >
-                {quejasNuevas.map((q) => (
-                  <li key={q.id} className="flex items-center justify-between text-sm">
-                    <Link href="/admin/quejas" className="truncate hover:underline">
-                      {q.cliente.nombre} — {q.categoria}
-                    </Link>
-                    <span className="shrink-0 text-xs text-muted-foreground">{fecha.format(q.creadoEn)}</span>
-                  </li>
-                ))}
-              </PendienteCard>
-            )}
-
-            {permisosTareas.puedeVer && tareasPendientes.length > 0 && (
-              <PendienteCard
-                title="Tareas pendientes"
-                icon={ListTodo}
-                count={tareasPendientes.length}
-                emptyText="No tienes tareas pendientes."
-              >
-                {tareasPendientes.map((t) => {
-                  const proyecto =
-                    t.servicio?.descripcion ?? (t.cotizacion ? nombreClienteCotizacion(t.cotizacion) : null);
-                  const vencida = t.fechaLimite && t.fechaLimite < new Date();
-                  const href = t.servicioId
-                    ? `/admin/servicios/${t.servicioId}`
-                    : t.cotizacionId
-                      ? `/admin/cotizaciones/${t.cotizacionId}`
-                      : "/admin/tareas";
-                  return (
-                    <li key={t.id} className="flex items-center justify-between text-sm">
-                      <Link href={href} className="truncate hover:underline">
-                        {t.titulo}
-                        {proyecto ? ` — ${proyecto}` : ""}
-                      </Link>
-                      <span
-                        className={`shrink-0 text-xs ${vencida ? "text-destructive" : "text-muted-foreground"}`}
-                      >
-                        {t.fechaLimite ? fecha.format(t.fechaLimite) : t.prioridad}
-                      </span>
-                    </li>
-                  );
-                })}
-              </PendienteCard>
-            )}
-
-            {permisosServicios.puedeVer && ordenesCambioPendientes.length > 0 && (
-              <PendienteCard
-                title="Órdenes de cambio por aprobar"
-                icon={Briefcase}
-                count={ordenesCambioPendientes.length}
-                emptyText="No hay órdenes de cambio pendientes."
-              >
-                {ordenesCambioPendientes.map((o) => (
-                  <li key={o.id} className="flex items-center justify-between text-sm">
-                    <Link href={`/admin/servicios/${o.servicio.id}`} className="truncate hover:underline">
-                      {o.servicio.cliente.nombre} — {o.descripcion}
-                    </Link>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {currency.format(Number(o.monto))}
-                    </span>
-                  </li>
-                ))}
-              </PendienteCard>
-            )}
-          </div>
-
-          {hayPendientesActivos && pendientesVacios.length > 0 && <SinPendientesCard items={pendientesVacios} />}
-        </div>
-      )}
+      {tieneAlgunModulo && <ListaPendientes pendientes={pendientes} filtro={filtro} />}
 
       {kpis.length === 0 && !tieneAlgunModulo && (
         <Card>
