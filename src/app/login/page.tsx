@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemedLogo } from "@/components/themed-logo";
 import { PasswordField } from "@/components/ui/password-field";
 import {
   Mail,
@@ -127,6 +128,12 @@ export default async function LoginPage({
 
         <div className="flex flex-1 items-center justify-center px-6 pb-16 sm:px-10 lg:px-14">
           <div className="w-full max-w-sm">
+            {/* El panel de marca (con el logo grande) se oculta debajo de
+                lg, así que en celular/tablet no quedaba ningún logo
+                visible en todo el login -- este va solo ahí, chico, para
+                que la marca siga presente sin duplicarla en PC. */}
+            <ThemedLogo className="mb-6 h-14 w-auto lg:hidden" />
+
             <h2 className="text-[26px] leading-tight font-semibold tracking-tight">
               Bienvenido de vuelta
             </h2>
