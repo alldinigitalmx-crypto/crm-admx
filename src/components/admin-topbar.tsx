@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,10 +21,14 @@ export function AdminTopbar({
   userEmail,
   userName,
   onSignOut,
+  actualizadoEn,
 }: {
   userEmail?: string | null;
   userName?: string | null;
   onSignOut: () => Promise<void>;
+  // Ya formateado en el layout (server) -- así la hora es la del render en
+  // el servidor y no cambia entre el HTML inicial y la hidratación.
+  actualizadoEn: string;
 }) {
   const initial = (userName ?? userEmail ?? "?").charAt(0).toUpperCase();
 
@@ -36,6 +40,10 @@ export function AdminTopbar({
       </div>
 
       <div className="flex items-center gap-2">
+        <span className="hidden items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs text-muted-foreground sm:flex sm:h-8">
+          <RefreshCw className="size-3" />
+          Actualizado {actualizadoEn}
+        </span>
         <ReloadButton />
         <ThemeToggle />
         <DropdownMenu>
