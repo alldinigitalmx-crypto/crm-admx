@@ -148,12 +148,16 @@ export function AppSidebar({
   userEmail,
   userName,
   onSignOut,
+  counts,
 }: {
   modulosVisibles: ModuloSistema[];
   esAdmin: boolean;
   userEmail?: string | null;
   userName?: string | null;
   onSignOut?: () => Promise<void>;
+  // Contador junto al nombre del módulo (como en el diseño: Servicios,
+  // Cotizaciones, Tareas, Usuarios y Accesos) -- llave = href del item.
+  counts?: Partial<Record<string, number>>;
 }) {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -221,6 +225,11 @@ export function AppSidebar({
                       <Link href={item.href}>
                         <item.icon />
                         <span>{item.title}</span>
+                        {!!counts?.[item.href] && (
+                          <span className="ml-auto font-mono text-[11px] text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
+                            {counts[item.href]}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -231,30 +240,37 @@ export function AppSidebar({
         ))}
       </SidebarContent>
 
-      {isMobile && (
-        <SidebarFooter>
-          <div className="flex items-center gap-3 rounded-lg border border-sidebar-border px-2 py-2.5">
-            <Avatar className="size-9 shrink-0">
-              <AvatarFallback>{initial}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{userName ?? "Usuario"}</p>
-              <p className="truncate text-xs text-sidebar-foreground/60">{userEmail}</p>
-            </div>
-            {onSignOut && (
-              <form action={onSignOut}>
-                <button
-                  type="submit"
-                  aria-label="Cerrar sesión"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                >
-                  <LogOut className="size-5" />
-                </button>
-              </form>
-            )}
+      {/* Antes solo en móvil (el logout de PC vivía en el dropdown de la
+          topbar) -- el diseño lo quiere siempre presente, debajo de la
+          última sección del menú, así que ahora se muestra en ambos. */}
+      <SidebarFooter>
+        <div
+          className={`flex items-center gap-3 rounded-lg border border-sidebar-border px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:px-0 ${
+            isMobile ? "py-2.5" : "py-2"
+          }`}
+        >
+          <Avatar className={`shrink-0 ${isMobile ? "size-9" : "size-8"}`}>
+            <AvatarFallback>{initial}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <p className={`truncate font-medium ${isMobile ? "text-sm" : "text-xs"}`}>{userName ?? "Usuario"}</p>
+            <p className={`truncate text-sidebar-foreground/60 ${isMobile ? "text-xs" : "text-[11px]"}`}>{userEmail}</p>
           </div>
-        </SidebarFooter>
-      )}
+          {onSignOut && (
+            <form action={onSignOut} className="group-data-[collapsible=icon]:hidden">
+              <button
+                type="submit"
+                aria-label="Cerrar sesión"
+                className={`flex shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+                  isMobile ? "size-9" : "size-8"
+                }`}
+              >
+                <LogOut className={isMobile ? "size-5" : "size-4"} />
+              </button>
+            </form>
+          )}
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
