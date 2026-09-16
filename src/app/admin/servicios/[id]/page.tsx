@@ -22,6 +22,7 @@ import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog"
 import { DeleteServicioButton } from "@/components/servicios/delete-servicio-button";
 import { StatusQuickSelect } from "@/components/servicios/status-quick-select";
 import { OrdenCambioFormDialog } from "@/components/servicios/orden-cambio-form-dialog";
+import { DeleteOrdenCambioButton } from "@/components/servicios/delete-orden-cambio-button";
 import { CotizacionFormDialog } from "@/components/cotizaciones/cotizacion-form-dialog";
 import { CopyLinkButton } from "@/components/cotizaciones/copy-link-button";
 import { TareaFormDialog } from "@/components/tareas/tarea-form-dialog";
@@ -32,10 +33,12 @@ import { DeletePagoButton } from "@/components/pagos/delete-pago-button";
 import { PagoDetalleDialog } from "@/components/pagos/pago-detalle-dialog";
 import { ZoomableImage } from "@/components/ui/zoomable-image";
 import {
+  actualizarOrdenCambio,
   aprobarOrdenCambio,
   cambiarStatusServicio,
   createOrdenCambio,
   eliminarEvidencia,
+  eliminarOrdenCambio,
   eliminarServicio,
   rechazarOrdenCambio,
   subirEvidencia,
@@ -299,7 +302,7 @@ export default async function ServicioDetallePage({
                   <TableHead>Status</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-40" />
+                  <TableHead className="w-56" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -314,20 +317,39 @@ export default async function ServicioDetallePage({
                     <TableCell>{formatDate(o.creadoEn)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(o.monto)}</TableCell>
                     <TableCell>
-                      {o.status === "Pendiente" && (
-                        <div className="flex justify-end gap-2">
-                          <form action={aprobarOrdenCambio.bind(null, o.id, servicio.id)}>
-                            <Button type="submit" size="sm" variant="secondary">
-                              Aprobar
-                            </Button>
-                          </form>
-                          <form action={rechazarOrdenCambio.bind(null, o.id, servicio.id)}>
-                            <Button type="submit" size="sm" variant="outline">
-                              Rechazar
-                            </Button>
-                          </form>
-                        </div>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        {o.status === "Pendiente" && (
+                          <>
+                            <form action={aprobarOrdenCambio.bind(null, o.id, servicio.id)}>
+                              <Button type="submit" size="sm" variant="secondary">
+                                Aprobar
+                              </Button>
+                            </form>
+                            <form action={rechazarOrdenCambio.bind(null, o.id, servicio.id)}>
+                              <Button type="submit" size="sm" variant="outline">
+                                Rechazar
+                              </Button>
+                            </form>
+                          </>
+                        )}
+                        {permisos.puedeEditar && (
+                          <>
+                            <OrdenCambioFormDialog
+                              trigger={
+                                <Button size="icon" variant="ghost" className="size-7">
+                                  <Pencil className="size-4" />
+                                </Button>
+                              }
+                              title="Editar orden de cambio"
+                              description="El status (pendiente/aprobada/rechazada) no cambia al editar -- usa Aprobar/Rechazar para eso."
+                              action={actualizarOrdenCambio.bind(null, o.id, servicio.id)}
+                              defaultValues={{ descripcion: o.descripcion, monto: Number(o.monto) }}
+                              submitLabel="Guardar cambios"
+                            />
+                            <DeleteOrdenCambioButton action={eliminarOrdenCambio.bind(null, o.id, servicio.id)} />
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

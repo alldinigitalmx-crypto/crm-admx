@@ -188,6 +188,57 @@ export async function createOrdenCambio(
   return { success: true };
 }
 
+export async function actualizarOrdenCambio(
+  ordenId: number,
+  servicioId: number,
+  _prevState: OrdenCambioFormState,
+  formData: FormData
+): Promise<OrdenCambioFormState> {
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) {
+    return { error: "No tienes permiso para editar este servicio." };
+  }
+
+  const descripcion = String(formData.get("descripcion") ?? "").trim();
+  const montoRaw = String(formData.get("monto") ?? "");
+
+  if (!descripcion) return { error: "La descripción es obligatoria." };
+  if (!montoRaw || Number.isNaN(Number(montoRaw)) || Number(montoRaw) <= 0) {
+    return { error: "El monto debe ser un número mayor a cero." };
+  }
+
+  try {
+    await prisma.ordenCambio.update({
+      where: { id: ordenId },
+      // El status (Pendiente/Aprobada/Rechazada) no se toca aquí a
+      // propósito -- editar la descripción o el monto no debería
+      // reiniciar una aprobación ya dada; para eso ya están los botones
+      // de Aprobar/Rechazar.
+      data: { descripcion, monto: montoRaw },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return { error: "Esta orden de cambio ya no existe." };
+    }
+    throw e;
+  }
+
+  revalidatePath(`/admin/servicios/${servicioId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function eliminarOrdenCambio(ordenId: number, servicioId: number) {
+  if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
+
+  await prisma.ordenCambio.delete({ where: { id: ordenId } }).catch((e) => {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") return;
+    throw e;
+  });
+
+  revalidatePath(`/admin/servicios/${servicioId}`);
+  revalidatePath("/admin");
+}
+
 export async function aprobarOrdenCambio(ordenId: number, servicioId: number) {
   if (!(await requiereNivelServicio(servicioId, "Editar"))) return;
 

@@ -18,11 +18,21 @@ import type { OrdenCambioFormState } from "@/app/admin/servicios/actions";
 
 export function OrdenCambioFormDialog({
   action,
+  trigger,
+  title = "Nueva orden de cambio",
+  description = "Ajuste solicitado por el cliente sobre este servicio.",
+  defaultValues,
+  submitLabel = "Registrar",
 }: {
   action: (
     prevState: OrdenCambioFormState,
     formData: FormData
   ) => Promise<OrdenCambioFormState>;
+  trigger?: React.ReactNode;
+  title?: string;
+  description?: string;
+  defaultValues?: { descripcion: string; monto: number | string };
+  submitLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(action, undefined);
@@ -36,17 +46,17 @@ export function OrdenCambioFormDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Plus />
-          Nueva orden de cambio
-        </Button>
+        {trigger ?? (
+          <Button size="sm" variant="outline">
+            <Plus />
+            Nueva orden de cambio
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Nueva orden de cambio</DialogTitle>
-          <DialogDescription>
-            Ajuste solicitado por el cliente sobre este servicio.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-4">
           {state?.error && (
@@ -61,6 +71,7 @@ export function OrdenCambioFormDialog({
               name="descripcion"
               required
               placeholder="Ej. Agregar módulo de reportes"
+              defaultValue={defaultValues?.descripcion ?? ""}
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -73,11 +84,12 @@ export function OrdenCambioFormDialog({
               min="0"
               required
               placeholder="0.00"
+              defaultValue={defaultValues?.monto !== undefined ? String(defaultValues.monto) : ""}
             />
           </div>
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Guardando..." : "Registrar"}
+              {isPending ? "Guardando..." : submitLabel}
             </Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
