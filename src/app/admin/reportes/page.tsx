@@ -197,7 +197,7 @@ function MetricaPrincipal({
   destacada?: boolean;
 }) {
   return (
-    <Card className={destacada ? "ring-primary/30" : undefined}>
+    <Card className={`min-w-0 ${destacada ? "ring-primary/30" : ""}`}>
       <CardContent>
         <div className="flex items-center gap-2">
           <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${TONO_CLASE[tone]}`}>
@@ -206,7 +206,7 @@ function MetricaPrincipal({
           <span className="text-xs font-medium text-muted-foreground">{title}</span>
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <span className="font-mono text-2xl leading-none font-semibold tracking-tight sm:text-[28px]">
+          <span className="min-w-0 truncate font-mono text-xl leading-none font-semibold tracking-tight sm:text-2xl lg:text-[28px]">
             {value}
           </span>
           {delta && <DeltaPill delta={delta} buenoCuando={buenoCuando} />}
@@ -247,14 +247,14 @@ function MetricaSecundaria({
   detalle: { tipo: string; exportHref: string; rangoQS: string };
 }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardContent>
         <div className="flex items-center gap-1.5">
           <Icon className="size-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">{title}</span>
         </div>
         <div className="mt-2.5 flex flex-wrap items-baseline gap-2">
-          <span className="font-mono text-xl leading-none font-semibold">{value}</span>
+          <span className="min-w-0 truncate font-mono text-xl leading-none font-semibold">{value}</span>
           {delta && <DeltaPill delta={delta} buenoCuando={buenoCuando} />}
         </div>
         <p className="mt-1.5 text-[11px] text-muted-foreground">{sub}</p>
@@ -504,7 +504,7 @@ export default async function ReportesPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <MetricaPrincipal
           title="Total recaudado"
           value={formatCurrency(totalRecaudado)}

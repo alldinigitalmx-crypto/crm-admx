@@ -109,17 +109,19 @@ function StatCard({
   children?: React.ReactNode;
 }) {
   const contenido = (
-    <Card className={href ? "h-full transition-colors hover:bg-muted/30" : "h-full"}>
-      <CardContent className="flex h-full flex-col">
+    <Card className={`min-w-0 ${href ? "h-full transition-colors hover:bg-muted/30" : "h-full"}`}>
+      <CardContent className="flex h-full min-w-0 flex-col">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Icon className={`size-[15px] ${iconTone}`} />
-            <span className="text-[12.5px] font-medium text-muted-foreground">{label}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <Icon className={`size-[15px] shrink-0 ${iconTone}`} />
+            <span className="truncate text-[12.5px] font-medium text-muted-foreground">{label}</span>
           </div>
           {href && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
         </div>
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className={`font-mono text-[26px] leading-none font-semibold tracking-tight ${valueClassName ?? ""}`}>
+        <div className="mt-3 flex min-w-0 items-baseline gap-2">
+          <span
+            className={`min-w-0 truncate font-mono text-[26px] leading-none font-semibold tracking-tight ${valueClassName ?? ""}`}
+          >
             {value}
           </span>
           {unit && (
@@ -544,7 +546,7 @@ export default async function KpisPage({
           unit={cierre.count > 0 ? "días" : undefined}
           sub={
             cierre.count > 0
-              ? `De emitida a firmada, ${cierre.count} cotización${cierre.count === 1 ? "" : "es"}`
+              ? `De emitida a firmada, ${cierre.count} cotizaci${cierre.count === 1 ? "ón" : "ones"}`
               : "Sin cotizaciones firmadas en el rango"
           }
         />
