@@ -559,6 +559,7 @@ async function PanelAdmin({ filtro }: { filtro?: string }) {
         clienteId: true,
         montoInicial: true,
         moneda: true,
+        porcentajeIntermediario: true,
         ordenesCambio: { select: { status: true, monto: true } },
         pagos: { select: { monto: true, confirmado: true, moneda: true } },
       },

@@ -15,17 +15,33 @@ export function montoTotalServicio(servicio: ServicioConOrdenes) {
 
 type PagoParaMonto = { monto: DecimalLike; confirmado: boolean; moneda?: string | null };
 
-// Cuánto le falta cobrar al negocio por este servicio en concreto -- solo
-// cuenta pagos confirmados en la MISMA moneda que el total del servicio
-// (tratando null como MXN de los dos lados), igual que ya se hace para
-// cotizaciones (ver montoPagadoCotizacion en lib/cotizacion.ts): un pago
-// en otra moneda no debe restarle nada a este total, o el pendiente sale
-// mal.
+type ServicioConIntermediario = ServicioConOrdenes & {
+  porcentajeIntermediario?: DecimalLike | null;
+};
+
+// Cuánto le corresponde de verdad al negocio de este servicio -- cuando
+// hay intermediario, su % nunca llega al dueño (lo cobra/se lo queda el
+// intermediario directamente), así que NO es parte de lo que el negocio
+// tiene pendiente por cobrar. Sin intermediario, es igual al total.
+export function montoPropioServicio(servicio: ServicioConIntermediario): number {
+  const total = montoTotalServicio(servicio);
+  return total - comisionIntermediario(total, servicio.porcentajeIntermediario);
+}
+
+// Cuánto le falta cobrar al negocio por este servicio en concreto -- contra
+// su propia parte (montoPropioServicio), no contra el total del contrato:
+// si hay intermediario, ya se le restó su % (ver arriba), porque ese
+// dinero nunca iba a llegarle al dueño aunque el cliente pague completo.
+// Solo cuenta pagos confirmados en la MISMA moneda que el total del
+// servicio (tratando null como MXN de los dos lados), igual que ya se hace
+// para cotizaciones (ver montoPagadoCotizacion en lib/cotizacion.ts): un
+// pago en otra moneda no debe restarle nada a este total, o el pendiente
+// sale mal.
 export function montoPendienteServicio(
-  servicio: ServicioConOrdenes & { moneda?: string | null },
+  servicio: ServicioConIntermediario & { moneda?: string | null },
   pagos: PagoParaMonto[]
 ): number {
-  return Math.max(montoTotalServicio(servicio) - montoPagadoServicio(servicio, pagos), 0);
+  return Math.max(montoPropioServicio(servicio) - montoPagadoServicio(servicio, pagos), 0);
 }
 
 // Cuánto se ha cobrado ya de este servicio -- mismo criterio de moneda

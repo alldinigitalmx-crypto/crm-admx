@@ -299,6 +299,7 @@ export async function obtenerDatosReportes(
         montoInicial: true,
         moneda: true,
         intermediarioId: true,
+        porcentajeIntermediario: true,
         ordenesCambio: { select: { status: true, monto: true } },
         pagos: { select: { monto: true, confirmado: true, moneda: true } },
         cliente: { select: { nombre: true } },
