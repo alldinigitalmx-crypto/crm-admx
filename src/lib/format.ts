@@ -47,27 +47,3 @@ export function formatDate(value: Date | string | null | undefined) {
   if (!value) return "—";
   return dateFormatter.format(new Date(value));
 }
-
-const DIA_MS = 24 * 60 * 60 * 1000;
-
-// Fecha relativa corta ("hoy", "ayer", "hace 3 semanas") para listas donde
-// importa más el "qué tan reciente" que la fecha exacta -- ej. última
-// actividad de un cliente. Redondea hacia abajo (trunca), así que "hace 1
-// semana" es de 7 a 13 días, no de 4 a 10.
-export function formatRelativeDate(value: Date | string | null | undefined) {
-  if (!value) return "—";
-  const dias = Math.floor((Date.now() - new Date(value).getTime()) / DIA_MS);
-  if (dias <= 0) return "hoy";
-  if (dias === 1) return "ayer";
-  if (dias < 7) return `hace ${dias} días`;
-  if (dias < 30) {
-    const semanas = Math.floor(dias / 7);
-    return `hace ${semanas} semana${semanas === 1 ? "" : "s"}`;
-  }
-  if (dias < 365) {
-    const meses = Math.floor(dias / 30);
-    return `hace ${meses} mes${meses === 1 ? "" : "es"}`;
-  }
-  const anios = Math.floor(dias / 365);
-  return `hace ${anios} año${anios === 1 ? "" : "s"}`;
-}
