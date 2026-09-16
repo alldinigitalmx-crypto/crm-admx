@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { StatusQuickSelect } from "@/components/servicios/status-quick-select";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { createServicio, cambiarStatusServicio } from "@/app/admin/servicios/actions";
 import { Pagination } from "@/components/ui/pagination";
 import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
@@ -206,63 +207,29 @@ export default async function ServiciosPage({
         <CardContent>
           <form className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Clientes</span>
-                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
-                  {clientes.map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="clienteId"
-                        value={c.id}
-                        defaultChecked={clienteIds.includes(String(c.id))}
-                        className="size-3.5"
-                      />
-                      <span className="truncate">{c.nombre}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <MultiSelectFilter
+                key={`cliente-${clienteIds.join(",")}`}
+                name="clienteId"
+                label="Clientes"
+                options={clientes.map((c) => ({ value: String(c.id), label: c.nombre }))}
+                defaultSelected={clienteIds}
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Status</span>
-                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
-                  {STATUSES.map((s) => (
-                    <label key={s} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="status"
-                        value={s}
-                        defaultChecked={statuses.includes(s)}
-                        className="size-3.5"
-                      />
-                      <span>{s}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <MultiSelectFilter
+                key={`status-${statuses.join(",")}`}
+                name="status"
+                label="Status"
+                options={STATUSES.map((s) => ({ value: s, label: s }))}
+                defaultSelected={statuses}
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Intermediarios</span>
-                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
-                  {intermediarios.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No hay intermediarios.</p>
-                  ) : (
-                    intermediarios.map((i) => (
-                      <label key={i.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="intermediarioId"
-                          value={i.id}
-                          defaultChecked={intermediarioIds.includes(String(i.id))}
-                          className="size-3.5"
-                        />
-                        <span className="truncate">{i.nombre}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
+              <MultiSelectFilter
+                key={`intermediario-${intermediarioIds.join(",")}`}
+                name="intermediarioId"
+                label="Intermediarios"
+                options={intermediarios.map((i) => ({ value: String(i.id), label: i.nombre }))}
+                defaultSelected={intermediarioIds}
+              />
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>

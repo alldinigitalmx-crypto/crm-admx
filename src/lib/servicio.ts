@@ -37,10 +37,15 @@ export function montoPropioServicio(servicio: ServicioConIntermediario): number 
 // para cotizaciones (ver montoPagadoCotizacion en lib/cotizacion.ts): un
 // pago en otra moneda no debe restarle nada a este total, o el pendiente
 // sale mal.
+//
+// Un servicio Cancelado nunca tiene saldo pendiente: se canceló, no se va a
+// cobrar el resto, así que ese "faltante" no debe seguir apareciendo como
+// deuda -- el monto capturado ahí queda solo de referencia.
 export function montoPendienteServicio(
-  servicio: ServicioConIntermediario & { moneda?: string | null },
+  servicio: ServicioConIntermediario & { moneda?: string | null; status?: string },
   pagos: PagoParaMonto[]
 ): number {
+  if (servicio.status === "Cancelado") return 0;
   return Math.max(montoPropioServicio(servicio) - montoPagadoServicio(servicio, pagos), 0);
 }
 
