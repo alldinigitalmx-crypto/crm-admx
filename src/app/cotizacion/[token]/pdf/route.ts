@@ -43,6 +43,7 @@ export async function GET(
         descuentoMotivo: cotizacion.descuentoMotivo,
         montoTotal: Number(cotizacion.montoTotal),
         moneda: cotizacion.moneda,
+        porcentajeAnticipo: cotizacion.porcentajeAnticipo,
         fechaEmision: cotizacion.fechaEmision,
         fechaVencimiento: cotizacion.fechaVencimiento,
       },

@@ -3,12 +3,13 @@ import { FileDown } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemedLogo } from "@/components/themed-logo";
 import { FirmaForm } from "@/components/cotizaciones/firma-form";
 import { PagoTransferenciaForm } from "@/components/cotizaciones/pago-transferencia-form";
 import { MetodosPagoElectronicos } from "@/components/cotizaciones/metodos-pago-electronicos";
+import { COTIZACION_STATUS_COLOR } from "@/lib/status-colors";
+import { businessInfo } from "@/lib/business-info";
 import {
   firmarCotizacion,
   reportarPagoTransferencia,
@@ -99,130 +100,186 @@ export default async function CotizacionPublicaPage({
       ? Number(cotizacion.montoSubtotal) * (Number(cotizacion.descuentoValor ?? 0) / 100)
       : Number(cotizacion.descuentoValor ?? 0);
 
+  const esPagable = cotizacion.status !== "Pagada" && cotizacion.status !== "Perdida";
+  const progresoPct = Math.max(
+    0,
+    Math.min(100, Math.round((montoPagado / Number(cotizacion.montoTotal)) * 100))
+  );
+
   const firmarAction = firmarCotizacion.bind(null, token);
   const pagoAction = reportarPagoTransferencia.bind(null, token);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-4 py-10">
-      <div>
-        <p className="text-sm font-semibold tracking-wide text-primary">
-          ADMX DEV
-        </p>
-        <h1 className="text-2xl font-semibold">
-          Cotización #{String(cotizacion.id).padStart(4, "0")}
-        </h1>
-        <p className="text-sm text-muted-foreground">Para {nombreClienteCotizacion(cotizacion)}</p>
-      </div>
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-medium">{descripcion}</CardTitle>
-          <Badge
-            variant={
-              cotizacion.status === "Pagada"
-                ? "secondary"
-                : vencida || cotizacion.status === "Perdida"
-                  ? "destructive"
-                  : "outline"
-            }
-          >
-            {vencida ? "Vencida" : STATUS_LABEL[cotizacion.status]}
-          </Badge>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          {detalles && <p className="text-muted-foreground">{detalles}</p>}
-          <div className="flex justify-between border-t pt-3">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatCurrency(cotizacion.montoSubtotal, moneda)}</span>
+    <div className="mx-auto min-h-screen max-w-xl px-4 py-8 sm:py-12">
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        {/* Encabezado */}
+        <div className="flex items-start justify-between gap-6 border-b p-6 sm:p-8">
+          <div className="flex flex-col gap-3">
+            <ThemedLogo className="h-auto w-24 sm:w-28" />
+            <p className="font-mono text-[11px] tracking-widest text-muted-foreground uppercase">
+              Cotización #{String(cotizacion.id).padStart(4, "0")}
+            </p>
           </div>
-          {cotizacion.descuentoTipo && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Descuento
-                {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
-              </span>
-              <span>-{formatCurrency(montoDescuento, moneda)}</span>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 font-mono text-[11px] font-medium tracking-wide uppercase ${
+                vencida
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                  : (COTIZACION_STATUS_COLOR[cotizacion.status] ?? "bg-muted text-muted-foreground")
+              }`}
+            >
+              {vencida ? "Vencida" : STATUS_LABEL[cotizacion.status]}
+            </span>
+            {cotizacion.fechaVencimiento && (
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Vence {formatDate(cotizacion.fechaVencimiento)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Título / proyecto */}
+        <div className="flex flex-col gap-2 border-b p-6 sm:p-8">
+          <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+            Para {nombreClienteCotizacion(cotizacion)}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+            {descripcion}
+          </h1>
+          {detalles && (
+            <p className="text-sm leading-relaxed text-muted-foreground">{detalles}</p>
+          )}
+        </div>
+
+        {/* Total */}
+        <div className="flex flex-col gap-4 bg-foreground p-6 text-background sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="font-mono text-[11px] tracking-widest text-background/70 uppercase">
+                Total {moneda ?? "MXN"}
+              </p>
+              <p className="text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">
+                {formatCurrency(cotizacion.montoTotal, moneda)}
+              </p>
+            </div>
+            {esPagable && cotizacion.clienteId && (
+              <div className="flex flex-col items-end gap-1">
+                <p className="font-mono text-[11px] tracking-widest text-background/70 uppercase">
+                  A pagar ahora
+                </p>
+                <p className="font-mono text-lg font-semibold tabular-nums">
+                  {formatCurrency(montoAhora, moneda)}
+                </p>
+                {esCobroPorPartes && (
+                  <p className="font-mono text-[11px] text-background/60">
+                    {esSegundoPago ? "Saldo restante" : `Anticipo ${cotizacion.porcentajeAnticipo}%`}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          {esPagable && cotizacion.clienteId && (
+            <div className="h-1.5 overflow-hidden rounded-full bg-background/15">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{ width: `${progresoPct}%` }}
+              />
             </div>
           )}
-          <div className="flex justify-between border-t pt-3 text-base font-semibold">
-            <span>Total</span>
-            <span>{formatCurrency(cotizacion.montoTotal, moneda)}</span>
+          {cotizacion.status === "Pagada" && (
+            <p className="font-mono text-[11px] text-background/70">
+              Pagada{cotizacion.fechaPago ? ` el ${formatDate(cotizacion.fechaPago)}` : ""}
+            </p>
+          )}
+        </div>
+
+        {/* Desglose */}
+        <details className="group border-b">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 font-mono text-[11px] tracking-widest text-muted-foreground uppercase marker:content-none sm:px-8">
+            <span>Ver desglose</span>
+            <span className="text-xs transition group-open:rotate-45">+</span>
+          </summary>
+          <div className="flex flex-col gap-3 px-6 pb-6 sm:px-8">
+            <div className="flex justify-between gap-4 border-t pt-3">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-medium">{descripcion}</p>
+                <p className="font-mono text-xs text-muted-foreground">1 × Servicio</p>
+              </div>
+              <p className="font-mono text-sm whitespace-nowrap tabular-nums">
+                {formatCurrency(cotizacion.montoSubtotal, moneda)}
+              </p>
+            </div>
+            <div className="flex justify-between border-t pt-3 font-mono text-[13px] text-muted-foreground">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{formatCurrency(cotizacion.montoSubtotal, moneda)}</span>
+            </div>
+            {cotizacion.descuentoTipo && (
+              <div className="flex justify-between border-t pt-3 font-mono text-[13px] text-muted-foreground">
+                <span>
+                  Descuento
+                  {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
+                </span>
+                <span className="tabular-nums">−{formatCurrency(montoDescuento, moneda)}</span>
+              </div>
+            )}
+            {montoPagado > 0 && cotizacion.status !== "Pagada" && (
+              <>
+                <div className="flex justify-between border-t pt-3 text-emerald-600 dark:text-emerald-400">
+                  <span>Pagado</span>
+                  <span className="tabular-nums">{formatCurrency(montoPagado, moneda)}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span>Saldo pendiente</span>
+                  <span className="tabular-nums">{formatCurrency(montoPendiente, moneda)}</span>
+                </div>
+              </>
+            )}
           </div>
-          {montoPagado > 0 && cotizacion.status !== "Pagada" && (
-            <>
-              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                <span>Pagado</span>
-                <span>{formatCurrency(montoPagado, moneda)}</span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span>Saldo pendiente</span>
-                <span>{formatCurrency(montoPendiente, moneda)}</span>
-              </div>
-            </>
-          )}
-          {esCobroPorPartes && montoPagado === 0 && cotizacion.status !== "Pagada" && (
-            <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              Este proyecto se cobra en dos partes: {cotizacion.porcentajeAnticipo}% de anticipo
-              ({formatCurrency(montoAhora, moneda)}) y el resto al terminar.
-            </p>
-          )}
-          {cotizacion.fechaVencimiento && (
-            <p className="text-xs text-muted-foreground">
-              Vence: {formatDate(cotizacion.fechaVencimiento)}
-            </p>
-          )}
-          <Button variant="outline" size="sm" asChild className="mt-2 self-start">
-            <a href={`/cotizacion/${token}/pdf`} target="_blank" rel="noopener noreferrer">
-              <FileDown />
-              Descargar PDF
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
+        </details>
 
-      {cotizacion.status === "Enviada" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Firma de la cotización</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {[mensajeMp, mensajePp].filter(Boolean).length > 0 && (
+          <div className="flex flex-col gap-2 border-b p-6 sm:px-8">
+            {[mensajeMp, mensajePp].filter(Boolean).map((mensaje, i) => (
+              <p
+                key={i}
+                className={
+                  "rounded-lg border px-3 py-2 text-sm " +
+                  (mensaje!.tono === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                    : mensaje!.tono === "warning"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      : "border-destructive/30 bg-destructive/10 text-destructive")
+                }
+              >
+                {mensaje!.texto}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Firmar */}
+        {cotizacion.status === "Enviada" && (
+          <div className="flex flex-col gap-4 border-b p-6 sm:p-8">
+            <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+              Firma de la cotización
+            </p>
             <FirmaForm action={firmarAction} nombreDefault={nombreClienteCotizacion(cotizacion)} />
-          </CardContent>
-        </Card>
-      )}
-
-      {cotizacion.status === "Firmada" && (
-        <Card>
-          <CardContent className="py-4 text-sm text-muted-foreground">
+          </div>
+        )}
+        {cotizacion.status === "Firmada" && (
+          <div className="border-b p-6 text-sm text-muted-foreground sm:p-8">
             Firmada por {cotizacion.firmanteNombre} el {formatDate(cotizacion.fechaFirma)}.
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {[mensajeMp, mensajePp].filter(Boolean).map((mensaje, i) => (
-        <p
-          key={i}
-          className={
-            "rounded-lg border px-3 py-2 text-sm " +
-            (mensaje!.tono === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : mensaje!.tono === "warning"
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                : "border-destructive/30 bg-destructive/10 text-destructive")
-          }
-        >
-          {mensaje!.texto}
-        </p>
-      ))}
-
-      {cotizacion.status !== "Pagada" && cotizacion.status !== "Perdida" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Pagar</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        {/* Pagar */}
+        {esPagable && (
+          <div className="flex flex-col gap-4 border-b p-6 sm:p-8">
+            <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+              Pagar
+            </p>
             {!cotizacion.clienteId ? (
-              <p className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              <p className="rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 Estamos formalizando este proyecto. Muy pronto podrás pagar aquí.
               </p>
             ) : pagoPendiente ? (
@@ -231,13 +288,6 @@ export default async function CotizacionPublicaPage({
               </p>
             ) : (
               <>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {esCobroPorPartes && !esSegundoPago
-                    ? `Paga tu anticipo (${cotizacion.porcentajeAnticipo}%) — ${formatCurrency(montoAhora, moneda)}`
-                    : esSegundoPago
-                      ? `Paga el saldo restante — ${formatCurrency(montoAhora, moneda)}`
-                      : "Paga en línea al instante"}
-                </p>
                 <MetodosPagoElectronicos
                   token={token}
                   mercadoPagoDisponible={esMexico && !mpBloqueadaPorMoneda}
@@ -248,31 +298,46 @@ export default async function CotizacionPublicaPage({
                   paypalNoDisponibleTexto="No disponible en COP"
                 />
 
-                <details className="group rounded-lg border border-input open:bg-muted/20">
-                  <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium text-muted-foreground marker:content-none">
+                <details className="group rounded-lg border open:bg-muted/20">
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 font-mono text-xs tracking-wide text-muted-foreground uppercase marker:content-none">
                     ¿Prefieres transferencia, Spin o Binance?
                     <span className="text-xs text-muted-foreground transition group-open:rotate-180">
                       ▾
                     </span>
                   </summary>
-                  <div className="border-t border-input px-3 pb-3 pt-3">
+                  <div className="border-t px-3 pt-3 pb-3">
                     <PagoTransferenciaForm action={pagoAction} montoAPagar={montoAhora} moneda={moneda} />
                   </div>
                 </details>
               </>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {cotizacion.status === "Pagada" && (
-        <Card>
-          <CardContent className="py-4 text-sm text-emerald-600 dark:text-emerald-400">
+          </div>
+        )}
+        {cotizacion.status === "Pagada" && (
+          <div className="border-b p-6 text-sm text-emerald-600 sm:p-8 dark:text-emerald-400">
             Esta cotización ya fue pagada
             {cotizacion.fechaPago ? ` el ${formatDate(cotizacion.fechaPago)}` : ""}. ¡Gracias!
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+
+        {/* Documento + pie */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 sm:px-8">
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/cotizacion/${token}/pdf`} target="_blank" rel="noopener noreferrer">
+              <FileDown />
+              Descargar PDF
+            </a>
+          </Button>
+          <div className="flex items-center gap-4 font-mono text-[11px] text-muted-foreground">
+            <span>
+              {businessInfo.nombre} · {businessInfo.eslogan}
+            </span>
+            <a href={businessInfo.whatsappLink} className="hover:text-foreground">
+              WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

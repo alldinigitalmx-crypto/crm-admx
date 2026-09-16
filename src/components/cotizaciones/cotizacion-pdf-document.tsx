@@ -8,75 +8,112 @@ const logoDataUri = `data:image/png;base64,${fs
   .readFileSync(path.join(process.cwd(), "public", "admx-logo-ink.png"))
   .toString("base64")}`;
 
-const INK = "#111827";
+const INK = "#18181f";
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
-const ACCENT = "#2563eb";
-const PANEL = "#f9fafb";
+// Mismo indigo que --primary (oklch(0.53 0.19 264)) del resto de la app y
+// que ya se usa como acento en reportes.tsx -- react-pdf no soporta oklch,
+// así que aquí vive como su equivalente hex.
+const ACCENT = "#6366f1";
+const ACCENT_DARK = "#4f46e5";
 
 const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 9, fontFamily: "Helvetica", color: INK },
+  page: { paddingHorizontal: 40, paddingTop: 36, paddingBottom: 36, fontSize: 9, fontFamily: "Helvetica", color: INK },
 
   headerRow: { flexDirection: "row", justifyContent: "space-between" },
-  logo: { width: 56, marginBottom: 6 },
-  companyName: { fontSize: 18, fontWeight: 700, letterSpacing: 0.5 },
-  companyTagline: { fontSize: 9, color: MUTED, marginTop: 2 },
-  whatsapp: { fontSize: 8, color: "#374151", marginTop: 8 },
-  whatsappLink: { fontSize: 8, color: ACCENT },
+  headerLeft: { flexDirection: "column" },
+  logo: { width: 62, marginBottom: 8 },
+  tagline: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 1, color: MUTED, textTransform: "uppercase" },
+  whatsapp: { fontFamily: "Courier", fontSize: 8, color: "#374151", marginTop: 6 },
+  whatsappLink: { fontFamily: "Courier", fontSize: 8, color: ACCENT_DARK, marginTop: 1 },
 
   headerRight: { alignItems: "flex-end" },
-  docTitle: { fontSize: 20, fontWeight: 700, letterSpacing: 1 },
-  metaLine: { fontSize: 9, marginTop: 6, color: "#374151" },
-  metaLabel: { fontWeight: 700 },
-
-  divider: { borderBottomWidth: 2, borderBottomColor: INK, marginTop: 16, marginBottom: 18 },
-
-  twoColRow: { flexDirection: "row", marginBottom: 18 },
-  sectionBox: { flex: 1 },
-  sectionBoxSpacer: { width: 16 },
-  sectionHeader: {
-    backgroundColor: INK,
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: 700,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginBottom: 8,
+  docTitle: { fontSize: 22, fontWeight: 700, letterSpacing: -0.2 },
+  metaTable: { marginTop: 10, minWidth: 170 },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    paddingVertical: 5,
   },
-  sectionLine: { fontSize: 9, color: "#374151", marginBottom: 2 },
-  sectionLineLabel: { fontWeight: 700, color: INK },
+  metaLabel: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 0.8, color: MUTED, textTransform: "uppercase" },
+  metaValue: { fontFamily: "Courier", fontSize: 8.5, fontWeight: 700, color: INK },
+
+  accentBand: { height: 4, backgroundColor: ACCENT, marginTop: 14, marginBottom: 18 },
+  accentBandTight: { height: 4, backgroundColor: ACCENT, marginTop: 10, marginBottom: 16 },
+
+  twoColRow: { flexDirection: "row", marginBottom: 16 },
+  colBox: { flex: 1, paddingRight: 14, borderRightWidth: 1, borderRightColor: BORDER },
+  colBoxRight: { flex: 1, paddingLeft: 14 },
+  colLabel: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 1, color: ACCENT_DARK, textTransform: "uppercase", marginBottom: 5 },
+  colValue: { fontSize: 11.5, fontWeight: 700, color: INK },
+  colMuted: { fontFamily: "Courier", fontSize: 8, color: MUTED, marginTop: 3 },
 
   tableHeaderRow: {
     flexDirection: "row",
-    backgroundColor: INK,
-    color: "#ffffff",
-    fontSize: 8,
-    fontWeight: 700,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+    borderBottomWidth: 1.5,
+    borderBottomColor: INK,
+    paddingBottom: 5,
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    borderBottomColor: "#eef0f3",
+    paddingVertical: 9,
   },
   colNum: { width: "6%" },
-  colDesc: { width: "44%", paddingRight: 6 },
+  colDesc: { width: "44%", paddingRight: 8 },
   colQty: { width: "10%", textAlign: "center" },
   colUnit: { width: "16%" },
   colPrice: { width: "12%", textAlign: "right" },
   colSubtotal: { width: "12%", textAlign: "right" },
-  cellText: { fontSize: 8.5, lineHeight: 1.4 },
+  th: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 0.8, color: MUTED, textTransform: "uppercase" },
+  cellTitle: { fontSize: 9, fontWeight: 700, color: INK },
+  cellMuted: { fontFamily: "Courier", fontSize: 8, color: MUTED, marginTop: 2, lineHeight: 1.4 },
+  cellText: { fontFamily: "Courier", fontSize: 8.5, color: "#374151" },
+  cellTextBold: { fontFamily: "Courier", fontSize: 8.5, fontWeight: 700, color: INK },
 
-  totalRow: { flexDirection: "row", justifyContent: "flex-end", alignItems: "stretch", marginTop: 18 },
-  totalBar: { width: 3, backgroundColor: ACCENT, marginRight: 10 },
-  totalText: { fontSize: 14, fontWeight: 700, paddingVertical: 4 },
+  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 16 },
+  totalsBox: { width: 260 },
+  totalLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+    fontFamily: "Courier",
+    fontSize: 8.5,
+    color: "#374151",
+  },
+  totalLineBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
+  totalBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: ACCENT,
+    color: "#ffffff",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  totalBarLabel: { fontFamily: "Courier", fontSize: 8, letterSpacing: 1, textTransform: "uppercase", color: "#ffffff" },
+  totalBarValue: { fontSize: 16, fontWeight: 700, color: "#ffffff" },
+  anticipoLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderTopWidth: 0,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    fontFamily: "Courier",
+    fontSize: 8.5,
+    color: "#374151",
+  },
+  anticipoValue: { fontWeight: 700, color: INK },
 
-  pagoRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 6 },
+  pagoRow: { alignItems: "flex-end", marginTop: 8 },
   paidBadge: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 700,
     color: "#ffffff",
     backgroundColor: "#15803d",
@@ -85,32 +122,46 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   cuentaBox: { alignItems: "flex-end" },
-  cuentaLine: { fontSize: 9, color: "#374151", marginTop: 2 },
+  cuentaLine: { fontFamily: "Courier", fontSize: 8.5, color: "#374151", marginTop: 2 },
   cuentaLineLabel: { fontWeight: 700, color: INK },
-  cuentaPendiente: { fontSize: 9, color: "#b45309", marginTop: 2, fontWeight: 700 },
+  cuentaPendiente: { fontFamily: "Courier", fontSize: 8.5, color: "#b45309", marginTop: 2, fontWeight: 700 },
 
-  paymentsRow: { flexDirection: "row", marginTop: 26 },
-  paymentCol: {
-    flex: 1,
-    backgroundColor: PANEL,
-    padding: 10,
-    marginRight: 10,
-    borderRadius: 3,
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 28,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
   },
-  paymentColLast: { marginRight: 0 },
-  paymentTitle: { fontSize: 9, fontWeight: 700, marginBottom: 6 },
-  paymentLine: { fontSize: 8, color: "#374151", marginBottom: 2 },
-  paymentLabel: { fontWeight: 700, color: INK },
-  paymentLink: { fontSize: 8, color: ACCENT, marginTop: 2 },
+  footerText: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 0.5, color: MUTED },
 
-  termsBox: { backgroundColor: PANEL, padding: 12, marginTop: 22, borderRadius: 3 },
-  termsTitle: { fontSize: 9, fontWeight: 700, marginBottom: 8 },
-  termsRow: { flexDirection: "row" },
+  headerRowSimple: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  logoSmall: { width: 46 },
+  headerRightLabel: { fontFamily: "Courier", fontSize: 8, letterSpacing: 0.8, color: MUTED, textTransform: "uppercase" },
+
+  section: { marginTop: 22 },
+  sectionLabel: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 1, color: ACCENT_DARK, textTransform: "uppercase", marginBottom: 10 },
+
+  paymentsRow: { flexDirection: "row" },
+  paymentCol: { flex: 1, paddingRight: 16, borderRightWidth: 1, borderRightColor: BORDER },
+  paymentColLast: { paddingRight: 0, paddingLeft: 16, borderRightWidth: 0 },
+  paymentColMid: { paddingLeft: 16 },
+  paymentTitle: { fontSize: 9.5, fontWeight: 700, marginBottom: 5, color: INK },
+  paymentLine: { fontFamily: "Courier", fontSize: 8, color: "#374151", marginBottom: 2 },
+  paymentLink: { fontFamily: "Courier", fontSize: 8, color: ACCENT_DARK, marginTop: 2 },
+
+  termsGrid: { flexDirection: "row" },
   termsCol: { flex: 1 },
-  termsItem: { fontSize: 8, color: "#374151", marginBottom: 4, lineHeight: 1.4 },
-  termsLabel: { fontWeight: 700, color: INK },
+  termsItem: { flexDirection: "row", marginBottom: 8, paddingRight: 20 },
+  termsItemLabel: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 0.5, color: MUTED, textTransform: "uppercase", width: 62 },
+  termsItemValue: { fontSize: 8.5, color: "#374151", flex: 1, lineHeight: 1.4 },
 
-  footer: { marginTop: 32, textAlign: "center", fontSize: 10, color: MUTED },
+  signRow: { flexDirection: "row", marginTop: 4 },
+  signCol: { flex: 1, paddingRight: 30 },
+  signLine: { borderBottomWidth: 1, borderBottomColor: INK, height: 34 },
+  signCaption: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 0.5, color: MUTED, textTransform: "uppercase", marginTop: 6 },
+  signValue: { fontSize: 8.5, color: "#374151", marginTop: 3 },
 });
 
 // Mismo criterio que formatCurrency() (src/lib/format.ts): MXN no lleva
@@ -142,6 +193,7 @@ export type CotizacionPdfProps = {
     descuentoMotivo: string | null;
     montoTotal: number;
     moneda: string | null;
+    porcentajeAnticipo: number | null;
     fechaEmision: Date;
     fechaVencimiento: Date | null;
   };
@@ -168,110 +220,121 @@ export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: C
       : (cotizacion.descuentoValor ?? 0);
   const descripcion = servicio?.descripcion ?? cotizacion.descripcion ?? "";
   const detalles = servicio?.detalles ?? cotizacion.detalles;
+  const folio = `#${String(cotizacion.id).padStart(4, "0")}`;
+  const anticipoMonto = cotizacion.porcentajeAnticipo
+    ? cotizacion.montoTotal * (cotizacion.porcentajeAnticipo / 100)
+    : null;
 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
         <View style={styles.headerRow}>
-          <View>
+          <View style={styles.headerLeft}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
             <Image src={logoDataUri} style={styles.logo} />
-            <Text style={styles.companyName}>{businessInfo.nombre}</Text>
-            <Text style={styles.companyTagline}>{businessInfo.eslogan}</Text>
-            <Text style={styles.whatsapp}>WhatsApp: {businessInfo.whatsapp}</Text>
+            <Text style={styles.tagline}>{businessInfo.eslogan}</Text>
+            <Text style={styles.whatsapp}>WhatsApp {businessInfo.whatsapp}</Text>
             <Link src={businessInfo.whatsappLink} style={styles.whatsappLink}>
-              Click para chatear
+              {businessInfo.whatsappLink.replace("https://", "")}
             </Link>
           </View>
 
           <View style={styles.headerRight}>
-            <Text style={styles.docTitle}>COTIZACIÓN</Text>
-            <Text style={styles.metaLine}>
-              <Text style={styles.metaLabel}>Fecha: </Text>
-              {fechaCorta(cotizacion.fechaEmision)}
-            </Text>
-            <Text style={styles.metaLine}>
-              <Text style={styles.metaLabel}>Cotización #: </Text>
-              {cotizacion.id}
-            </Text>
+            <Text style={styles.docTitle}>Cotización</Text>
+            <View style={styles.metaTable}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Folio</Text>
+                <Text style={styles.metaValue}>{folio}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Emisión</Text>
+                <Text style={styles.metaValue}>{fechaCorta(cotizacion.fechaEmision)}</Text>
+              </View>
+              {cotizacion.fechaVencimiento && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Vigencia</Text>
+                  <Text style={styles.metaValue}>{fechaCorta(cotizacion.fechaVencimiento)}</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
-        <View style={styles.divider} />
+        <View style={styles.accentBand} />
 
         <View style={styles.twoColRow}>
-          <View style={styles.sectionBox}>
-            <Text style={styles.sectionHeader}>Cliente</Text>
-            <Text style={styles.sectionLine}>{cliente.nombre}</Text>
-            {cliente.email && <Text style={styles.sectionLine}>{cliente.email}</Text>}
+          <View style={styles.colBox}>
+            <Text style={styles.colLabel}>Cliente</Text>
+            <Text style={styles.colValue}>{cliente.nombre}</Text>
+            {cliente.email && <Text style={styles.colMuted}>{cliente.email}</Text>}
           </View>
 
-          <View style={styles.sectionBoxSpacer} />
-
-          <View style={styles.sectionBox}>
-            <Text style={styles.sectionHeader}>Proyecto</Text>
-            <Text style={styles.sectionLine}>
-              <Text style={styles.sectionLineLabel}>Nombre: </Text>
-              {descripcion}
+          <View style={styles.colBoxRight}>
+            <Text style={styles.colLabel}>Proyecto</Text>
+            <Text style={styles.colValue}>{descripcion}</Text>
+            <Text style={styles.colMuted}>
+              Status: {servicio ? servicio.status : "En negociación"}
+              {servicio
+                ? `   Inicio: ${fechaCorta(servicio.fechaInicio)}${
+                    servicio.fechaFin ? ` — Entrega: ${fechaCorta(servicio.fechaFin)}` : ""
+                  }`
+                : ""}
             </Text>
-            <Text style={styles.sectionLine}>
-              <Text style={styles.sectionLineLabel}>Status: </Text>
-              {servicio ? servicio.status : "En negociación"}
-            </Text>
-            {servicio && (
-              <Text style={styles.sectionLine}>
-                <Text style={styles.sectionLineLabel}>Inicio: </Text>
-                {fechaCorta(servicio.fechaInicio)}
-                {servicio.fechaFin ? ` — Entrega: ${fechaCorta(servicio.fechaFin)}` : ""}
-              </Text>
-            )}
           </View>
         </View>
 
         <View style={styles.tableHeaderRow}>
-          <Text style={styles.colNum}>#</Text>
-          <Text style={styles.colDesc}>Descripción</Text>
-          <Text style={styles.colQty}>Cantidad</Text>
-          <Text style={styles.colUnit}>Unidad</Text>
-          <Text style={styles.colPrice}>Precio Unit.</Text>
-          <Text style={styles.colSubtotal}>Sub Total</Text>
+          <Text style={[styles.colNum, styles.th]}>#</Text>
+          <Text style={[styles.colDesc, styles.th]}>Concepto</Text>
+          <Text style={[styles.colQty, styles.th]}>Cant.</Text>
+          <Text style={[styles.colUnit, styles.th]}>Unidad</Text>
+          <Text style={[styles.colPrice, styles.th]}>P. unitario</Text>
+          <Text style={[styles.colSubtotal, styles.th]}>Importe</Text>
         </View>
 
         <View style={styles.tableRow}>
-          <Text style={[styles.colNum, styles.cellText]}>1</Text>
-          <Text style={[styles.colDesc, styles.cellText]}>{detalles || descripcion}</Text>
+          <Text style={[styles.colNum, styles.cellText]}>01</Text>
+          <View style={styles.colDesc}>
+            <Text style={styles.cellTitle}>{descripcion}</Text>
+            {detalles && <Text style={styles.cellMuted}>{detalles}</Text>}
+          </View>
           <Text style={[styles.colQty, styles.cellText]}>1</Text>
           <Text style={[styles.colUnit, styles.cellText]}>Servicio</Text>
-          <Text style={[styles.colPrice, styles.cellText]}>
+          <Text style={[styles.colPrice, styles.cellTextBold]}>
             {currency(cotizacion.montoSubtotal, cotizacion.moneda)}
           </Text>
-          <Text style={[styles.colSubtotal, styles.cellText]}>
+          <Text style={[styles.colSubtotal, styles.cellTextBold]}>
             {currency(cotizacion.montoSubtotal, cotizacion.moneda)}
           </Text>
         </View>
 
-        {cotizacion.descuentoTipo && (
-          <View style={styles.tableRow}>
-            <Text style={[styles.colNum, styles.cellText]} />
-            <Text style={[styles.colDesc, styles.cellText]}>
-              Descuento
-              {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
-              {cotizacion.descuentoTipo === "Porcentaje" ? ` (${cotizacion.descuentoValor}%)` : ""}
-            </Text>
-            <Text style={[styles.colQty, styles.cellText]}>—</Text>
-            <Text style={[styles.colUnit, styles.cellText]}>—</Text>
-            <Text style={[styles.colPrice, styles.cellText]}>—</Text>
-            <Text style={[styles.colSubtotal, styles.cellText]}>
-              -{currency(montoDescuento, cotizacion.moneda)}
-            </Text>
+        <View style={styles.totalsWrap}>
+          <View style={styles.totalsBox}>
+            <View style={styles.totalLine}>
+              <Text>Subtotal</Text>
+              <Text>{currency(cotizacion.montoSubtotal, cotizacion.moneda)}</Text>
+            </View>
+            {cotizacion.descuentoTipo && (
+              <View style={[styles.totalLine, styles.totalLineBorder]}>
+                <Text>
+                  Descuento
+                  {cotizacion.descuentoMotivo ? ` — ${cotizacion.descuentoMotivo}` : ""}
+                  {cotizacion.descuentoTipo === "Porcentaje" ? ` (${cotizacion.descuentoValor}%)` : ""}
+                </Text>
+                <Text>-{currency(montoDescuento, cotizacion.moneda)}</Text>
+              </View>
+            )}
+            <View style={styles.totalBar}>
+              <Text style={styles.totalBarLabel}>Total {cotizacion.moneda ?? "MXN"}</Text>
+              <Text style={styles.totalBarValue}>{currency(cotizacion.montoTotal, cotizacion.moneda)}</Text>
+            </View>
+            {anticipoMonto !== null && (
+              <View style={styles.anticipoLine}>
+                <Text>Anticipo {cotizacion.porcentajeAnticipo}% para arrancar</Text>
+                <Text style={styles.anticipoValue}>{currency(anticipoMonto, cotizacion.moneda)}</Text>
+              </View>
+            )}
           </View>
-        )}
-
-        <View style={styles.totalRow}>
-          <View style={styles.totalBar} />
-          <Text style={styles.totalText}>
-            Total: {currency(cotizacion.montoTotal, cotizacion.moneda)}
-          </Text>
         </View>
 
         <View style={styles.pagoRow}>
@@ -292,83 +355,114 @@ export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: C
           ) : null}
         </View>
 
-        <View style={styles.paymentsRow}>
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentTitle}>Transferencia bancaria</Text>
-            <Text style={styles.paymentLine}>
-              <Text style={styles.paymentLabel}>Banco: </Text>
-              {businessInfo.banco.nombre}
-            </Text>
-            <Text style={styles.paymentLine}>
-              <Text style={styles.paymentLabel}>Cuenta: </Text>
-              {businessInfo.banco.cuenta}
-            </Text>
-            <Text style={styles.paymentLine}>
-              <Text style={styles.paymentLabel}>CLABE: </Text>
-              {businessInfo.banco.clabe}
-            </Text>
-            <Text style={styles.paymentLine}>
-              <Text style={styles.paymentLabel}>SWIFT: </Text>
-              {businessInfo.banco.swift}
-            </Text>
-          </View>
+        <View style={styles.footerRow}>
+          <Text style={styles.footerText}>
+            {businessInfo.nombre} · {folio}
+          </Text>
+          <Text style={styles.footerText}>Página 1 de 2</Text>
+        </View>
+      </Page>
 
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentTitle}>Binance</Text>
-            <Text style={styles.paymentLine}>
-              <Text style={styles.paymentLabel}>Correo: </Text>
-              {businessInfo.binance.correo}
-            </Text>
-          </View>
-
-          <View style={[styles.paymentCol, styles.paymentColLast]}>
-            <Text style={styles.paymentTitle}>PayPal</Text>
-            <Text style={styles.paymentLine}>Haz click en el enlace para pagar</Text>
-            <Link src={businessInfo.paypal.link} style={styles.paymentLink}>
-              {businessInfo.paypal.link}
-            </Link>
-          </View>
+      <Page size="LETTER" style={styles.page}>
+        <View style={styles.headerRowSimple}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
+          <Image src={logoDataUri} style={styles.logoSmall} />
+          <Text style={styles.headerRightLabel}>
+            Cotización {folio} · {cliente.nombre}
+          </Text>
         </View>
 
-        <View style={styles.termsBox}>
-          <Text style={styles.termsTitle}>TÉRMINOS Y CONDICIONES</Text>
-          <View style={styles.termsRow}>
-            <View style={styles.termsCol}>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Forma de pago: </Text>
-                50% anticipo y 50% contra entrega.
-              </Text>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Validez: </Text>
-                15 días calendario
-                {cotizacion.fechaVencimiento
-                  ? ` (vence el ${fechaCorta(cotizacion.fechaVencimiento)})`
-                  : ""}
-                .
-              </Text>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Garantía: </Text>
-                6 meses por defectos de programación.
-              </Text>
+        <View style={styles.accentBandTight} />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Formas de pago</Text>
+          <View style={styles.paymentsRow}>
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentTitle}>Transferencia {businessInfo.banco.nombre}</Text>
+              <Text style={styles.paymentLine}>Cuenta {businessInfo.banco.cuenta}</Text>
+              <Text style={styles.paymentLine}>CLABE {businessInfo.banco.clabe}</Text>
+              <Text style={styles.paymentLine}>SWIFT {businessInfo.banco.swift}</Text>
             </View>
-            <View style={styles.termsCol}>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Métodos: </Text>
-                Transferencia bancaria, Binance o PayPal.
-              </Text>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Entregables: </Text>
-                Código fuente, manuales y soporte.
-              </Text>
-              <Text style={styles.termsItem}>
-                <Text style={styles.termsLabel}>Cambios: </Text>
-                Pueden generar costos adicionales — se documentan como órdenes de cambio.
-              </Text>
+            <View style={[styles.paymentCol, styles.paymentColMid]}>
+              <Text style={styles.paymentTitle}>Binance</Text>
+              <Text style={styles.paymentLine}>{businessInfo.binance.correo}</Text>
+            </View>
+            <View style={[styles.paymentCol, styles.paymentColLast]}>
+              <Text style={styles.paymentTitle}>PayPal</Text>
+              <Link src={businessInfo.paypal.link} style={styles.paymentLink}>
+                {businessInfo.paypal.link.replace("https://", "")}
+              </Link>
+              <Text style={styles.paymentLine}>Pago con tarjeta al instante</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.footer}>¡Gracias por su confianza!</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Términos y condiciones</Text>
+          <View style={styles.termsGrid}>
+            <View style={styles.termsCol}>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Pago</Text>
+                <Text style={styles.termsItemValue}>50% anticipo y 50% contra entrega.</Text>
+              </View>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Validez</Text>
+                <Text style={styles.termsItemValue}>
+                  15 días calendario
+                  {cotizacion.fechaVencimiento
+                    ? ` (vence el ${fechaCorta(cotizacion.fechaVencimiento)})`
+                    : ""}
+                  .
+                </Text>
+              </View>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Garantía</Text>
+                <Text style={styles.termsItemValue}>6 meses por defectos de programación.</Text>
+              </View>
+            </View>
+            <View style={styles.termsCol}>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Métodos</Text>
+                <Text style={styles.termsItemValue}>Transferencia bancaria, Binance o PayPal.</Text>
+              </View>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Entregables</Text>
+                <Text style={styles.termsItemValue}>Código fuente, manuales y soporte.</Text>
+              </View>
+              <View style={styles.termsItem}>
+                <Text style={styles.termsItemLabel}>Cambios</Text>
+                <Text style={styles.termsItemValue}>
+                  Se documentan como órdenes de cambio y pueden generar costos adicionales.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Aceptación</Text>
+          <View style={styles.signRow}>
+            <View style={styles.signCol}>
+              <View style={styles.signLine} />
+              <Text style={styles.signCaption}>Firma del cliente</Text>
+              <Text style={styles.signValue}>{cliente.nombre}</Text>
+            </View>
+            <View style={styles.signCol}>
+              <View style={styles.signLine} />
+              <Text style={styles.signCaption}>Fecha</Text>
+              <Text style={styles.signValue}>
+                También puedes firmar en línea desde el enlace de la cotización.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.footerRow}>
+          <Text style={styles.footerText}>
+            {businessInfo.nombre} · {folio}
+          </Text>
+          <Text style={styles.footerText}>Página 2 de 2</Text>
+        </View>
       </Page>
     </Document>
   );
