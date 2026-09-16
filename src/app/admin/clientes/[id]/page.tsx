@@ -3,9 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, Pencil, Mail, MessageCircle, CalendarDays, Plus, ShieldAlert } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { montoTotalServicio } from "@/lib/servicio";
+import { montoTotalServicio, montoPendienteServicio } from "@/lib/servicio";
 import { montoEnMXN } from "@/lib/pago-monto";
-import { totalServicioMXN, pendienteServicioMXN } from "@/lib/cliente-metricas";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
@@ -134,14 +133,12 @@ export default async function ClienteDetallePage({
   const serviciosActivos = cliente.servicios.filter((s) =>
     ["Aprobado", "EnProceso"].includes(s.status)
   );
-  // Un cliente puede tener servicios cotizados en monedas distintas (MXN,
-  // USD, COP...) -- se normalizan a MXN con Servicio.montoInicialMXN /
-  // Pago.montoMXN antes de sumar (misma lógica que los KPIs globales de la
-  // lista, ver src/lib/cliente-metricas.ts), o sumar los montos crudos
-  // mezclaría pesos colombianos con pesos mexicanos como si fueran la
-  // misma moneda.
+  // Aproximado cuando el cliente tiene servicios en más de una moneda —
+  // suma los totales tal cual, sin convertir (Servicio no guarda un
+  // equivalente en MXN como sí hace Pago.montoMXN). Poco común: un
+  // cliente normalmente factura siempre en la misma moneda.
   const montoTotalFacturado = cliente.servicios.reduce(
-    (acc, s) => acc + totalServicioMXN(s),
+    (acc, s) => acc + montoTotalServicio(s),
     0
   );
 
@@ -154,11 +151,11 @@ export default async function ClienteDetallePage({
     .filter((p) => p.confirmado)
     .reduce((acc, p) => acc + montoEnMXN(p), 0);
   const montoTotalSaldo = cliente.servicios.reduce(
-    (acc, s) => acc + pendienteServicioMXN(s, s.pagos),
+    (acc, s) => acc + montoPendienteServicio(s, s.pagos),
     0
   );
   const serviciosConSaldo = cliente.servicios.filter(
-    (s) => pendienteServicioMXN(s, s.pagos) > 0
+    (s) => montoPendienteServicio(s, s.pagos) > 0
   ).length;
   const pctCobrado =
     montoTotalFacturado > 0 ? Math.round((montoTotalPagado / montoTotalFacturado) * 100) : 0;

@@ -112,12 +112,9 @@ export default async function ClientesPage({
           fechaInicio: true,
           actualizadoEn: true,
           montoInicial: true,
-          montoInicialMXN: true,
           moneda: true,
           ordenesCambio: { select: { status: true, monto: true } },
-          pagos: {
-            select: { monto: true, moneda: true, montoMXN: true, confirmado: true, fecha: true },
-          },
+          pagos: { select: { monto: true, moneda: true, confirmado: true, fecha: true } },
         },
       }),
       prisma.queja.findMany({ select: { clienteId: true, creadoEn: true } }),
