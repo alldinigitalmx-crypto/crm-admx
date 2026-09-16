@@ -12,7 +12,11 @@ import {
   User,
   ArrowUp,
   ArrowDown,
-  Minus,
+  Filter,
+  Calendar,
+  GitCompare,
+  Receipt,
+  ArrowRight,
 } from "lucide-react";
 
 import { requiereAdmin } from "@/lib/alcance";
@@ -21,7 +25,7 @@ import { obtenerDatosReportes } from "@/lib/reportes-data";
 import { calcularDelta, type Delta, type ModoComparacion } from "@/lib/reportes";
 import { hoyEnMexico } from "@/lib/fecha";
 import { DetalleDialog } from "@/components/reportes/detalle-dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -35,10 +39,9 @@ import { Button } from "@/components/ui/button";
 import { RecaudadoGastosChart } from "@/components/reportes/recaudado-gastos-chart";
 import { DesgloseBarras, type ItemBarra } from "@/components/reportes/desglose-barras";
 import { DonutChart, type DonutItem } from "@/components/reportes/donut-chart";
+import { SERVICIO_STATUS_COLOR } from "@/lib/status-colors";
 import type { StatusServicio } from "@/generated/prisma/client";
 
-// Colores planos (no clases bg-*) para los segmentos de la dona — el mismo
-// tono conceptual que METODO_COLOR de abajo, pero utilizable como stroke SVG.
 const METODO_COLOR_HEX: Record<string, string> = {
   Efectivo: "#10b981",
   Transferencia: "#6366f1",
@@ -58,6 +61,13 @@ const STATUS_COLOR: Record<StatusServicio, string> = {
   EnProceso: "bg-amber-500 dark:bg-amber-400",
   Entregado: "bg-emerald-600 dark:bg-emerald-400",
   Cancelado: "bg-red-500 dark:bg-red-400",
+};
+const STATUS_LABEL: Record<StatusServicio, string> = {
+  Cotizado: "Cotizado",
+  Aprobado: "Aprobado",
+  EnProceso: "En proceso",
+  Entregado: "Entregado",
+  Cancelado: "Cancelado",
 };
 
 const METODO_COLOR: Record<string, string> = {
@@ -81,95 +91,181 @@ const CATEGORICOS_GASTO = [
   "bg-pink-500 dark:bg-pink-400",
 ];
 
+const AVATAR_TONOS = [
+  "bg-primary/10 text-primary",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-400",
+];
+
 function isoDate(d: Date) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-// Línea de variación vs. el periodo de comparación. Verde cuando el
-// cambio va en la dirección buena de ESA métrica (para gastos, bajar es
-// bueno), rojo cuando no, gris cuando prácticamente no se movió.
-function DeltaLinea({
-  delta,
-  previo,
-  buenoCuando,
-}: {
-  delta: Delta;
-  previo: string;
-  buenoCuando: "up" | "down";
-}) {
-  const bueno = delta.dir === "flat" || delta.dir === buenoCuando;
-  const color =
-    delta.dir === "flat" ? "text-muted-foreground" : bueno ? "text-success" : "text-destructive";
-  const Icono = delta.dir === "up" ? ArrowUp : delta.dir === "down" ? ArrowDown : Minus;
-  const texto =
-    delta.pct === null
-      ? delta.dir === "flat"
-        ? "igual"
-        : "nuevo"
-      : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(1)}%`;
+function iniciales(nombre: string) {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  const letras = partes.length > 1 ? `${partes[0][0]}${partes[1][0]}` : (partes[0]?.slice(0, 2) ?? "?");
+  return letras.toUpperCase();
+}
+
+function tonoAvatar(id: number) {
+  return AVATAR_TONOS[id % AVATAR_TONOS.length];
+}
+
+// Segmento de pills tipo "segmented control" para navegar por Link (no
+// hay estado de cliente -- cada opción es su propio href con el query
+// ya armado) -- mismo patrón que los presets de antes, solo que con el
+// look de un selector de un solo grupo.
+function PillGroup({ items }: { items: { label: string; href: string; activo: boolean }[] }) {
   return (
-    <p className={`flex items-center gap-1 truncate text-xs ${color}`}>
-      <Icono className="size-3 shrink-0" />
-      <span className="font-medium">{texto}</span>
-      <span className="truncate text-muted-foreground">· {previo} antes</span>
-    </p>
+    <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+      {items.map((item) => (
+        <Link
+          key={item.label}
+          href={item.href}
+          className={`inline-flex h-7 items-center rounded-md px-2.5 text-xs transition-colors ${
+            item.activo
+              ? "bg-card font-semibold text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </div>
   );
 }
 
-function KpiCard({
+// Badge de variación vs. el periodo de comparación -- mismo criterio de
+// "bueno" que antes (verde cuando el cambio va a favor de esa métrica),
+// pero como pastilla compacta para vivir junto a la cifra grande.
+function DeltaPill({ delta, buenoCuando }: { delta: Delta; buenoCuando: "up" | "down" }) {
+  if (delta.dir === "flat") {
+    return (
+      <span className="mb-0.5 inline-flex h-5 shrink-0 items-center rounded-md bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">
+        sin cambio
+      </span>
+    );
+  }
+  const bueno = delta.dir === buenoCuando;
+  const Icono = delta.dir === "up" ? ArrowUp : ArrowDown;
+  return (
+    <span
+      className={`mb-0.5 inline-flex h-5 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-[11px] font-semibold ${
+        bueno ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+      }`}
+    >
+      <Icono className="size-3" />
+      {delta.pct === null ? "nuevo" : `${Math.abs(delta.pct).toFixed(1)}%`}
+    </span>
+  );
+}
+
+type Tono = "good" | "bad" | "primary";
+const TONO_CLASE: Record<Tono, string> = {
+  good: "bg-success/10 text-success",
+  bad: "bg-destructive/10 text-destructive",
+  primary: "bg-primary/10 text-primary",
+};
+
+// Tarjeta grande (Total recaudado / Gastos / Utilidad) -- valor en mono,
+// delta como pastilla junto al número, línea del periodo de comparación
+// abajo, y un pie completo "Ver detalles" que abre el mismo modal de
+// siempre pero con el trato visual de una franja clicable.
+function MetricaPrincipal({
   title,
   value,
   icon: Icon,
-  tone = "default",
+  tone,
   sub,
-  detalle,
+  previo,
   delta,
+  buenoCuando,
+  detalle,
+  destacada,
 }: {
   title: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
-  tone?: "default" | "good" | "bad";
-  sub?: string;
-  // Abre un modal con el listado real (Pagos/Gastos/Servicios/Clientes)
-  // ya filtrado con el mismo rango y criterio que se usó para esta cifra,
-  // sin salir de Reportes -- ahí mismo se puede exportar a Excel esos
-  // registros exactos. Se omite en tarjetas sin una lista propia detrás
-  // (ej. Utilidad neta, que es una resta, no un conjunto de registros).
+  tone: Tono;
+  sub: string;
+  previo?: string;
+  delta?: Delta;
+  buenoCuando: "up" | "down";
   detalle?: { tipo: string; exportHref: string; rangoQS: string };
-  delta?: { delta: Delta; previo: string; buenoCuando: "up" | "down" };
+  destacada?: boolean;
 }) {
-  const toneClass =
-    tone === "good"
-      ? "bg-success/10 text-success"
-      : tone === "bad"
-        ? "bg-destructive/10 text-destructive"
-        : "bg-primary/10 text-primary";
+  return (
+    <Card className={destacada ? "ring-primary/30" : undefined}>
+      <CardContent>
+        <div className="flex items-center gap-2">
+          <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${TONO_CLASE[tone]}`}>
+            <Icon className="size-3.5" />
+          </span>
+          <span className="text-xs font-medium text-muted-foreground">{title}</span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <span className="font-mono text-2xl leading-none font-semibold tracking-tight sm:text-[28px]">
+            {value}
+          </span>
+          {delta && <DeltaPill delta={delta} buenoCuando={buenoCuando} />}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{sub}</p>
+        {previo && <p className="mt-0.5 text-[11px] text-muted-foreground/80">{previo}</p>}
+      </CardContent>
+      {detalle && (
+        <DetalleDialog
+          tipo={detalle.tipo}
+          titulo={title}
+          rangoQS={detalle.rangoQS}
+          exportHref={detalle.exportHref}
+          variant="row"
+        />
+      )}
+    </Card>
+  );
+}
+
+// Tarjeta chica (Gastos personales / Servicios entregados / Servicios
+// nuevos / Clientes nuevos) -- mismo pie clicable, número más chico.
+function MetricaSecundaria({
+  title,
+  value,
+  icon: Icon,
+  sub,
+  delta,
+  buenoCuando,
+  detalle,
+}: {
+  title: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+  sub: string;
+  delta?: Delta;
+  buenoCuando: "up" | "down";
+  detalle: { tipo: string; exportHref: string; rangoQS: string };
+}) {
   return (
     <Card>
-      <CardContent className="flex flex-col gap-2 py-2">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 ${toneClass}`}>
-            <Icon className="size-4 sm:size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs text-muted-foreground">{title}</p>
-            <p className="truncate text-lg font-semibold sm:text-xl">{value}</p>
-            {delta ? (
-              <DeltaLinea delta={delta.delta} previo={delta.previo} buenoCuando={delta.buenoCuando} />
-            ) : (
-              sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>
-            )}
-          </div>
+      <CardContent>
+        <div className="flex items-center gap-1.5">
+          <Icon className="size-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{title}</span>
         </div>
-        {detalle && (
-          <DetalleDialog
-            tipo={detalle.tipo}
-            titulo={title}
-            rangoQS={detalle.rangoQS}
-            exportHref={detalle.exportHref}
-          />
-        )}
+        <div className="mt-2.5 flex flex-wrap items-baseline gap-2">
+          <span className="font-mono text-xl leading-none font-semibold">{value}</span>
+          {delta && <DeltaPill delta={delta} buenoCuando={buenoCuando} />}
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">{sub}</p>
       </CardContent>
+      <DetalleDialog
+        tipo={detalle.tipo}
+        titulo={title}
+        rangoQS={detalle.rangoQS}
+        exportHref={detalle.exportHref}
+        variant="row"
+      />
     </Card>
   );
 }
@@ -185,10 +281,6 @@ export default async function ReportesPage({
   const comparar: ModoComparacion | undefined =
     compararRaw === "anterior" || compararRaw === "año" ? compararRaw : undefined;
 
-  // Sin filtro en la URL, antes se veía "Todo" por default -- ahora se
-  // manda derecho a "Este mes" (el caso que de verdad se usa a diario).
-  // "Todo" sigue existiendo como su propio preset explícito (?todo=1),
-  // así no se pierde la forma de ver el histórico completo.
   if (!desde && !hasta && todo !== "1") {
     const hoyDefault = hoyEnMexico();
     const inicioMesDefault = new Date(
@@ -225,26 +317,20 @@ export default async function ReportesPage({
     gastosPersonalesItems: gastosPersonalesFilas,
     topClientes,
     pendientePorRecibir,
+    pendienteServiciosDetalle,
     comparacion,
   } = datos;
 
-  // Helper: arma el `delta` que espera KpiCard a partir del bloque de
-  // comparación (si no hay comparación activa, devuelve undefined y la
-  // tarjeta se ve igual que siempre).
-  function deltaDe(
-    actual: number,
-    previo: number | undefined,
-    buenoCuando: "up" | "down",
-    formato: (n: number) => string = formatCurrency
-  ) {
+  function deltaDe(actual: number, previo: number | undefined) {
     if (comparacion === undefined || previo === undefined) return undefined;
-    return { delta: calcularDelta(actual, previo), previo: formato(previo), buenoCuando };
+    return calcularDelta(actual, previo);
   }
   const comparaLabel =
     comparacion?.modo === "año" ? "año pasado" : comparacion ? "periodo anterior" : "";
+  const comparaAnioCorto = comparacion ? String(comparacion.desde.getUTCFullYear()) : "";
 
   const statusItems: ItemBarra[] = statusFilas.map((f) => ({
-    label: f.label,
+    label: STATUS_LABEL[f.label as StatusServicio] ?? f.label,
     valor: f.count,
     colorClass: STATUS_COLOR[f.label as StatusServicio] ?? COLOR_OTROS,
   }));
@@ -304,8 +390,6 @@ export default async function ReportesPage({
   if (comparar) exportParams.set("comparar", comparar);
   const exportQuery = exportParams.toString();
 
-  // Arma un href a /admin/reportes conservando el rango actual y
-  // cambiando solo `comparar` (o quitándolo para "Sin comparar").
   function hrefComparar(modo: ModoComparacion | null) {
     const p = new URLSearchParams();
     if (todo === "1") p.set("todo", "1");
@@ -322,6 +406,8 @@ export default async function ReportesPage({
     { label: "Año pasado", modo: "año" },
   ];
 
+  const rangoQS = `desde=${isoDate(desdeEfectivo)}&hasta=${isoDate(hastaEfectivo)}`;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -329,6 +415,12 @@ export default async function ReportesPage({
           <h1 className="text-2xl font-semibold">Reportes</h1>
           <p className="text-sm text-muted-foreground">
             {formatDate(desdeEfectivo)} — {formatDate(hastaEfectivo)}
+            {comparacion && (
+              <>
+                <span className="text-muted-foreground/60"> · </span>
+                comparado con {formatDate(comparacion.desde)} — {formatDate(comparacion.hasta)}
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -347,53 +439,54 @@ export default async function ReportesPage({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Rango de fechas</CardTitle>
-        </CardHeader>
+      <Card size="sm">
         <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {presets.map((p) => {
-              const params = new URLSearchParams();
-              if (p.todo) {
-                params.set("todo", "1");
-              } else {
-                if (p.desde) params.set("desde", p.desde);
-                if (p.hasta) params.set("hasta", p.hasta);
-              }
-              if (comparar) params.set("comparar", comparar);
-              const href = `/admin/reportes?${params}`;
-              const activo = presetActivo?.label === p.label;
-              return (
-                <Button key={p.label} asChild size="sm" variant={activo ? "default" : "outline"}>
-                  <Link href={href}>{p.label}</Link>
-                </Button>
-              );
-            })}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Comparar con</span>
-            <div className="flex flex-wrap gap-2">
-              {opcionesComparar.map((o) => {
-                const activo = (comparar ?? null) === o.modo;
-                return (
-                  <Button
-                    key={o.label}
-                    asChild
-                    size="sm"
-                    variant={activo ? "default" : "outline"}
-                  >
-                    <Link href={hrefComparar(o.modo)}>{o.label}</Link>
-                  </Button>
-                );
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="w-16 shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground">
+              PERIODO
+            </span>
+            <PillGroup
+              items={presets.map((p) => {
+                const params = new URLSearchParams();
+                if (p.todo) params.set("todo", "1");
+                else {
+                  if (p.desde) params.set("desde", p.desde);
+                  if (p.hasta) params.set("hasta", p.hasta);
+                }
+                if (comparar) params.set("comparar", comparar);
+                return {
+                  label: p.label,
+                  href: `/admin/reportes?${params}`,
+                  activo: presetActivo?.label === p.label,
+                };
               })}
-            </div>
+            />
           </div>
-          <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+
+          <div className="-mx-(--card-spacing) flex flex-wrap items-center gap-3 border-t border-border bg-muted/30 px-(--card-spacing) py-3">
+            <span className="w-16 shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground">
+              COMPARAR
+            </span>
+            <PillGroup
+              items={opcionesComparar.map((o) => ({
+                label: o.label,
+                href: hrefComparar(o.modo),
+                activo: (comparar ?? null) === o.modo,
+              }))}
+            />
+            {comparacion && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <GitCompare className="size-3.5" />
+                Los deltas de cada tarjeta se calculan contra el {comparaLabel}
+              </span>
+            )}
+          </div>
+
+          <form className="grid gap-3 pt-1 sm:grid-cols-[1fr_1fr_auto]">
             {comparar && <input type="hidden" name="comparar" value={comparar} />}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="desde" className="text-xs text-muted-foreground">
-                Desde
+              <label htmlFor="desde" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="size-3.5" /> Desde
               </label>
               <Input id="desde" type="date" name="desde" defaultValue={desde ?? ""} />
             </div>
@@ -404,176 +497,216 @@ export default async function ReportesPage({
               <Input id="hasta" type="date" name="hasta" defaultValue={hasta ?? ""} />
             </div>
             <Button type="submit" className="self-end">
+              <Filter />
               Filtrar
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {(() => {
-        // Mismo rango que se está reportando (aunque el usuario haya
-        // entrado sin filtro/con "Todo") -- así "Ver detalles" siempre
-        // trae exactamente lo que la tarjeta contó, ni un registro de más.
-        const rangoQS = `desde=${isoDate(desdeEfectivo)}&hasta=${isoDate(hastaEfectivo)}`;
-        const cuenta = (n: number) => String(n);
-        return (
-          <div className="flex flex-col gap-3">
-            {comparacion && (
-              <p className="text-xs text-muted-foreground">
-                Comparando contra el {comparaLabel}:{" "}
-                <span className="font-medium text-foreground">
-                  {formatDate(comparacion.desde)} — {formatDate(comparacion.hasta)}
-                </span>
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-              <KpiCard
-                title="Total recaudado"
-                value={formatCurrency(totalRecaudado)}
-                icon={TrendingUp}
-                tone="good"
-                sub={`${pagosCount} pagos confirmados — neto de comisión de pasarela`}
-                delta={deltaDe(totalRecaudado, comparacion?.totalRecaudado, "up")}
-                detalle={{
-                  tipo: "pagos",
-                  rangoQS,
-                  exportHref: `/admin/pagos/export?confirmado=true&${rangoQS}`,
-                }}
-              />
-              <KpiCard
-                title="Gastos (empresa)"
-                value={formatCurrency(totalGastos)}
-                icon={TrendingDown}
-                tone="bad"
-                sub={`${gastosCount} movimientos`}
-                delta={deltaDe(totalGastos, comparacion?.totalGastos, "down")}
-                detalle={{
-                  tipo: "gastos-empresa",
-                  rangoQS,
-                  exportHref: `/admin/gastos/export?ambito=Empresa&${rangoQS}`,
-                }}
-              />
-              <KpiCard
-                title="Utilidad neta"
-                value={formatCurrency(utilidadNeta)}
-                icon={Wallet}
-                tone={utilidadNeta >= 0 ? "good" : "bad"}
-                sub="Recaudado − gastos (solo empresa)"
-                delta={deltaDe(utilidadNeta, comparacion?.utilidadNeta, "up")}
-              />
-              <KpiCard
-                title="Gastos personales"
-                value={formatCurrency(totalGastosPersonales)}
-                icon={User}
-                sub={`${gastosPersonalesCount} movimientos — no resta de la utilidad`}
-                delta={deltaDe(totalGastosPersonales, comparacion?.totalGastosPersonales, "down")}
-                detalle={{
-                  tipo: "gastos-personal",
-                  rangoQS,
-                  exportHref: `/admin/gastos/export?ambito=Personal&${rangoQS}`,
-                }}
-              />
-              <KpiCard
-                title="Servicios entregados"
-                value={String(serviciosEntregadosCount)}
-                icon={CheckCircle2}
-                sub="Por fecha de fin"
-                delta={deltaDe(serviciosEntregadosCount, comparacion?.serviciosEntregadosCount, "up", cuenta)}
-                detalle={{
-                  tipo: "servicios-entregados",
-                  rangoQS,
-                  exportHref: `/admin/servicios/export?status=Entregado&${rangoQS}`,
-                }}
-              />
-              <KpiCard
-                title="Servicios nuevos"
-                value={String(serviciosNuevosCount)}
-                icon={Briefcase}
-                sub="Por fecha de inicio"
-                delta={deltaDe(serviciosNuevosCount, comparacion?.serviciosNuevosCount, "up", cuenta)}
-                detalle={{
-                  tipo: "servicios-nuevos",
-                  rangoQS,
-                  exportHref: `/admin/servicios/export?${rangoQS}`,
-                }}
-              />
-              <KpiCard
-                title="Clientes nuevos"
-                value={String(clientesNuevosCount)}
-                icon={Users}
-                delta={deltaDe(clientesNuevosCount, comparacion?.clientesNuevosCount, "up", cuenta)}
-                detalle={{
-                  tipo: "clientes-nuevos",
-                  rangoQS,
-                  exportHref: `/admin/clientes/export?${rangoQS}`,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })()}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MetricaPrincipal
+          title="Total recaudado"
+          value={formatCurrency(totalRecaudado)}
+          icon={TrendingUp}
+          tone="good"
+          sub={`${pagosCount} pago${pagosCount === 1 ? "" : "s"} confirmados — neto de comisión de pasarela`}
+          previo={
+            comparacion
+              ? `${comparaAnioCorto}: ${formatCurrency(comparacion.totalRecaudado)} · ${comparacion.pagosCount} pago${comparacion.pagosCount === 1 ? "" : "s"}`
+              : undefined
+          }
+          delta={deltaDe(totalRecaudado, comparacion?.totalRecaudado)}
+          buenoCuando="up"
+          detalle={{ tipo: "pagos", rangoQS, exportHref: `/admin/pagos/export?confirmado=true&${rangoQS}` }}
+        />
+        <MetricaPrincipal
+          title="Gastos (empresa)"
+          value={formatCurrency(totalGastos)}
+          icon={TrendingDown}
+          tone="bad"
+          sub={`${gastosCount} movimiento${gastosCount === 1 ? "" : "s"}`}
+          previo={
+            comparacion
+              ? `${comparaAnioCorto}: ${formatCurrency(comparacion.totalGastos)} · ${comparacion.gastosCount} movimiento${comparacion.gastosCount === 1 ? "" : "s"}`
+              : undefined
+          }
+          delta={deltaDe(totalGastos, comparacion?.totalGastos)}
+          buenoCuando="down"
+          detalle={{ tipo: "gastos-empresa", rangoQS, exportHref: `/admin/gastos/export?ambito=Empresa&${rangoQS}` }}
+        />
+        <MetricaPrincipal
+          title="Utilidad neta"
+          value={formatCurrency(utilidadNeta)}
+          icon={Wallet}
+          tone="primary"
+          sub="Recaudado − gastos (solo empresa)"
+          previo={comparacion ? `${comparaAnioCorto}: ${formatCurrency(comparacion.utilidadNeta)}` : undefined}
+          delta={deltaDe(utilidadNeta, comparacion?.utilidadNeta)}
+          buenoCuando="up"
+          destacada
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MetricaSecundaria
+          title="Gastos personales"
+          value={formatCurrency(totalGastosPersonales)}
+          icon={User}
+          sub={`${gastosPersonalesCount} mov. — no resta de la utilidad`}
+          delta={deltaDe(totalGastosPersonales, comparacion?.totalGastosPersonales)}
+          buenoCuando="down"
+          detalle={{ tipo: "gastos-personal", rangoQS, exportHref: `/admin/gastos/export?ambito=Personal&${rangoQS}` }}
+        />
+        <MetricaSecundaria
+          title="Servicios entregados"
+          value={String(serviciosEntregadosCount)}
+          icon={CheckCircle2}
+          sub="Por fecha de fin"
+          delta={deltaDe(serviciosEntregadosCount, comparacion?.serviciosEntregadosCount)}
+          buenoCuando="up"
+          detalle={{ tipo: "servicios-entregados", rangoQS, exportHref: `/admin/servicios/export?status=Entregado&${rangoQS}` }}
+        />
+        <MetricaSecundaria
+          title="Servicios nuevos"
+          value={String(serviciosNuevosCount)}
+          icon={Briefcase}
+          sub="Por fecha de inicio"
+          delta={deltaDe(serviciosNuevosCount, comparacion?.serviciosNuevosCount)}
+          buenoCuando="up"
+          detalle={{ tipo: "servicios-nuevos", rangoQS, exportHref: `/admin/servicios/export?${rangoQS}` }}
+        />
+        <MetricaSecundaria
+          title="Clientes nuevos"
+          value={String(clientesNuevosCount)}
+          icon={Users}
+          sub="Alta en el periodo"
+          delta={deltaDe(clientesNuevosCount, comparacion?.clientesNuevosCount)}
+          buenoCuando="up"
+          detalle={{ tipo: "clientes-nuevos", rangoQS, exportHref: `/admin/clientes/export?${rangoQS}` }}
+        />
+      </div>
 
       {pendientePorRecibir.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Pendiente por recibir</CardTitle>
-            <CardDescription className="text-xs">
-              Servicios aprobados o en proceso que aún no se cobran completos — no incluye
-              cotizados, entregados ni cancelados.
-            </CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <CardTitle>Pendiente por recibir</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Servicios aprobados o en proceso que aún no se cobran completos — no incluye
+                cotizados, entregados ni cancelados.
+              </p>
+            </div>
+            {pendientePorRecibir.length === 1 && (
+              <div className="shrink-0 text-right">
+                <div className="text-[11px] font-semibold tracking-wide text-muted-foreground">TOTAL</div>
+                <div className="mt-0.5 font-mono text-lg font-semibold">
+                  {formatCurrency(pendientePorRecibir[0].total.monto, pendientePorRecibir[0].moneda)}
+                </div>
+              </div>
+            )}
           </CardHeader>
-          <CardContent className="flex flex-col gap-5">
+          <CardContent className="flex flex-col gap-5 pt-4">
             {pendientePorRecibir.map((g) => (
               <div key={g.moneda} className="flex flex-col gap-3">
                 {pendientePorRecibir.length > 1 && (
-                  <p className="text-xs font-semibold text-muted-foreground">{g.moneda}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground">{g.moneda}</p>
+                    <p className="font-mono text-sm font-semibold">{formatCurrency(g.total.monto, g.moneda)}</p>
+                  </div>
                 )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-input p-3">
-                    <p className="text-xs text-muted-foreground">Trabajos propios</p>
-                    <p className="text-lg font-semibold">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Trabajos propios</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {g.propios.count} trabajo{g.propios.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-mono text-lg font-semibold">
                       {formatCurrency(g.propios.monto, g.moneda)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {g.propios.count} trabajo{g.propios.count === 1 ? "" : "s"}
-                    </p>
+                    <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${g.total.monto > 0 ? Math.max(2, (g.propios.monto / g.total.monto) * 100) : 0}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="rounded-lg border border-input p-3">
-                    <p className="text-xs text-muted-foreground">Con intermediario</p>
-                    <p className="text-lg font-semibold">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Con intermediario</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {g.intermediarios.count} trabajo{g.intermediarios.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-mono text-lg font-semibold">
                       {formatCurrency(g.intermediarios.monto, g.moneda)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {g.intermediarios.count} trabajo{g.intermediarios.count === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="text-lg font-semibold">
-                      {formatCurrency(g.total.monto, g.moneda)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {g.total.count} trabajo{g.total.count === 1 ? "" : "s"}
-                    </p>
+                    <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-violet-500 dark:bg-violet-400"
+                        style={{
+                          width: `${g.total.monto > 0 ? Math.max(2, (g.intermediarios.monto / g.total.monto) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
+
+            {pendienteServiciosDetalle.length > 0 && (
+              <div className="-mx-(--card-spacing) overflow-hidden border-t border-border">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 bg-muted/30 px-(--card-spacing) py-2 text-[10.5px] font-semibold tracking-wide text-muted-foreground sm:grid-cols-[1fr_120px_100px_100px]">
+                  <span>SERVICIO</span>
+                  <span className="hidden text-right sm:block">STATUS</span>
+                  <span className="text-right">COBRADO</span>
+                  <span className="text-right">PENDIENTE</span>
+                </div>
+                {pendienteServiciosDetalle.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/admin/servicios/${s.id}`}
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-border px-(--card-spacing) py-2.5 transition-colors hover:bg-muted/40 sm:grid-cols-[1fr_120px_100px_100px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{s.descripcion}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {s.cliente} · {formatDate(s.fechaInicio)}
+                        {s.esIntermediario ? " · intermediario" : ""}
+                      </p>
+                    </div>
+                    <span className="hidden justify-self-end sm:block">
+                      <span className={`inline-flex h-5 items-center rounded-md px-2 text-[11px] font-medium ${SERVICIO_STATUS_COLOR[s.status]}`}>
+                        {STATUS_LABEL[s.status]}
+                      </span>
+                    </span>
+                    <span className="text-right font-mono text-sm text-muted-foreground">
+                      {formatCurrency(s.cobrado, s.moneda)}
+                    </span>
+                    <span className="text-right font-mono text-sm font-semibold">
+                      {formatCurrency(s.pendiente, s.moneda)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Recaudado vs. gastos</CardTitle>
-          <CardDescription className="text-xs">
+        <CardHeader className="border-b border-border pb-4">
+          <CardTitle>Recaudado vs. gastos</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
             {granularidadPeriodo === "mes"
               ? "Un punto por mes — así se ve la tendencia de meses anteriores."
               : "Un punto por día."}
             {comparacion && ` Línea punteada: recaudado del ${comparaLabel}.`}
-          </CardDescription>
+          </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <RecaudadoGastosChart
             datos={puntosPeriodo}
             comparacionRecaudado={comparacion?.recaudadoPorPeriodo}
@@ -584,19 +717,25 @@ export default async function ReportesPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Servicios por status</CardTitle>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle>Servicios por status</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {statusFilas.reduce((acc, f) => acc + f.count, 0)} servicios en el rango
+            </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <DesgloseBarras items={statusItems} formato="numero" vacio="No hay servicios que iniciaran en este rango." />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Pagos por método</CardTitle>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle>Pagos por método</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {pagosCount} pago{pagosCount === 1 ? "" : "s"} confirmados
+            </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {metodoItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">No hay pagos confirmados en este rango.</p>
             ) : (
@@ -613,35 +752,74 @@ export default async function ReportesPage({
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Gastos por categoría</CardTitle>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle>Gastos por categoría</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Solo gasto de empresa</p>
           </CardHeader>
-          <CardContent>
-            <DesgloseBarras items={gastosItems} vacio="No hay gastos de empresa en este rango." />
+          <CardContent className="flex flex-1 flex-col pt-4">
+            {gastosItems.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                  <Receipt className="size-5" />
+                </span>
+                <p className="text-sm font-medium">Sin gastos de empresa en este rango</p>
+                {gastosPersonalesFilas.length > 0 && (
+                  <p className="max-w-56 text-xs text-muted-foreground">
+                    Los gastos del periodo están marcados como personales, así que no restan de la
+                    utilidad neta.
+                  </p>
+                )}
+                <Link
+                  href="/admin/gastos"
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Registrar un gasto <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+            ) : (
+              <DesgloseBarras items={gastosItems} vacio="No hay gastos de empresa en este rango." />
+            )}
           </CardContent>
         </Card>
       </div>
 
       {(gastosPersonalesItems.length > 0 || totalGastosPersonales > 0) && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Gastos personales por categoría</CardTitle>
-            <CardDescription className="text-xs">
-              Aparte de los números del negocio — no se suman a Gastos (empresa) ni restan de la
-              utilidad neta.
-            </CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <CardTitle>Gastos personales por categoría</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Aparte de los números del negocio — no se suman a Gastos (empresa) ni restan de la
+                utilidad neta.
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-[11px] font-semibold tracking-wide text-muted-foreground">TOTAL</div>
+              <div className="mt-0.5 font-mono text-base font-semibold">{formatCurrency(totalGastosPersonales)}</div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <DesgloseBarras items={gastosPersonalesItems} vacio="No hay gastos personales en este rango." />
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Clientes con más recaudación</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <CardTitle>Clientes con más recaudación</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {topClientes.length} cliente{topClientes.length === 1 ? "" : "s"} pagaron en el rango
+            </p>
+          </div>
+          <Link
+            href="/admin/clientes"
+            className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            Ver todos los clientes <ArrowRight className="size-3.5" />
+          </Link>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {topClientes.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay pagos confirmados en este rango.</p>
           ) : (
@@ -661,14 +839,16 @@ export default async function ReportesPage({
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">
                         <Link href={`/admin/clientes/${c.id}`} className="flex items-center gap-2.5 hover:underline">
-                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                            {c.nombre.trim().charAt(0).toUpperCase() || "?"}
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${tonoAvatar(c.id)}`}
+                          >
+                            {iniciales(c.nombre)}
                           </span>
                           {c.nombre}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{c.count}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(c.monto)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-muted-foreground">{c.count}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums font-semibold">{formatCurrency(c.monto)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
@@ -677,7 +857,7 @@ export default async function ReportesPage({
                               style={{ width: `${Math.max(2, pct)}%` }}
                             />
                           </span>
-                          <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                          <span className="shrink-0 font-mono tabular-nums text-xs text-muted-foreground">
                             {pct.toFixed(1)}%
                           </span>
                         </div>
@@ -690,6 +870,11 @@ export default async function ReportesPage({
           )}
         </CardContent>
       </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Los montos se muestran en la moneda de cada pago
+        {comparacion && ` · comparación contra el ${comparaLabel}`}
+      </p>
     </div>
   );
 }

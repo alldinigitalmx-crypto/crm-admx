@@ -63,11 +63,16 @@ export function DetalleDialog({
   titulo,
   rangoQS,
   exportHref,
+  variant = "link",
 }: {
   tipo: string;
   titulo: string;
   rangoQS: string;
   exportHref: string;
+  /** "link": texto chico con flecha, para dentro de la tarjeta (default).
+   * "row": franja completa de pie de tarjeta, con separador y hover --
+   * para las tarjetas de Reportes rediseñadas. */
+  variant?: "link" | "row";
 }) {
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -101,13 +106,24 @@ export function DetalleDialog({
   return (
     <Dialog onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <button
-          type="button"
-          className="flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
-        >
-          Ver detalles
-          <ChevronRight className="size-3.5" />
-        </button>
+        {variant === "row" ? (
+          <button
+            type="button"
+            data-slot="card-footer"
+            className="flex items-center justify-between gap-2 rounded-b-xl border-t border-border bg-muted/30 p-(--card-spacing) text-left text-xs font-medium transition-colors hover:bg-muted/60"
+          >
+            Ver detalles
+            <ChevronRight className="size-3.5 text-muted-foreground" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
+          >
+            Ver detalles
+            <ChevronRight className="size-3.5" />
+          </button>
+        )}
       </DialogTrigger>
       <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] flex-col overflow-hidden sm:max-w-3xl lg:max-w-5xl">
         <DialogHeader>

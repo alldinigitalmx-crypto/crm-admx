@@ -16,7 +16,7 @@ import {
 } from "@/lib/reportes";
 import { METODO_LABEL } from "@/lib/metodo-pago";
 import { montoEnMXN, montoNetoEnMXN } from "@/lib/pago-monto";
-import { montoPendienteServicio } from "@/lib/servicio";
+import { montoPendienteServicio, montoPagadoServicio } from "@/lib/servicio";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 export const STATUS_ORDEN: StatusServicio[] = [
@@ -49,6 +49,17 @@ export type ReporteGastoDetalle = {
   monto: number;
 };
 export type PendienteGrupo = { count: number; monto: number };
+export type PendienteServicioDetalle = {
+  id: number;
+  descripcion: string;
+  cliente: string;
+  status: StatusServicio;
+  fechaInicio: Date;
+  moneda: string;
+  cobrado: number;
+  pendiente: number;
+  esIntermediario: boolean;
+};
 
 // Los mismos totales del reporte pero para el rango contra el que se
 // compara (mes/año anterior). Solo cifras agregadas -- ninguna lista de
@@ -64,6 +75,8 @@ export type ReporteComparacion = {
   serviciosEntregadosCount: number;
   serviciosNuevosCount: number;
   clientesNuevosCount: number;
+  pagosCount: number;
+  gastosCount: number;
   // "recaudado" del rango de comparación, agrupado con la misma
   // granularidad y alineado por posición con puntosPeriodo -- para la
   // línea punteada del gráfico de tendencia.
@@ -112,6 +125,11 @@ export type ReporteData = {
   gastosDetalle: ReporteGastoDetalle[];
   gastosPersonalesDetalle: ReporteGastoDetalle[];
   pendientePorRecibir: PendientePorRecibirMoneda[];
+  // Detalle servicio por servicio de "Pendiente por recibir" -- misma
+  // foto del momento que los totales de arriba, ordenado por lo que más
+  // falta cobrar primero. Acotado a un puñado para la tarjeta de
+  // Reportes (el listado completo vive en /admin/servicios).
+  pendienteServiciosDetalle: PendienteServicioDetalle[];
   comparacion?: ReporteComparacion;
 };
 
@@ -125,7 +143,7 @@ async function totalesDeRango(rango: { gte: Date; lte: Date }) {
         where: { confirmado: true, fecha: rango },
         select: { fecha: true, monto: true, moneda: true, montoMXN: true, comision: true, montoIncluyeComision: true },
       }),
-      prisma.gasto.aggregate({ _sum: { monto: true }, where: { ambito: "Empresa", fecha: rango } }),
+      prisma.gasto.aggregate({ _sum: { monto: true }, _count: true, where: { ambito: "Empresa", fecha: rango } }),
       prisma.gasto.aggregate({ _sum: { monto: true }, where: { ambito: "Personal", fecha: rango } }),
       prisma.servicio.count({ where: { fechaInicio: rango } }),
       prisma.servicio.count({ where: { status: "Entregado", fechaFin: rango } }),
@@ -142,6 +160,8 @@ async function totalesDeRango(rango: { gte: Date; lte: Date }) {
     serviciosNuevosCount: serviciosNuevos,
     serviciosEntregadosCount,
     clientesNuevosCount,
+    pagosCount: pagos.length,
+    gastosCount: gastosSum._count,
   };
 }
 
@@ -272,11 +292,16 @@ export async function obtenerDatosReportes(
     prisma.servicio.findMany({
       where: { status: { in: ["Aprobado", "EnProceso"] } },
       select: {
+        id: true,
+        descripcion: true,
+        status: true,
+        fechaInicio: true,
         montoInicial: true,
         moneda: true,
         intermediarioId: true,
         ordenesCambio: { select: { status: true, monto: true } },
         pagos: { select: { monto: true, confirmado: true, moneda: true } },
+        cliente: { select: { nombre: true } },
       },
     }),
   ]);
@@ -376,6 +401,7 @@ export async function obtenerDatosReportes(
     .slice(0, 8);
 
   const gruposPendiente = new Map<string, PendientePorRecibirMoneda>();
+  const pendienteServiciosDetalle: PendienteServicioDetalle[] = [];
   for (const s of serviciosActivos) {
     const pendiente = montoPendienteServicio(s, s.pagos);
     if (pendiente <= 0.01) continue; // ya saldado -- no cuenta como "falta"
@@ -393,10 +419,23 @@ export async function obtenerDatosReportes(
     grupo.total.count += 1;
     grupo.total.monto += pendiente;
     gruposPendiente.set(moneda, grupo);
+
+    pendienteServiciosDetalle.push({
+      id: s.id,
+      descripcion: s.descripcion,
+      cliente: s.cliente.nombre,
+      status: s.status,
+      fechaInicio: s.fechaInicio,
+      moneda,
+      cobrado: montoPagadoServicio(s, s.pagos),
+      pendiente,
+      esIntermediario: s.intermediarioId !== null,
+    });
   }
   const pendientePorRecibir = Array.from(gruposPendiente.values()).sort((a, b) =>
     a.moneda === "MXN" ? -1 : b.moneda === "MXN" ? 1 : a.moneda.localeCompare(b.moneda)
   );
+  pendienteServiciosDetalle.sort((a, b) => b.pendiente - a.pendiente);
 
   let comparacion: ReporteComparacion | undefined;
   if (comparar) {
@@ -419,6 +458,8 @@ export async function obtenerDatosReportes(
       serviciosEntregadosCount: t.serviciosEntregadosCount,
       serviciosNuevosCount: t.serviciosNuevosCount,
       clientesNuevosCount: t.clientesNuevosCount,
+      pagosCount: t.pagosCount,
+      gastosCount: t.gastosCount,
       recaudadoPorPeriodo: puntosComp.map((p) => p.recaudado),
     };
   }
@@ -446,6 +487,7 @@ export async function obtenerDatosReportes(
     gastosPersonalesItems,
     topClientes,
     pendientePorRecibir,
+    pendienteServiciosDetalle: pendienteServiciosDetalle.slice(0, 12),
     comparacion,
     pagosDetalle: pagos.map((p) => ({
       fecha: p.fecha,
