@@ -218,7 +218,7 @@ export default async function ClienteDetallePage({
 
   const tabTriggerClass = (v: TabValue) =>
     cn(
-      "flex-none border-b-2 border-transparent px-0.5 pb-2.5 text-sm font-medium whitespace-nowrap text-white/70 hover:text-white",
+      "flex-none border-b-2 border-transparent px-0.5 pb-3 text-sm font-medium whitespace-nowrap text-white/70 hover:text-white",
       activeTab === v && "border-white text-white"
     );
 
@@ -226,7 +226,7 @@ export default async function ClienteDetallePage({
     <div className="flex flex-col gap-5">
       {/* ================= HERO ================= */}
       <div className="overflow-hidden rounded-xl bg-[linear-gradient(103deg,oklch(0.24_0.045_264)_0%,oklch(0.3_0.07_268)_100%)] text-white">
-        <div className="min-w-0 px-4 pt-4 sm:px-6 sm:pt-5">
+        <div className="px-5 pt-5 sm:px-7 sm:pt-6">
           <Link
             href="/admin/clientes"
             className="inline-flex items-center gap-1 text-sm text-white/70 hover:text-white"
@@ -235,36 +235,34 @@ export default async function ClienteDetallePage({
             Clientes
           </Link>
 
-          <div className="mt-2.5 flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
               <div
-                className={`flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-bold sm:size-12 ${colorAvatar}`}
+                className={`flex size-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold ${colorAvatar}`}
               >
                 {inicial}
               </div>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="min-w-0 text-xl font-semibold tracking-tight break-words sm:text-2xl">
-                    {cliente.nombre}
-                  </h1>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-2xl font-semibold tracking-tight sm:text-[26px]">{cliente.nombre}</h1>
                   {cliente.etiqueta && (
-                    <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-white/90 px-2.5 text-[11px] font-bold text-[oklch(0.3_0.08_85)]">
+                    <span className="inline-flex h-[23px] items-center rounded-full bg-white/90 px-2.5 text-[11.5px] font-bold text-[oklch(0.3_0.08_85)]">
                       {cliente.etiqueta}
                     </span>
                   )}
                   {cliente.portalActivo && (
-                    <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-white/15 px-2.5 text-[11px] font-semibold">
+                    <span className="inline-flex h-[23px] items-center rounded-full bg-white/15 px-2.5 text-[11.5px] font-semibold">
                       Portal activo
                     </span>
                   )}
                 </div>
-                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[12.5px] break-words text-white/75">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-white/75">
                   {[cliente.pais, cliente.email, cliente.telefono, `Alta ${formatDate(cliente.creadoEn)}`]
                     .filter(Boolean)
                     .map((part, i) => (
-                      <span key={i} className="flex min-w-0 items-center gap-2">
+                      <span key={i} className="flex items-center gap-2">
                         {i > 0 && <span className="opacity-50">·</span>}
-                        <span className="min-w-0 break-words">{part}</span>
+                        {part}
                       </span>
                     ))}
                 </div>
@@ -329,7 +327,7 @@ export default async function ClienteDetallePage({
           </div>
         </div>
 
-        <div className="mt-3 flex gap-5 overflow-x-auto px-4 sm:px-6">
+        <div className="mt-5 flex gap-6 overflow-x-auto px-5 sm:px-7">
           <Link href={hrefTab("resumen")} scroll={false} className={tabTriggerClass("resumen")}>
             Resumen
           </Link>
