@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
 import { buildExcelResponse } from "@/lib/excel";
-import { montoTotalServicio } from "@/lib/servicio";
+import { montoTotalServicio, montoPendienteServicio } from "@/lib/servicio";
 import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -13,30 +13,24 @@ export async function GET(request: Request) {
   if (!permisos.puedeVer) redirect("/admin");
 
   const { searchParams } = new URL(request.url);
-  const clienteId = searchParams.get("clienteId");
-  const status = searchParams.get("status");
-  const intermediarioId = searchParams.get("intermediarioId");
-  const desde = searchParams.get("desde");
-  const hasta = searchParams.get("hasta");
+  const clienteIds = searchParams.getAll("clienteId");
+  const statuses = searchParams.getAll("status");
+  const intermediarioIds = searchParams.getAll("intermediarioId");
 
   const where: Prisma.ServicioWhereInput = {};
-  if (clienteId) where.clienteId = Number(clienteId);
-  if (status) where.status = status as StatusServicio;
-  if (intermediarioId) where.intermediarioId = Number(intermediarioId);
-  if (desde || hasta) {
-    // Mismo criterio que la página: "Entregado" se cuenta por fecha de fin
-    // (ver serviciosEntregadosWhere en reportes-data.ts).
-    const campoFecha = status === "Entregado" ? "fechaFin" : "fechaInicio";
-    where[campoFecha] = {
-      ...(desde ? { gte: new Date(desde) } : {}),
-      ...(hasta ? { lte: new Date(hasta) } : {}),
-    };
-  }
+  if (clienteIds.length) where.clienteId = { in: clienteIds.map(Number) };
+  if (statuses.length) where.status = { in: statuses as StatusServicio[] };
+  if (intermediarioIds.length) where.intermediarioId = { in: intermediarioIds.map(Number) };
   if (!permisos.verTodo && usuario) where.responsableId = usuario.id;
 
   const servicios = await prisma.servicio.findMany({
     where,
-    include: { cliente: true, intermediario: true, ordenesCambio: true },
+    include: {
+      cliente: true,
+      intermediario: true,
+      ordenesCambio: true,
+      pagos: { select: { monto: true, confirmado: true, moneda: true } },
+    },
     orderBy: { creadoEn: "desc" },
   });
 
@@ -50,6 +44,7 @@ export async function GET(request: Request) {
       { header: "Intermediario", key: "intermediario", width: 20 },
       { header: "Inicio", key: "fechaInicio", width: 14 },
       { header: "Monto", key: "monto", width: 14 },
+      { header: "Pendiente", key: "pendiente", width: 14 },
       { header: "Moneda", key: "moneda", width: 12 },
     ],
     servicios.map((s) => ({
@@ -59,6 +54,7 @@ export async function GET(request: Request) {
       intermediario: s.intermediario?.nombre ?? "",
       fechaInicio: s.fechaInicio,
       monto: montoTotalServicio(s),
+      pendiente: montoPendienteServicio(s, s.pagos),
       moneda: s.moneda ?? "MXN",
     }))
   );

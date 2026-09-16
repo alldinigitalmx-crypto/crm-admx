@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ClienteRapidoDialog } from "@/components/clientes/cliente-rapido-dialog";
 import { crearClienteRapido } from "@/app/admin/clientes/actions";
+import { formatCurrency } from "@/lib/format";
 import type { ServicioFormState } from "@/app/admin/servicios/actions";
 
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"] as const;
@@ -92,6 +93,20 @@ export function ServicioForm({
   const [cargandoTipoCambio, setCargandoTipoCambio] = useState(false);
   const [tipoCambioInfo, setTipoCambioInfo] = useState<{ rate: number; fecha: string | null } | null>(null);
   const [tipoCambioError, setTipoCambioError] = useState<string | null>(null);
+
+  // Solo para el preview de "lo que cobras" -- el cálculo real y definitivo
+  // vive en comisionIntermediario()/montoPropioServicio() (lib/servicio.ts);
+  // aquí solo se reproduce para mostrarlo mientras el usuario captura.
+  const [montoPreview, setMontoPreview] = useState(
+    defaultValues ? String(defaultValues.montoInicial) : ""
+  );
+  const [porcentajePreview, setPorcentajePreview] = useState(
+    defaultValues?.porcentajeIntermediario ? String(defaultValues.porcentajeIntermediario) : ""
+  );
+  const montoNum = Number(montoPreview) || 0;
+  const porcentajeNum = Number(porcentajePreview) || 0;
+  const comisionIntermediarioPreview = montoNum * (porcentajeNum / 100);
+  const cobrasPreview = montoNum - comisionIntermediarioPreview;
 
   async function usarTipoCambioDeHoy() {
     const montoActual = Number(montoRef.current?.value ?? "");
@@ -225,6 +240,7 @@ export function ServicioForm({
               defaultValues ? String(defaultValues.montoInicial) : ""
             }
             placeholder="0.00"
+            onChange={(e) => setMontoPreview(e.target.value)}
           />
         </div>
 
@@ -383,7 +399,19 @@ export function ServicioForm({
                 : ""
             }
             placeholder="Ej. 10"
+            onChange={(e) => setPorcentajePreview(e.target.value)}
           />
+          {porcentajeNum > 0 && montoNum > 0 && (
+            <p className="text-xs text-muted-foreground">
+              El intermediario se lleva{" "}
+              {formatCurrency(comisionIntermediarioPreview, monedaEsExtranjera ? moneda : "MXN")} — tú
+              cobras{" "}
+              <span className="font-medium text-foreground">
+                {formatCurrency(cobrasPreview, monedaEsExtranjera ? moneda : "MXN")}
+              </span>
+              .
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 sm:col-span-2">

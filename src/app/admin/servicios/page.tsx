@@ -29,22 +29,36 @@ import type { Prisma, StatusServicio } from "@/generated/prisma/client";
 
 const STATUSES = ["Cotizado", "Aprobado", "EnProceso", "Entregado", "Cancelado"];
 
+const ORDENES = [
+  { value: "recientes", label: "Más recientes" },
+  { value: "pendiente_desc", label: "Saldo pendiente (mayor primero)" },
+  { value: "pendiente_asc", label: "Saldo pendiente (menor primero)" },
+] as const;
+
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+function toArray(v: string | string[] | undefined): string[] {
+  if (!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
 
 export default async function ServiciosPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    clienteId?: string;
-    status?: string;
-    intermediarioId?: string;
-    desde?: string;
-    hasta?: string;
+    clienteId?: string | string[];
+    status?: string | string[];
+    intermediarioId?: string | string[];
+    orden?: string;
+    solo?: string;
     page?: string;
   }>;
 }) {
-  const { clienteId, status, intermediarioId, desde, hasta, page: pageParam } = await searchParams;
+  const { clienteId, status, intermediarioId, orden, solo, page: pageParam } = await searchParams;
+  const clienteIds = toArray(clienteId);
+  const statuses = toArray(status);
+  const intermediarioIds = toArray(intermediarioId);
   const page = parsePage(pageParam);
 
   const [clientes, intermediarios, usuarios, usuario] = await Promise.all([
@@ -63,58 +77,74 @@ export default async function ServiciosPage({
   const verTodo = permisos.verTodo;
 
   const where: Prisma.ServicioWhereInput = {};
-  if (clienteId) where.clienteId = Number(clienteId);
-  if (status) where.status = status as StatusServicio;
-  if (intermediarioId) where.intermediarioId = Number(intermediarioId);
-  if (desde || hasta) {
-    // "Entregado" se cuenta en Reportes por su fecha de fin, no de inicio
-    // (ver serviciosEntregadosWhere en reportes-data.ts) -- aquí se sigue
-    // el mismo criterio para que "Ver detalles" muestre exactamente lo
-    // que la tarjeta contó, ni un servicio de más ni de menos.
-    const campoFecha = status === "Entregado" ? "fechaFin" : "fechaInicio";
-    where[campoFecha] = {
-      ...(desde ? { gte: new Date(desde) } : {}),
-      ...(hasta ? { lte: new Date(hasta) } : {}),
-    };
-  }
+  if (clienteIds.length) where.clienteId = { in: clienteIds.map(Number) };
+  if (statuses.length) where.status = { in: statuses as StatusServicio[] };
+  if (intermediarioIds.length) where.intermediarioId = { in: intermediarioIds.map(Number) };
   if (!verTodo && usuario) where.responsableId = usuario.id;
 
-  const hasFiltros = Boolean(clienteId || status || intermediarioId || desde || hasta);
+  const hasFiltros = Boolean(clienteIds.length || statuses.length || intermediarioIds.length);
 
   const exportParams = new URLSearchParams();
-  if (clienteId) exportParams.set("clienteId", clienteId);
-  if (status) exportParams.set("status", status);
-  if (intermediarioId) exportParams.set("intermediarioId", intermediarioId);
-  if (desde) exportParams.set("desde", desde);
-  if (hasta) exportParams.set("hasta", hasta);
+  clienteIds.forEach((v) => exportParams.append("clienteId", v));
+  statuses.forEach((v) => exportParams.append("status", v));
+  intermediarioIds.forEach((v) => exportParams.append("intermediarioId", v));
 
-  const [totalCount, servicios] = await Promise.all([
-    prisma.servicio.count({ where }),
-    prisma.servicio.findMany({
-      where,
-      include: {
-        cliente: true,
-        intermediario: true,
-        ordenesCambio: true,
-        // Solo lo necesario para calcular el pendiente por pagar de cada
-        // fila (ver montoPendienteServicio) -- nada de detalle del pago.
-        pagos: { select: { monto: true, confirmado: true, moneda: true } },
-      },
-      orderBy: { creadoEn: "desc" },
-      skip: paginationSkip(page),
-      take: PAGE_SIZE,
-    }),
-  ]);
+  // El saldo pendiente/liquidado se calcula en memoria (montoPendienteServicio
+  // depende de órdenes de cambio y pagos, no es una columna) -- por eso el
+  // filtro "solo" y el orden por pendiente se resuelven aquí, no en Prisma,
+  // y la paginación se hace con slice() sobre el arreglo ya filtrado/ordenado.
+  const todos = await prisma.servicio.findMany({
+    where,
+    include: {
+      cliente: true,
+      intermediario: true,
+      ordenesCambio: true,
+      pagos: { select: { monto: true, confirmado: true, moneda: true } },
+    },
+    orderBy: { creadoEn: "desc" },
+  });
+
+  const conPendiente = todos.map((s) => ({ s, pendiente: montoPendienteServicio(s, s.pagos) }));
+
+  const filtrados =
+    solo === "pendientes"
+      ? conPendiente.filter((x) => x.pendiente > 0.01)
+      : solo === "liquidados"
+        ? conPendiente.filter((x) => x.pendiente <= 0.01)
+        : conPendiente;
+
+  if (orden === "pendiente_desc") filtrados.sort((a, b) => b.pendiente - a.pendiente);
+  else if (orden === "pendiente_asc") filtrados.sort((a, b) => a.pendiente - b.pendiente);
+
+  const totalCount = filtrados.length;
   const paginas = totalPages(totalCount);
+  const servicios = filtrados
+    .slice(paginationSkip(page), paginationSkip(page) + PAGE_SIZE)
+    .map((x) => ({ ...x.s, pendienteCalculado: x.pendiente }));
 
   function buildHref(targetPage: number) {
     const params = new URLSearchParams();
-    if (clienteId) params.set("clienteId", clienteId);
-    if (status) params.set("status", status);
-    if (intermediarioId) params.set("intermediarioId", intermediarioId);
-    if (desde) params.set("desde", desde);
-    if (hasta) params.set("hasta", hasta);
+    clienteIds.forEach((v) => params.append("clienteId", v));
+    statuses.forEach((v) => params.append("status", v));
+    intermediarioIds.forEach((v) => params.append("intermediarioId", v));
+    if (orden) params.set("orden", orden);
+    if (solo) params.set("solo", solo);
     if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return qs ? `/admin/servicios?${qs}` : "/admin/servicios";
+  }
+
+  function buildQuickHref(soloValue: string | null) {
+    const params = new URLSearchParams();
+    clienteIds.forEach((v) => params.append("clienteId", v));
+    statuses.forEach((v) => params.append("status", v));
+    intermediarioIds.forEach((v) => params.append("intermediarioId", v));
+    if (soloValue === "pendientes") {
+      params.set("solo", "pendientes");
+      params.set("orden", "pendiente_desc");
+    } else if (soloValue === "liquidados") {
+      params.set("solo", "liquidados");
+    }
     const qs = params.toString();
     return qs ? `/admin/servicios?${qs}` : "/admin/servicios";
   }
@@ -126,7 +156,7 @@ export default async function ServiciosPage({
           <h1 className="text-2xl font-semibold">Servicios</h1>
           <p className="text-sm text-muted-foreground">
             {totalCount} servicio{totalCount === 1 ? "" : "s"}
-            {hasFiltros ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
+            {hasFiltros || solo ? " con estos filtros" : " registrado" + (totalCount === 1 ? "" : "s")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -157,63 +187,101 @@ export default async function ServiciosPage({
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant={!solo ? "secondary" : "outline"} asChild>
+          <Link href={buildQuickHref(null)}>Todos</Link>
+        </Button>
+        <Button size="sm" variant={solo === "pendientes" ? "secondary" : "outline"} asChild>
+          <Link href={buildQuickHref("pendientes")}>Con saldo pendiente</Link>
+        </Button>
+        <Button size="sm" variant={solo === "liquidados" ? "secondary" : "outline"} asChild>
+          <Link href={buildQuickHref("liquidados")}>Liquidados</Link>
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <select name="clienteId" defaultValue={clienteId ?? ""} className={selectClass}>
-              <option value="">Todos los clientes</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+          <form className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Clientes</span>
+                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
+                  {clientes.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="clienteId"
+                        value={c.id}
+                        defaultChecked={clienteIds.includes(String(c.id))}
+                        className="size-3.5"
+                      />
+                      <span className="truncate">{c.nombre}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-            <select name="status" defaultValue={status ?? ""} className={selectClass}>
-              <option value="">Todos los status</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Status</span>
+                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
+                  {STATUSES.map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="status"
+                        value={s}
+                        defaultChecked={statuses.includes(s)}
+                        className="size-3.5"
+                      />
+                      <span>{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-            <select
-              name="intermediarioId"
-              defaultValue={intermediarioId ?? ""}
-              className={selectClass}
-            >
-              <option value="">Todos los intermediarios</option>
-              {intermediarios.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.nombre}
-                </option>
-              ))}
-            </select>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Intermediarios</span>
+                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-input p-2">
+                  {intermediarios.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No hay intermediarios.</p>
+                  ) : (
+                    intermediarios.map((i) => (
+                      <label key={i.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="intermediarioId"
+                          value={i.id}
+                          defaultChecked={intermediarioIds.includes(String(i.id))}
+                          className="size-3.5"
+                        />
+                        <span className="truncate">{i.nombre}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
 
-            <input
-              type="date"
-              name="desde"
-              defaultValue={desde ?? ""}
-              aria-label="Desde"
-              className={selectClass}
-            />
-            <input
-              type="date"
-              name="hasta"
-              defaultValue={hasta ?? ""}
-              aria-label="Hasta"
-              className={selectClass}
-            />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
+                <select name="orden" defaultValue={orden ?? "recientes"} className={selectClass}>
+                  {ORDENES.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {solo && <input type="hidden" name="solo" value={solo} />}
+              </div>
+            </div>
 
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-5">
+            <div className="flex gap-2">
               <Button type="submit" size="sm">
                 Filtrar
               </Button>
-              {hasFiltros && (
+              {(hasFiltros || orden || solo) && (
                 <Button type="button" size="sm" variant="outline" asChild>
                   <Link href="/admin/servicios">Limpiar</Link>
                 </Button>
@@ -230,7 +298,7 @@ export default async function ServiciosPage({
         <CardContent>
           {servicios.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {hasFiltros
+              {hasFiltros || solo
                 ? "No hay servicios con esos filtros."
                 : "Aún no hay servicios registrados."}
             </p>
@@ -253,7 +321,7 @@ export default async function ServiciosPage({
                 <TableBody>
                   {servicios.map((s) => {
                     const Icono = STATUS_ICON[s.status] ?? FileText;
-                    const pendiente = montoPendienteServicio(s, s.pagos);
+                    const pendiente = s.pendienteCalculado;
                     return (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
@@ -313,7 +381,7 @@ export default async function ServiciosPage({
               <div className="flex flex-col gap-2 md:hidden">
                 {servicios.map((s) => {
                   const Icono = STATUS_ICON[s.status] ?? FileText;
-                  const pendiente = montoPendienteServicio(s, s.pagos);
+                  const pendiente = s.pendienteCalculado;
                   return (
                     <MobileRecordCard
                       key={s.id}
