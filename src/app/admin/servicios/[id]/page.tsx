@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { montoTotalServicio, montoPagadoServicio, montoPendienteServicio, comisionIntermediario } from "@/lib/servicio";
+import { montoTotalServicio, montoPagadoServicio, montoPendienteServicio, estadoSaldoServicio, comisionIntermediario } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { esAdmin, permisosModulo } from "@/lib/alcance";
@@ -144,6 +144,7 @@ export default async function ServicioDetallePage({
   const comision = comisionIntermediario(montoTotal, servicio.porcentajeIntermediario);
   const montoPagado = montoPagadoServicio(servicio, servicio.pagos);
   const montoPendiente = montoPendienteServicio(servicio, servicio.pagos);
+  const estadoSaldo = estadoSaldoServicio(servicio, servicio.pagos);
 
   const boundUpdateServicio = updateServicio.bind(null, servicio.id);
   const boundCreateOrdenCambio = createOrdenCambio.bind(null, servicio.id);
@@ -243,8 +244,14 @@ export default async function ServicioDetallePage({
         <Kpi label="Pagado" value={formatCurrency(montoPagado, servicio.moneda)} tone="good" />
         <Kpi
           label="Pendiente por pagar"
-          value={montoPendiente > 0.01 ? formatCurrency(montoPendiente, servicio.moneda) : "Liquidado"}
-          tone={montoPendiente > 0.01 ? "bad" : "good"}
+          value={
+            estadoSaldo === "pendiente"
+              ? formatCurrency(montoPendiente, servicio.moneda)
+              : estadoSaldo === "cancelado"
+                ? "Cancelado"
+                : "Liquidado"
+          }
+          tone={estadoSaldo === "pendiente" ? "bad" : estadoSaldo === "cancelado" ? "default" : "good"}
         />
         <Kpi
           label="Comisión intermediario"

@@ -63,6 +63,22 @@ export function montoPagadoServicio(
     .reduce((acc, p) => acc + Number(p.monto), 0);
 }
 
+// Para decidir qué mostrar en la UI: un servicio Cancelado que ya se había
+// pagado completo sigue siendo "liquidado" (de verdad se cobró todo), pero
+// uno Cancelado sin terminar de pagar no debe verse como "Liquidado" (nunca
+// se cobró) ni como si aún tuviera saldo activo pendiente por cobrar (ver
+// montoPendienteServicio) -- por eso es un tercer estado aparte.
+export type EstadoSaldoServicio = "liquidado" | "pendiente" | "cancelado";
+
+export function estadoSaldoServicio(
+  servicio: ServicioConIntermediario & { moneda?: string | null; status?: string },
+  pagos: PagoParaMonto[]
+): EstadoSaldoServicio {
+  const pagadoCompleto = montoPagadoServicio(servicio, pagos) >= montoPropioServicio(servicio) - 0.01;
+  if (pagadoCompleto) return "liquidado";
+  return servicio.status === "Cancelado" ? "cancelado" : "pendiente";
+}
+
 export function comisionIntermediario(
   montoTotal: number,
   porcentaje: DecimalLike | null | undefined

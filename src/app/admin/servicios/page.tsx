@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Plus, ChevronRight, Download, FileText } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
-import { montoTotalServicio, montoPendienteServicio } from "@/lib/servicio";
+import { montoTotalServicio, montoPendienteServicio, estadoSaldoServicio } from "@/lib/servicio";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { currentUsuario } from "@/lib/current-usuario";
 import { permisosModulo } from "@/lib/alcance";
@@ -23,6 +23,7 @@ import { MobileRecordCard } from "@/components/ui/mobile-record-card";
 import { ServicioFormDialog } from "@/components/servicios/servicio-form-dialog";
 import { StatusQuickSelect } from "@/components/servicios/status-quick-select";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { FiltrosCard } from "@/components/ui/filtros-card";
 import { createServicio, cambiarStatusServicio } from "@/app/admin/servicios/actions";
 import { Pagination } from "@/components/ui/pagination";
 import { PAGE_SIZE, parsePage, paginationSkip, totalPages } from "@/lib/pagination";
@@ -200,63 +201,58 @@ export default async function ServiciosPage({
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <MultiSelectFilter
-                key={`cliente-${clienteIds.join(",")}`}
-                name="clienteId"
-                label="Clientes"
-                options={clientes.map((c) => ({ value: String(c.id), label: c.nombre }))}
-                defaultSelected={clienteIds}
-              />
+      <FiltrosCard activo={hasFiltros}>
+        <form className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MultiSelectFilter
+              key={`cliente-${clienteIds.join(",")}`}
+              name="clienteId"
+              label="Clientes"
+              options={clientes.map((c) => ({ value: String(c.id), label: c.nombre }))}
+              defaultSelected={clienteIds}
+            />
 
-              <MultiSelectFilter
-                key={`status-${statuses.join(",")}`}
-                name="status"
-                label="Status"
-                options={STATUSES.map((s) => ({ value: s, label: s }))}
-                defaultSelected={statuses}
-              />
+            <MultiSelectFilter
+              key={`status-${statuses.join(",")}`}
+              name="status"
+              label="Status"
+              options={STATUSES.map((s) => ({ value: s, label: s }))}
+              defaultSelected={statuses}
+            />
 
-              <MultiSelectFilter
-                key={`intermediario-${intermediarioIds.join(",")}`}
-                name="intermediarioId"
-                label="Intermediarios"
-                options={intermediarios.map((i) => ({ value: String(i.id), label: i.nombre }))}
-                defaultSelected={intermediarioIds}
-              />
+            <MultiSelectFilter
+              key={`intermediario-${intermediarioIds.join(",")}`}
+              name="intermediarioId"
+              label="Intermediarios"
+              options={intermediarios.map((i) => ({ value: String(i.id), label: i.nombre }))}
+              defaultSelected={intermediarioIds}
+            />
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
-                <select name="orden" defaultValue={orden ?? "recientes"} className={selectClass}>
-                  {ORDENES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                {solo && <input type="hidden" name="solo" value={solo} />}
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
+              <select name="orden" defaultValue={orden ?? "recientes"} className={selectClass}>
+                {ORDENES.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              {solo && <input type="hidden" name="solo" value={solo} />}
             </div>
+          </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" size="sm">
-                Filtrar
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">
+              Filtrar
+            </Button>
+            {(hasFiltros || orden || solo) && (
+              <Button type="button" size="sm" variant="outline" asChild>
+                <Link href="/admin/servicios">Limpiar</Link>
               </Button>
-              {(hasFiltros || orden || solo) && (
-                <Button type="button" size="sm" variant="outline" asChild>
-                  <Link href="/admin/servicios">Limpiar</Link>
-                </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            )}
+          </div>
+        </form>
+      </FiltrosCard>
 
       <Card>
         <CardHeader>
@@ -289,6 +285,7 @@ export default async function ServiciosPage({
                   {servicios.map((s) => {
                     const Icono = STATUS_ICON[s.status] ?? FileText;
                     const pendiente = s.pendienteCalculado;
+                    const estado = estadoSaldoServicio(s, s.pagos);
                     return (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
@@ -326,9 +323,19 @@ export default async function ServiciosPage({
                         {formatCurrency(montoTotalServicio(s), s.moneda)}
                       </TableCell>
                       <TableCell
-                        className={`text-right ${pendiente > 0.01 ? "font-medium text-destructive" : "text-success"}`}
+                        className={`text-right ${
+                          estado === "pendiente"
+                            ? "font-medium text-destructive"
+                            : estado === "cancelado"
+                              ? "text-muted-foreground"
+                              : "text-success"
+                        }`}
                       >
-                        {pendiente > 0.01 ? formatCurrency(pendiente, s.moneda) : "Liquidado"}
+                        {estado === "pendiente"
+                          ? formatCurrency(pendiente, s.moneda)
+                          : estado === "cancelado"
+                            ? "Cancelado"
+                            : "Liquidado"}
                       </TableCell>
                       <TableCell>
                         <Link
@@ -349,6 +356,7 @@ export default async function ServiciosPage({
                 {servicios.map((s) => {
                   const Icono = STATUS_ICON[s.status] ?? FileText;
                   const pendiente = s.pendienteCalculado;
+                  const estado = estadoSaldoServicio(s, s.pagos);
                   return (
                     <MobileRecordCard
                       key={s.id}
@@ -358,7 +366,11 @@ export default async function ServiciosPage({
                       title={s.descripcion}
                       subtitle={s.cliente.nombre}
                       meta={`${formatDate(s.fechaInicio)} · ${formatCurrency(montoTotalServicio(s), s.moneda)} · ${
-                        pendiente > 0.01 ? `pendiente ${formatCurrency(pendiente, s.moneda)}` : "liquidado"
+                        estado === "pendiente"
+                          ? `pendiente ${formatCurrency(pendiente, s.moneda)}`
+                          : estado === "cancelado"
+                            ? "cancelado"
+                            : "liquidado"
                       }`}
                       badge={
                         <span

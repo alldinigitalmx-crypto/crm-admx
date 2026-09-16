@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, Film, ImageIcon, CircleCheck, Receipt } from "luc
 
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { calcularAvance, montoTotalServicio, montoPagadoServicio, montoPendienteServicio } from "@/lib/servicio";
+import { calcularAvance, montoTotalServicio, montoPagadoServicio, montoPendienteServicio, estadoSaldoServicio } from "@/lib/servicio";
 import { METODO_LABEL } from "@/lib/metodo-pago";
 import { SERVICIO_STATUS_COLOR, PRIORIDAD_BAR } from "@/lib/status-colors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,7 +66,9 @@ export default async function ServicioPublicoPage({
   const ordenesAprobadasMonto = montoTotal - Number(servicio.montoInicial);
   const montoPagado = montoPagadoServicio(servicio, servicio.pagos);
   const montoPendiente = montoPendienteServicio(servicio, servicio.pagos);
-  const saldado = montoPendiente <= 0.01;
+  const estadoSaldo = estadoSaldoServicio(servicio, servicio.pagos);
+  const saldado = estadoSaldo === "liquidado";
+  const cancelado = estadoSaldo === "cancelado";
   const avancePago = montoTotal > 0 ? Math.min(100, Math.round((montoPagado / montoTotal) * 100)) : 0;
   // Mismo criterio de moneda que montoPagadoServicio -- si por algún
   // motivo hubiera un pago confirmado en otra moneda, no se lista aquí
@@ -167,7 +169,12 @@ export default async function ServicioPublicoPage({
               </div>
             )}
 
-            {saldado ? (
+            {cancelado ? (
+              <div className="flex items-center gap-2.5 rounded-lg bg-muted px-3 py-2.5 text-muted-foreground">
+                <Circle className="size-5 shrink-0" />
+                <p className="font-medium">Este servicio fue cancelado.</p>
+              </div>
+            ) : saldado ? (
               <div className="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 text-success">
                 <CircleCheck className="size-5 shrink-0" />
                 <p className="font-medium">Servicio saldado — no debes nada de este proyecto.</p>
