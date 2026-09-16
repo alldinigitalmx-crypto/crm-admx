@@ -197,15 +197,15 @@ export default async function ClientesPage({
     <div className="flex flex-col gap-5">
       {/* ================= HERO + KPIs ================= */}
       <div className="overflow-hidden rounded-xl bg-[linear-gradient(103deg,oklch(0.24_0.045_264)_0%,oklch(0.3_0.07_268)_100%)] text-white">
-        <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-5 sm:px-7 sm:pt-7">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Clientes</h1>
-            <p className="mt-1 text-sm text-white/70">
+        <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-6 sm:pt-5">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Clientes</h1>
+            <p className="mt-0.5 text-sm text-white/70">
               {totalClientesGlobal} cliente{totalClientesGlobal === 1 ? "" : "s"} registrado
               {totalClientesGlobal === 1 ? "" : "s"} · {nuevosEsteMes} nuevo{nuevosEsteMes === 1 ? "" : "s"} este mes
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20" asChild>
               <a href={`/admin/clientes/export?${exportParams.toString()}`}>
                 <Download />
@@ -229,26 +229,26 @@ export default async function ClientesPage({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-4">
-          <div className="bg-[oklch(0.26_0.05_264)] px-5 py-3.5">
-            <p className="text-[11px] font-semibold tracking-wide text-white/65 uppercase">Cartera activa</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{carteraActivaCount}</p>
+        <div className="mt-4 grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-4">
+          <div className="min-w-0 bg-[oklch(0.26_0.05_264)] px-4 py-2.5">
+            <p className="text-[10.5px] font-semibold tracking-wide text-white/65 uppercase">Cartera activa</p>
+            <p className="mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-xl">{carteraActivaCount}</p>
           </div>
-          <div className="bg-[oklch(0.26_0.05_264)] px-5 py-3.5">
-            <p className="text-[11px] font-semibold tracking-wide text-white/65 uppercase">Facturado (año)</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+          <div className="min-w-0 bg-[oklch(0.26_0.05_264)] px-4 py-2.5">
+            <p className="text-[10.5px] font-semibold tracking-wide text-white/65 uppercase">Facturado (año)</p>
+            <p className="mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-xl">
               {formatCurrency(facturadoAnioGlobal)}
             </p>
           </div>
-          <div className="bg-[oklch(0.26_0.05_264)] px-5 py-3.5">
-            <p className="text-[11px] font-semibold tracking-wide text-white/65 uppercase">Saldo por cobrar</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-warning sm:text-2xl">
+          <div className="min-w-0 bg-[oklch(0.26_0.05_264)] px-4 py-2.5">
+            <p className="text-[10.5px] font-semibold tracking-wide text-white/65 uppercase">Saldo por cobrar</p>
+            <p className="mt-0.5 truncate text-lg font-semibold tabular-nums text-warning sm:text-xl">
               {formatCurrency(saldoPorCobrarGlobal)}
             </p>
           </div>
-          <div className="bg-[oklch(0.26_0.05_264)] px-5 py-3.5">
-            <p className="text-[11px] font-semibold tracking-wide text-white/65 uppercase">Sin actividad +60d</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{sinActividad60d}</p>
+          <div className="min-w-0 bg-[oklch(0.26_0.05_264)] px-4 py-2.5">
+            <p className="text-[10.5px] font-semibold tracking-wide text-white/65 uppercase">Sin actividad +60d</p>
+            <p className="mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-xl">{sinActividad60d}</p>
           </div>
         </div>
       </div>
