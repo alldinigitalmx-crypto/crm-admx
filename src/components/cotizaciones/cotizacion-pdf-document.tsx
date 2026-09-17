@@ -11,11 +11,10 @@ const logoDataUri = `data:image/png;base64,${fs
 const INK = "#18181f";
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
-// Mismo indigo que --primary (oklch(0.53 0.19 264)) del resto de la app y
-// que ya se usa como acento en reportes.tsx -- react-pdf no soporta oklch,
-// así que aquí vive como su equivalente hex.
-const ACCENT = "#6366f1";
-const ACCENT_DARK = "#4f46e5";
+// Azul clásico (no el indigo/morado --primary del resto de la app) -- en
+// el documento que se manda a clientes se ve mejor un azul inconfundible.
+const ACCENT = "#2563eb";
+const ACCENT_DARK = "#1d4ed8";
 
 const styles = StyleSheet.create({
   page: { paddingHorizontal: 40, paddingTop: 36, paddingBottom: 36, fontSize: 9, fontFamily: "Helvetica", color: INK },
@@ -24,8 +23,7 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "column" },
   logo: { width: 62, marginBottom: 8 },
   tagline: { fontFamily: "Courier", fontSize: 7.5, letterSpacing: 1, color: MUTED, textTransform: "uppercase" },
-  whatsapp: { fontFamily: "Courier", fontSize: 8, color: "#374151", marginTop: 6 },
-  whatsappLink: { fontFamily: "Courier", fontSize: 8, color: ACCENT_DARK, marginTop: 1 },
+  whatsapp: { fontFamily: "Courier", fontSize: 8, color: ACCENT_DARK, marginTop: 6 },
 
   headerRight: { alignItems: "flex-end" },
   docTitle: { fontSize: 22, fontWeight: 700, letterSpacing: -0.2 },
@@ -150,6 +148,7 @@ const styles = StyleSheet.create({
   paymentTitle: { fontSize: 9.5, fontWeight: 700, marginBottom: 5, color: INK },
   paymentLine: { fontFamily: "Courier", fontSize: 8, color: "#374151", marginBottom: 2 },
   paymentLink: { fontFamily: "Courier", fontSize: 8, color: ACCENT_DARK, marginTop: 2 },
+  paypalQr: { width: 58, height: 58, marginBottom: 6 },
 
   termsGrid: { flexDirection: "row" },
   termsCol: { flex: 1 },
@@ -211,9 +210,10 @@ export type CotizacionPdfProps = {
     fechaFin: Date | null;
   } | null;
   cliente: { nombre: string; email: string | null };
+  paypalQr: string;
 };
 
-export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: CotizacionPdfProps) {
+export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente, paypalQr }: CotizacionPdfProps) {
   const montoDescuento =
     cotizacion.descuentoTipo === "Porcentaje"
       ? cotizacion.montoSubtotal * ((cotizacion.descuentoValor ?? 0) / 100)
@@ -233,9 +233,8 @@ export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: C
             {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
             <Image src={logoDataUri} style={styles.logo} />
             <Text style={styles.tagline}>{businessInfo.eslogan}</Text>
-            <Text style={styles.whatsapp}>WhatsApp {businessInfo.whatsapp}</Text>
-            <Link src={businessInfo.whatsappLink} style={styles.whatsappLink}>
-              {businessInfo.whatsappLink.replace("https://", "")}
+            <Link src={businessInfo.whatsappLink} style={styles.whatsapp}>
+              WhatsApp {businessInfo.whatsapp}
             </Link>
           </View>
 
@@ -389,10 +388,12 @@ export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: C
             </View>
             <View style={[styles.paymentCol, styles.paymentColLast]}>
               <Text style={styles.paymentTitle}>PayPal</Text>
+              {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
+              <Image src={paypalQr} style={styles.paypalQr} />
               <Link src={businessInfo.paypal.link} style={styles.paymentLink}>
                 {businessInfo.paypal.link.replace("https://", "")}
               </Link>
-              <Text style={styles.paymentLine}>Pago con tarjeta al instante</Text>
+              <Text style={styles.paymentLine}>Escanea el código o entra al link</Text>
             </View>
           </View>
         </View>
@@ -450,9 +451,6 @@ export function CotizacionPdfDocument({ cotizacion, pago, servicio, cliente }: C
             <View style={styles.signCol}>
               <View style={styles.signLine} />
               <Text style={styles.signCaption}>Fecha</Text>
-              <Text style={styles.signValue}>
-                También puedes firmar en línea desde el enlace de la cotización.
-              </Text>
             </View>
           </View>
         </View>

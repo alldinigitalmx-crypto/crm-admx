@@ -140,7 +140,7 @@ export default async function CotizacionPublicaPage({
 
         {/* Título / proyecto */}
         <div className="flex flex-col gap-2 border-b p-6 sm:p-8">
-          <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+          <p className="font-mono text-[11px] tracking-widest text-blue-600 uppercase dark:text-blue-400">
             Para {nombreClienteCotizacion(cotizacion)}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
@@ -181,7 +181,7 @@ export default async function CotizacionPublicaPage({
           {esPagable && cotizacion.clienteId && (
             <div className="h-1.5 overflow-hidden rounded-full bg-background/15">
               <div
-                className="h-full rounded-full bg-primary transition-[width]"
+                className="h-full rounded-full bg-blue-600 transition-[width] dark:bg-blue-500"
                 style={{ width: `${progresoPct}%` }}
               />
             </div>
@@ -260,7 +260,7 @@ export default async function CotizacionPublicaPage({
         {/* Firmar */}
         {cotizacion.status === "Enviada" && (
           <div className="flex flex-col gap-4 border-b p-6 sm:p-8">
-            <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+            <p className="font-mono text-[11px] tracking-widest text-blue-600 uppercase dark:text-blue-400">
               Firma de la cotización
             </p>
             <FirmaForm action={firmarAction} nombreDefault={nombreClienteCotizacion(cotizacion)} />
@@ -275,7 +275,7 @@ export default async function CotizacionPublicaPage({
         {/* Pagar */}
         {esPagable && (
           <div className="flex flex-col gap-4 border-b p-6 sm:p-8">
-            <p className="font-mono text-[11px] tracking-widest text-primary uppercase">
+            <p className="font-mono text-[11px] tracking-widest text-blue-600 uppercase dark:text-blue-400">
               Pagar
             </p>
             {!cotizacion.clienteId ? (

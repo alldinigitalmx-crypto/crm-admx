@@ -10,6 +10,7 @@ import {
   montoPendienteCotizacion,
   cotizacionQuedaSaldada,
 } from "@/lib/cotizacion";
+import { paypalQrDataUri } from "@/lib/paypal-qr";
 
 export async function GET(
   _request: Request,
@@ -29,9 +30,11 @@ export async function GET(
   const montoPagado = montoPagadoCotizacion(cotizacion, cotizacion.pagos);
   const montoPendiente = montoPendienteCotizacion(cotizacion, cotizacion.pagos);
   const pagada = cotizacionQuedaSaldada(cotizacion, cotizacion.pagos);
+  const paypalQr = await paypalQrDataUri();
 
   const buffer = await renderToBuffer(
     createElement(CotizacionPdfDocument, {
+      paypalQr,
       cotizacion: {
         id: cotizacion.id,
         status: cotizacion.status,
