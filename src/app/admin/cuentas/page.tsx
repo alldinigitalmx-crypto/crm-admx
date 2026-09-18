@@ -132,8 +132,8 @@ export default async function CuentasPage() {
           )}
         </div>
 
-        <div className="flex items-start gap-6">
-          <div className="flex gap-5">
+        <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+          <div className="flex flex-wrap gap-x-5 gap-y-3">
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">Entró este mes</span>
               <span className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">

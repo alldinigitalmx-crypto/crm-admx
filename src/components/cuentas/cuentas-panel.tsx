@@ -125,7 +125,7 @@ function DetalleCuenta({ cuenta, puedeEditar }: { cuenta: CuentaVista; puedeEdit
 
       <div className="flex flex-col gap-2.5 border-t border-border py-4">
         <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">Datos de la cuenta</span>
-        <div className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-1.5">
           {datos.map((d) => (
             <Fragment key={d.label}>
               <span className="text-[10.5px] tracking-wide text-muted-foreground uppercase">{d.label}</span>
