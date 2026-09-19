@@ -12,18 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ProductoForm } from "@/components/productos/producto-form";
+import { ProductoForm, type ProductoDefaults } from "@/components/productos/producto-form";
 import type { ProductoFormState } from "@/app/admin/productos/actions";
-
-type ProductoDefaults = {
-  nombre: string;
-  descripcion: string | null;
-  categoria: string;
-  precio: number | string | { toString(): string };
-  costoReferencia: (number | string | { toString(): string }) | null;
-  requiereCotizacion: boolean;
-  activo: boolean;
-};
 
 export function ProductoFormDialog({
   trigger,
@@ -52,7 +42,7 @@ export function ProductoFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

@@ -60,6 +60,19 @@ export default async function ProductosPage({
     orderBy: { nombre: "asc" },
   });
 
+  const archivos = productos.length
+    ? await prisma.archivo.findMany({
+        where: { entidadTipo: "Producto", entidadId: { in: productos.map((p) => p.id) } },
+        select: { entidadId: true, tipo: true, url: true, nombre: true },
+      })
+    : [];
+  const imagenPorProducto = new Map(
+    archivos.filter((a) => a.tipo === "Imagen").map((a) => [a.entidadId, { url: a.url, nombre: a.nombre }])
+  );
+  const archivoPorProducto = new Map(
+    archivos.filter((a) => a.tipo === "Documento").map((a) => [a.entidadId, { url: a.url, nombre: a.nombre }])
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -177,6 +190,12 @@ export default async function ProductosPage({
                                 costoReferencia: p.costoReferencia ? Number(p.costoReferencia) : null,
                                 requiereCotizacion: p.requiereCotizacion,
                                 activo: p.activo,
+                                tipoEntrega: p.tipoEntrega,
+                                linkAppSheet: p.linkAppSheet,
+                                linkTutorial: p.linkTutorial,
+                                linkExterno: p.linkExterno,
+                                imagenActual: imagenPorProducto.get(p.id) ?? null,
+                                archivoActual: archivoPorProducto.get(p.id) ?? null,
                               }}
                               submitLabel="Guardar cambios"
                             />
@@ -231,6 +250,12 @@ export default async function ProductosPage({
                                 costoReferencia: p.costoReferencia ? Number(p.costoReferencia) : null,
                                 requiereCotizacion: p.requiereCotizacion,
                                 activo: p.activo,
+                                tipoEntrega: p.tipoEntrega,
+                                linkAppSheet: p.linkAppSheet,
+                                linkTutorial: p.linkTutorial,
+                                linkExterno: p.linkExterno,
+                                imagenActual: imagenPorProducto.get(p.id) ?? null,
+                                archivoActual: archivoPorProducto.get(p.id) ?? null,
                               }}
                               submitLabel="Guardar cambios"
                             />

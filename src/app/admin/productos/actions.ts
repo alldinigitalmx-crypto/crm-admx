@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { requiereNivel } from "@/lib/alcance";
-import { Prisma, type CategoriaProducto } from "@/generated/prisma/client";
+import { currentUsuario } from "@/lib/current-usuario";
+import { Prisma, type CategoriaProducto, type TipoEntregaProducto } from "@/generated/prisma/client";
 
 export type ProductoFormState = { error?: string } | undefined;
 
@@ -16,6 +17,10 @@ function parseProductoForm(formData: FormData) {
   const costoReferenciaRaw = String(formData.get("costoReferencia") ?? "");
   const requiereCotizacion = formData.get("requiereCotizacion") === "on";
   const activo = formData.get("activo") === "on";
+  const tipoEntrega = String(formData.get("tipoEntrega") ?? "ArchivoDescargable") as TipoEntregaProducto;
+  const linkAppSheet = String(formData.get("linkAppSheet") ?? "").trim() || null;
+  const linkTutorial = String(formData.get("linkTutorial") ?? "").trim() || null;
+  const linkExterno = String(formData.get("linkExterno") ?? "").trim() || null;
 
   return {
     nombre,
@@ -25,6 +30,10 @@ function parseProductoForm(formData: FormData) {
     costoReferenciaRaw,
     requiereCotizacion,
     activo,
+    tipoEntrega,
+    linkAppSheet,
+    linkTutorial,
+    linkExterno,
   };
 }
 
@@ -39,7 +48,47 @@ function validateProductoForm(data: ReturnType<typeof parseProductoForm>) {
   ) {
     return "El costo de referencia debe ser un número válido.";
   }
+  if (data.tipoEntrega === "LinkAppSheet" && !data.linkAppSheet) {
+    return "Captura el link de la plantilla de AppSheet.";
+  }
+  if (data.tipoEntrega === "LinkExterno" && !data.linkExterno) {
+    return "Captura el link externo.";
+  }
   return null;
+}
+
+// Imagen y archivo descargable viven en Archivo (entidadTipo: "Producto"),
+// mismo patrón que el portafolio -- ya se subieron a Blob del lado del
+// cliente antes de este submit, aquí solo se guarda el registro. Si el
+// admin no tocó el input (url vacía) no se toca lo que ya había.
+async function guardarArchivoProducto(
+  productoId: number,
+  tipo: "Imagen" | "Documento",
+  formData: FormData,
+  campoUrl: string,
+  campoNombre: string,
+  campoTamanio: string
+) {
+  const url = String(formData.get(campoUrl) ?? "").trim();
+  if (!url) return;
+
+  const nombre = String(formData.get(campoNombre) ?? "").trim() || "Archivo";
+  const tamanioRaw = formData.get(campoTamanio);
+  const tamanioBytes = tamanioRaw ? Number(tamanioRaw) : null;
+  const usuario = await currentUsuario();
+
+  await prisma.archivo.deleteMany({ where: { entidadTipo: "Producto", entidadId: productoId, tipo } });
+  await prisma.archivo.create({
+    data: {
+      entidadTipo: "Producto",
+      entidadId: productoId,
+      nombre,
+      url,
+      tipo,
+      tamanioBytes: tamanioBytes && Number.isFinite(tamanioBytes) ? tamanioBytes : null,
+      subidoPorId: usuario?.id ?? null,
+    },
+  });
 }
 
 export async function crearProducto(
@@ -54,7 +103,7 @@ export async function crearProducto(
   const error = validateProductoForm(data);
   if (error) return { error };
 
-  await prisma.producto.create({
+  const producto = await prisma.producto.create({
     data: {
       nombre: data.nombre,
       descripcion: data.descripcion,
@@ -63,8 +112,15 @@ export async function crearProducto(
       costoReferencia: data.costoReferenciaRaw || null,
       requiereCotizacion: data.requiereCotizacion,
       activo: data.activo,
+      tipoEntrega: data.tipoEntrega,
+      linkAppSheet: data.linkAppSheet,
+      linkTutorial: data.linkTutorial,
+      linkExterno: data.linkExterno,
     },
   });
+
+  await guardarArchivoProducto(producto.id, "Imagen", formData, "imagenUrl", "imagenNombre", "imagenTamanioBytes");
+  await guardarArchivoProducto(producto.id, "Documento", formData, "archivoUrl", "archivoNombre", "archivoTamanioBytes");
 
   revalidatePath("/admin/productos");
   revalidatePath("/admin/ventas");
@@ -95,6 +151,10 @@ export async function actualizarProducto(
         costoReferencia: data.costoReferenciaRaw || null,
         requiereCotizacion: data.requiereCotizacion,
         activo: data.activo,
+        tipoEntrega: data.tipoEntrega,
+        linkAppSheet: data.linkAppSheet,
+        linkTutorial: data.linkTutorial,
+        linkExterno: data.linkExterno,
       },
     });
   } catch (e) {
@@ -103,6 +163,9 @@ export async function actualizarProducto(
     }
     throw e;
   }
+
+  await guardarArchivoProducto(id, "Imagen", formData, "imagenUrl", "imagenNombre", "imagenTamanioBytes");
+  await guardarArchivoProducto(id, "Documento", formData, "archivoUrl", "archivoNombre", "archivoTamanioBytes");
 
   revalidatePath("/admin/productos");
   revalidatePath("/admin/ventas");
@@ -115,6 +178,7 @@ export async function eliminarProducto(id: number) {
   const ventas = await prisma.detalleVenta.count({ where: { productoId: id } });
   if (ventas > 0) return;
 
+  await prisma.archivo.deleteMany({ where: { entidadTipo: "Producto", entidadId: id } });
   await prisma.producto.delete({ where: { id } });
   revalidatePath("/admin/productos");
 }

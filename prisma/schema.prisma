@@ -390,6 +390,14 @@ model Producto {
   activo             Boolean           @default(true)
   creadoEn           DateTime          @default(now())
   detalles           DetalleVenta[]
+  // Tienda online (fase 1) -- cómo se entrega este producto tras el pago.
+  // Imagen y archivo descargable viven en Archivo (entidadTipo: "Producto",
+  // este id), mismo patrón que el portafolio -- aquí solo lo que es texto
+  // simple (links), no algo que se sube.
+  tipoEntrega  TipoEntregaProducto @default(ArchivoDescargable)
+  linkAppSheet String?
+  linkTutorial String?
+  linkExterno  String?
 }
 
 model Venta {
@@ -521,6 +529,7 @@ enum EntidadArchivo {
   Queja
   Pago
   Proyecto
+  Producto
 }
 
 enum TipoArchivo {
@@ -593,6 +602,13 @@ enum CategoriaProducto {
   Plantilla
   Sistema
   Otro
+}
+
+// Cómo recibe el comprador este producto tras pagar (tienda online).
+enum TipoEntregaProducto {
+  ArchivoDescargable
+  LinkAppSheet
+  LinkExterno
 }
 
 enum CanalVenta {
